@@ -19,7 +19,7 @@
 
 Approximately 2 to 4 minutes, walking through the design.
 
-**[ LINK TO BE ADDED ]**
+**[ Watch the TALLOW Design Video ]** ( https://drive.google.com/file/d/1nauq0n2xJdngfQN-RJxJgxfaS6lw4g9e/view?usp=sharing )
 
 ---
 
