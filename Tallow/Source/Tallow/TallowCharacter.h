@@ -16,65 +16,81 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 /**
- *  A basic first person character
+ *  A first person character
  */
 UCLASS(abstract)
 class ATallowCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Pawn mesh: first person view (arms; seen only by self) */
+	/** Pawn mesh: first person view */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* FirstPersonMesh;
 
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
-
+	
 protected:
 
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* JumpAction;
 
-	/** Move Input Action */
+	/** Crouch Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
-	UInputAction* MoveAction;
+	UInputAction* CrouchAction;
+
+	/** Walk Input Action */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* WalkAction;
+
+	/** Run Input Action */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* RunAction;
 
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* LookAction;
+	UInputAction* LookAction;
 
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* MouseLookAction;
+	UInputAction* MouseLookAction;
 	
 public:
 	ATallowCharacter();
 
 protected:
 
-	/** Called from Input Actions for movement input */
+	/** Movement input */
 	void MoveInput(const FInputActionValue& Value);
 
-	/** Called from Input Actions for looking input */
+	/** Looking input */
 	void LookInput(const FInputActionValue& Value);
 
-	/** Handles aim inputs from either controls or UI interfaces */
+	/** Handles aim inputs */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoAim(float Yaw, float Pitch);
 
-	/** Handles move inputs from either controls or UI interfaces */
+	/** Handles move inputs */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles jump start inputs from either controls or UI interfaces */
+	/** Handles jump start inputs */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump end inputs from either controls or UI interfaces */
+	/** Handles jump end inputs */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+	/** Handles crouch start inputs */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoCrouch();
+
+	/** Handles crouch end inputs */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoCrouchEnd();
 
 protected:
 

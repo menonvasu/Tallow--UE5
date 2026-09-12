@@ -13,7 +13,9 @@
 ATallowCharacter::ATallowCharacter()
 {
 	// Set size for collision capsule
-	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
+	constexpr float PlayerHalfHeight = 60.0f;
+	GetCapsuleComponent()->InitCapsuleSize(30.f, PlayerHalfHeight);
+	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -PlayerHalfHeight));
 	
 	// Create the first person mesh that will be viewed only by this character's owner
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
@@ -37,11 +39,13 @@ ATallowCharacter::ATallowCharacter()
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
-	GetCapsuleComponent()->SetCapsuleSize(34.0f, 96.0f);
-
 	// Configure character movement
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 	GetCharacterMovement()->AirControl = 0.5f;
+
+	// configure crouching
+	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
+	GetCharacterMovement()->CrouchedHalfHeight = PlayerHalfHeight / 2.0f;
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -53,16 +57,23 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ATallowCharacter::DoJumpStart);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoJumpEnd);
 
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATallowCharacter::MoveInput);
+		// Crouching
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ATallowCharacter::DoCrouch);
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoCrouchEnd);
 
-		// Looking/Aiming
+		// Walking
+		EnhancedInputComponent->BindAction(WalkAction, ETriggerEvent::Triggered, this, &ATallowCharacter::MoveInput);
+
+		// Running
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &ATallowCharacter::MoveInput);
+
+		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 	}
 	else
 	{
-		UE_LOG(LogTallow, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogTallow, Error, TEXT("'%s' Failed to find an Enhanced Input Component!"), *GetNameSafe(this));
 	}
 }
 
@@ -89,6 +100,8 @@ void ATallowCharacter::LookInput(const FInputActionValue& Value)
 
 void ATallowCharacter::DoAim(float Yaw, float Pitch)
 {
+	UE_LOG(LogTemp, Warning, TEXT("DoAim Fired: Yaw=%f, Pitch=%f"), Yaw, Pitch);
+
 	if (GetController())
 	{
 		// pass the rotation inputs
@@ -117,4 +130,17 @@ void ATallowCharacter::DoJumpEnd()
 {
 	// pass StopJumping to the character
 	StopJumping();
+}
+
+void ATallowCharacter::DoCrouch()
+{
+	UE_LOG(LogTemp, Warning, TEXT("DoCrouch Fired!"));
+	// pass Crouch to character
+	Crouch();
+}
+
+void ATallowCharacter::DoCrouchEnd()
+{
+	// pass Uncrouch to character
+	UnCrouch();
 }
