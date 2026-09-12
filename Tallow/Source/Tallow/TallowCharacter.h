@@ -23,42 +23,43 @@ class ATallowCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Pawn mesh: first person view */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	USkeletalMeshComponent* FirstPersonMesh;
-
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
+
+	UPROPERTY(EditAnywhere) 
+	float TestValue = 1.0f;
 	
 protected:
 
 	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* JumpAction;
 
 	/** Crouch Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* CrouchAction;
 
 	/** Walk Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* WalkAction;
 
 	/** Run Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* RunAction;
 
 	/** Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* LookAction;
 
 	/** Mouse Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category ="Input")
 	UInputAction* MouseLookAction;
 	
 public:
 	ATallowCharacter();
+
+	virtual void Tick(float DeltaTime) override;
 
 protected:
 
@@ -99,9 +100,6 @@ protected:
 	
 
 public:
-
-	/** Returns the first person mesh **/
-	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }

@@ -8,6 +8,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -16,36 +17,38 @@ ATallowCharacter::ATallowCharacter()
 	constexpr float PlayerHalfHeight = 60.0f;
 	GetCapsuleComponent()->InitCapsuleSize(30.f, PlayerHalfHeight);
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -PlayerHalfHeight));
-	
-	// Create the first person mesh that will be viewed only by this character's owner
-	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 
-	FirstPersonMesh->SetupAttachment(GetMesh());
-	FirstPersonMesh->SetOnlyOwnerSee(true);
-	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
-	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	// Create spring arm
+	USpringArmComponent* CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(GetCapsuleComponent());
+	CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 20.0f));
+	CameraBoom->TargetArmLength = 0.0f;
+	CameraBoom->bUsePawnControlRotation = true;
+
+	// Glide camera smoothly
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = 15.0f;
 
 	// Create the Camera Component	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
-	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
-	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(-2.8f, 5.89f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
-	FirstPersonCameraComponent->bUsePawnControlRotation = true;
+	FirstPersonCameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(0.f, 0.f, 0.f), FRotator(0.0f, 0.0f, -90.0f));
+	FirstPersonCameraComponent->bUsePawnControlRotation = false;
+
 	FirstPersonCameraComponent->bEnableFirstPersonFieldOfView = true;
 	FirstPersonCameraComponent->bEnableFirstPersonScale = true;
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 
 	// configure the character comps
-	GetMesh()->SetOwnerNoSee(true);
+	GetMesh()->SetOwnerNoSee(false);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
-	// Configure character movement
+	// Configure character movement/crouch
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 	GetCharacterMovement()->AirControl = 0.5f;
-
-	// configure crouching
 	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
-	GetCharacterMovement()->CrouchedHalfHeight = PlayerHalfHeight / 2.0f;
+	GetCharacterMovement()->SetCrouchedHalfHeight(PlayerHalfHeight / 2.0f);
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -100,7 +103,6 @@ void ATallowCharacter::LookInput(const FInputActionValue& Value)
 
 void ATallowCharacter::DoAim(float Yaw, float Pitch)
 {
-	UE_LOG(LogTemp, Warning, TEXT("DoAim Fired: Yaw=%f, Pitch=%f"), Yaw, Pitch);
 
 	if (GetController())
 	{
@@ -134,7 +136,6 @@ void ATallowCharacter::DoJumpEnd()
 
 void ATallowCharacter::DoCrouch()
 {
-	UE_LOG(LogTemp, Warning, TEXT("DoCrouch Fired!"));
 	// pass Crouch to character
 	Crouch();
 }
@@ -143,4 +144,15 @@ void ATallowCharacter::DoCrouchEnd()
 {
 	// pass Uncrouch to character
 	UnCrouch();
+}
+
+void ATallowCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (GetCharacterMovement()->IsCrouching())
+	{
+		// This will show 30.0f once the movement component updates the physics body
+		UE_LOG(LogTemp, Warning, TEXT("Crouching Half Height: %f"), GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight());
+	}
 }
