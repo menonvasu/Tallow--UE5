@@ -24,37 +24,48 @@ class ATallowCharacter : public ACharacter
 	GENERATED_BODY()
 
 	/** First person camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
-
-	UPROPERTY(EditAnywhere) 
-	float TestValue = 1.0f;
 	
-protected:
+	/** First person mesh */
+	UPROPERTY(VisibleAnywhere, Category = "Mesh")
+	USkeletalMeshComponent* FirstPersonMesh;
 
+protected:
 	/** Jump Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* JumpAction;
 
 	/** Crouch Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* CrouchAction;
 
 	/** Walk Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* WalkAction;
 
 	/** Run Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* RunAction;
 
 	/** Look Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* LookAction;
 
 	/** Mouse Look Input Action */
-	UPROPERTY(EditDefaultsOnly, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* MouseLookAction;
+
+	/** Interaction Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* InteractAction;
+
+	/** Movement Speeds */
+	UPROPERTY(EditAnywhere, Category = "Params")
+	float RunSpeed = 450.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Params")
+	float Walkspeed = 250.0f;
 	
 public:
 	ATallowCharacter();
@@ -70,28 +81,40 @@ protected:
 	void LookInput(const FInputActionValue& Value);
 
 	/** Handles aim inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoAim(float Yaw, float Pitch);
 
 	/** Handles move inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoMove(float Right, float Forward);
 
+	/** Handles run start inputs */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoRunStart();
+
+	/** Handles run end inputs */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoRunEnd();
+
 	/** Handles jump start inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoJumpStart();
 
 	/** Handles jump end inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoJumpEnd();
 
 	/** Handles crouch start inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoCrouch();
 
 	/** Handles crouch end inputs */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoCrouchEnd();
+
+	/** Handles interact */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoInteract();
 
 protected:
 

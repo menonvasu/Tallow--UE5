@@ -9,6 +9,7 @@
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "IInteractable.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -26,7 +27,7 @@ ATallowCharacter::ATallowCharacter()
 	CameraBoom->bUsePawnControlRotation = true;
 
 	// Glide camera smoothly
-	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->bEnableCameraLag = false;
 	CameraBoom->CameraLagSpeed = 15.0f;
 
 	// Create the Camera Component	
@@ -40,8 +41,15 @@ ATallowCharacter::ATallowCharacter()
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 
-	// configure the character comps
-	GetMesh()->SetOwnerNoSee(false);
+	// Create first person mesh
+	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
+	FirstPersonMesh->SetupAttachment(GetMesh());
+	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonMesh->SetOnlyOwnerSee(true);
+
+	// Configure the character comps
+	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
 	// Configure character movement/crouch
@@ -68,11 +76,15 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(WalkAction, ETriggerEvent::Triggered, this, &ATallowCharacter::MoveInput);
 
 		// Running
-		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &ATallowCharacter::MoveInput);
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRunStart);
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoRunEnd);
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
+
+		// Interact
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
 	}
 	else
 	{
@@ -122,6 +134,18 @@ void ATallowCharacter::DoMove(float Right, float Forward)
 	}
 }
 
+void ATallowCharacter::DoRunStart()
+{
+	// pass run speed to maxwalkspeed
+	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+}
+
+void ATallowCharacter::DoRunEnd()
+{
+	// pass walk speed to maxwalkspeed
+	GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
+}
+
 void ATallowCharacter::DoJumpStart()
 {
 	// pass Jump to the character
@@ -146,13 +170,30 @@ void ATallowCharacter::DoCrouchEnd()
 	UnCrouch();
 }
 
+void ATallowCharacter::DoInteract()
+{
+	FHitResult HitResult;
+	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();
+	FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 200.0f);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this); // ignore self
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+		HitResult,
+		StartLocation,
+		EndLocation,
+		ECollisionChannel::ECC_Visibility,
+		QueryParams
+	);
+
+	if (bHit && HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
+	{
+		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
+	}
+}
+
 void ATallowCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	if (GetCharacterMovement()->IsCrouching())
-	{
-		// This will show 30.0f once the movement component updates the physics body
-		UE_LOG(LogTemp, Warning, TEXT("Crouching Half Height: %f"), GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight());
-	}
 }
