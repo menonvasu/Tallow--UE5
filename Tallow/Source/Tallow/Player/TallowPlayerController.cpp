@@ -5,7 +5,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
-#include "TallowCameraManager.h"
+#include "CameraManager/TallowCameraManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Tallow.h"
 #include "Widgets/Input/SVirtualJoystick.h"

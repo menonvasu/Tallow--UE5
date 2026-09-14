@@ -18,8 +18,9 @@ public class Tallow : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
-		});
+			"Slate",
+            "GameplayTags",
+        });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
