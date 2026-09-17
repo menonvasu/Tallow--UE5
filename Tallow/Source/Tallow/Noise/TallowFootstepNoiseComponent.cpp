@@ -68,8 +68,8 @@ void UTallowFootstepNoiseComponent::EmitStep()
 		Type = ETallowNoiseType::RunStep;
 	}
 
-	// Noise comes from the feet rather than the middle of the capsule
-	const FVector FootLocation = OwnerCharacter->GetActorLocation() - FVector(0.0f, 0.0f, OwnerCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	// Noise comes from just above the feet rather than the middle of the capsule
+	const FVector FootLocation = OwnerCharacter->GetActorLocation() - FVector(0.0f, 0.0f, OwnerCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 10.0f);
 
 	NoiseSubsystem->EmitNoise(Type, FootLocation, OwnerCharacter, 1.0f, bAlertsAI);
 }
@@ -85,7 +85,7 @@ void UTallowFootstepNoiseComponent::HandleLanded(const FHitResult& Hit)
 	if (UTallowNoiseSubsystem* NoiseSubsystem = UTallowNoiseSubsystem::Get(this))
 	{
 		const float Scale = static_cast<float>(FMath::GetMappedRangeValueClamped(FVector2D(MinLandingSpeed, MaxLandingSpeed), FVector2D(0.4f, 1.0f), ImpactSpeed));
-		NoiseSubsystem->EmitNoise(ETallowNoiseType::Land, Hit.ImpactPoint, OwnerCharacter, Scale, bAlertsAI);
+		NoiseSubsystem->EmitNoise(ETallowNoiseType::Land, Hit.ImpactPoint + FVector(0.0f, 0.0f, 10.0f), OwnerCharacter, Scale, bAlertsAI);
 	}
 
 	DistanceSinceStep = 0.0f;

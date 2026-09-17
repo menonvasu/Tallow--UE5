@@ -5,12 +5,34 @@
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Noise/TallowNoiseOccluderComponent.h"
+#include "AIController.h"
+#include "EngineUtils.h"
 #include "Tallow.h"
 
 static TAutoConsoleVariable<bool> CVarNoiseDebug(
 	TEXT("tallow.Noise.Debug"),
 	false,
-	TEXT("Draws the range of every noise event"));
+	TEXT("Draws the range of every noise event, and the occlusion traces to each creature"));
+
+static TAutoConsoleVariable<bool> CVarNoiseOcclusion(
+	TEXT("tallow.Noise.Occlusion"),
+	true,
+	TEXT("Whether walls and doors reduce noise"));
+
+static TAutoConsoleVariable<float> CVarWallTransmission(
+	TEXT("tallow.Noise.WallTransmission"),
+	0.35f,
+	TEXT("Fraction of sound that gets through a wall with no occluder component"));
+
+/** Hits closer than this on the same component count as one wall, so both faces of a wall aren't counted twice */
+static constexpr float WallMergeDistance = 60.0f;
+
+/** Most traces a single occlusion check will make */
+static constexpr int32 MaxOcclusionTraces = 12;
+
+/** Below this almost nothing gets through, so stop tracing */
+static constexpr float MinTransmission = 0.01f;
 
 void UTallowNoiseSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -89,17 +111,9 @@ void UTallowNoiseSubsystem::ProcessNoise(FTallowNoiseEvent& NoiseEvent)
 	});
 	NoiseHistory.Add(NoiseEvent);
 
-	// Pass to AI Perception hearing. The hearing sense needs an instigator to register the stimulus
 	if (NoiseEvent.bAlertsAI)
 	{
-		AActor* Instigator = NoiseEvent.Instigator.Get();
-		if (!Instigator)
-		{
-			Instigator = World->GetFirstPlayerController() ? World->GetFirstPlayerController()->GetPawn() : nullptr;
-		}
-
-		const FName Tag = FName(StaticEnum<ETallowNoiseType>()->GetNameStringByValue(static_cast<int64>(NoiseEvent.Type)));
-		UAISense_Hearing::ReportNoiseEvent(World, NoiseEvent.Location, NoiseEvent.Loudness, Instigator, NoiseEvent.Range, Tag);
+		ReportNoiseToAI(NoiseEvent);
 	}
 
 	DrawNoiseDebug(NoiseEvent);
@@ -107,7 +121,140 @@ void UTallowNoiseSubsystem::ProcessNoise(FTallowNoiseEvent& NoiseEvent)
 	OnNoiseEmitted.Broadcast(NoiseEvent);
 }
 
-float UTallowNoiseSubsystem::GetLoudnessAt(const FTallowNoiseEvent& NoiseEvent, FVector ListenerLocation) const
+void UTallowNoiseSubsystem::ReportNoiseToAI(const FTallowNoiseEvent& NoiseEvent) const
+{
+	UWorld* World = GetWorld();
+
+	// The hearing sense needs an instigator to register the stimulus
+	AActor* Instigator = NoiseEvent.Instigator.Get();
+	if (!Instigator)
+	{
+		Instigator = World->GetFirstPlayerController() ? World->GetFirstPlayerController()->GetPawn() : nullptr;
+	}
+
+	// Hearing reports go to every listener at once, so use the creature the noise reaches best.
+	// With one creature in the house this is exact.
+	float BestTransmission = 0.0f;
+	bool bFoundListener = false;
+
+	for (TActorIterator<AAIController> It(World); It; ++It)
+	{
+		const APawn* ListenerPawn = It->GetPawn();
+		if (!ListenerPawn || !It->GetPerceptionComponent() || ListenerPawn == Instigator)
+		{
+			continue;
+		}
+
+		bFoundListener = true;
+
+		const float Transmission = CVarNoiseOcclusion.GetValueOnGameThread()
+			? TraceOcclusion(NoiseEvent.Location, ListenerPawn->GetPawnViewLocation(), Instigator, CVarNoiseDebug.GetValueOnGameThread())
+			: 1.0f;
+
+		BestTransmission = FMath::Max(BestTransmission, Transmission);
+	}
+
+	if (!bFoundListener || BestTransmission <= MinTransmission)
+	{
+		return;
+	}
+
+	// The hearing sense hears a noise within HearingRange * Loudness, capped at MaxRange, so scale both
+	const FName Tag = FName(StaticEnum<ETallowNoiseType>()->GetNameStringByValue(static_cast<int64>(NoiseEvent.Type)));
+	UAISense_Hearing::ReportNoiseEvent(World, NoiseEvent.Location, NoiseEvent.Loudness * BestTransmission, Instigator, NoiseEvent.Range * BestTransmission, Tag);
+}
+
+float UTallowNoiseSubsystem::GetOcclusion(FVector From, FVector To, AActor* IgnoredActor) const
+{
+	return TraceOcclusion(From, To, IgnoredActor, false);
+}
+
+float UTallowNoiseSubsystem::TraceOcclusion(const FVector& From, const FVector& To, AActor* IgnoredActor, bool bDrawDebug) const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return 1.0f;
+	}
+
+	const FVector Direction = (To - From).GetSafeNormal();
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(TallowNoiseOcclusion), false);
+	QueryParams.AddIgnoredActor(IgnoredActor);
+
+	float Transmission = 1.0f;
+	FVector Start = From;
+	const UPrimitiveComponent* LastComponent = nullptr;
+	FVector LastHitLocation = FVector::ZeroVector;
+
+	for (int32 TraceIndex = 0; TraceIndex < MaxOcclusionTraces && Transmission > MinTransmission; ++TraceIndex)
+	{
+		FHitResult Hit;
+		if (!World->LineTraceSingleByChannel(Hit, Start, To, ECC_Visibility, QueryParams))
+		{
+			if (bDrawDebug)
+			{
+				DrawDebugLine(World, Start, To, FColor::Green, false, 2.0f);
+			}
+			break;
+		}
+
+		AActor* HitActor = Hit.GetActor();
+
+		// Characters don't block sound
+		if (Cast<APawn>(HitActor))
+		{
+			QueryParams.AddIgnoredActor(HitActor);
+			continue;
+		}
+
+		// Noises made on a floor or against a wall start touching it, so ignore hits right at the start of a trace
+		if (Hit.bStartPenetrating || Hit.Distance < 5.0f)
+		{
+			Start += Direction * 5.0f;
+			if (FVector::DotProduct(To - Start, Direction) <= 0.0f)
+			{
+				break;
+			}
+			continue;
+		}
+
+		const UTallowNoiseOccluderComponent* Occluder = HitActor ? HitActor->FindComponentByClass<UTallowNoiseOccluderComponent>() : nullptr;
+		const float HitTransmission = Occluder ? Occluder->GetTransmission() : CVarWallTransmission.GetValueOnGameThread();
+
+		// Open doors and anything else that lets all sound through are ignored from here on
+		if (HitTransmission >= 1.0f && HitActor)
+		{
+			QueryParams.AddIgnoredActor(HitActor);
+			continue;
+		}
+
+		// The back face of a wall already counted
+		const bool bSameWall = Hit.GetComponent() == LastComponent && FVector::Dist(Hit.ImpactPoint, LastHitLocation) < WallMergeDistance;
+		if (!bSameWall)
+		{
+			Transmission *= HitTransmission;
+			LastComponent = Hit.GetComponent();
+			LastHitLocation = Hit.ImpactPoint;
+		}
+
+		if (bDrawDebug)
+		{
+			DrawDebugLine(World, Start, Hit.ImpactPoint, FColor::Green, false, 2.0f);
+			if (!bSameWall)
+			{
+				DrawDebugPoint(World, Hit.ImpactPoint, 10.0f, FColor::Red, false, 2.0f);
+				DrawDebugString(World, Hit.ImpactPoint, FString::Printf(TEXT("%.2f"), Transmission), nullptr, FColor::Red, 2.0f);
+			}
+		}
+
+		Start = Hit.ImpactPoint + Direction * 1.0f;
+	}
+
+	return FMath::Clamp(Transmission, 0.0f, 1.0f);
+}
+
+float UTallowNoiseSubsystem::GetLoudnessAt(const FTallowNoiseEvent& NoiseEvent, FVector ListenerLocation, bool bIncludeOcclusion) const
 {
 	if (NoiseEvent.Range <= 0.0f)
 	{
@@ -118,7 +265,14 @@ float UTallowNoiseSubsystem::GetLoudnessAt(const FTallowNoiseEvent& NoiseEvent, 
 	const float Distance = FVector::Dist(NoiseEvent.Location, ListenerLocation);
 	const float Remaining = FMath::Clamp(1.0f - Distance / NoiseEvent.Range, 0.0f, 1.0f);
 
-	return NoiseEvent.Loudness * Remaining * Remaining;
+	float Loudness = NoiseEvent.Loudness * Remaining * Remaining;
+
+	if (bIncludeOcclusion && Loudness > 0.0f && CVarNoiseOcclusion.GetValueOnGameThread())
+	{
+		Loudness *= TraceOcclusion(NoiseEvent.Location, ListenerLocation, NoiseEvent.Instigator.Get(), false);
+	}
+
+	return Loudness;
 }
 
 TArray<FTallowNoiseEvent> UTallowNoiseSubsystem::GetRecentNoises(float MaxAgeSeconds) const

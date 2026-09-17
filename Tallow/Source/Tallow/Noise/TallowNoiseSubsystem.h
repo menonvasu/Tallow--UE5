@@ -32,9 +32,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Noise", meta = (AdvancedDisplay = "bAlertsAI"))
 	void EmitCustomNoise(FVector Location, AActor* Instigator, float Loudness, float Range, bool bAlertsAI = true);
 
-	/** Returns how loud a noise is at a location, from 0 to 1 */
+	/** Returns how loud a noise is at a location from 0 to 1, after distance falloff and walls */
+	UFUNCTION(BlueprintPure, Category = "Noise", meta = (AdvancedDisplay = "bIncludeOcclusion"))
+	float GetLoudnessAt(const FTallowNoiseEvent& NoiseEvent, FVector ListenerLocation, bool bIncludeOcclusion = true) const;
+
+	/** Returns the fraction of sound that gets from one point to another through walls and doors, from 0 to 1 */
 	UFUNCTION(BlueprintPure, Category = "Noise")
-	float GetLoudnessAt(const FTallowNoiseEvent& NoiseEvent, FVector ListenerLocation) const;
+	float GetOcclusion(FVector From, FVector To, AActor* IgnoredActor = nullptr) const;
 
 	/** Returns noises made within the last few seconds, oldest first */
 	UFUNCTION(BlueprintPure, Category = "Noise")
@@ -56,6 +60,12 @@ protected:
 
 	/** Logs, reports and broadcasts a finished noise event */
 	void ProcessNoise(FTallowNoiseEvent& NoiseEvent);
+
+	/** Reports a noise to AI hearing, reduced by the walls between it and the nearest listening creature */
+	void ReportNoiseToAI(const FTallowNoiseEvent& NoiseEvent) const;
+
+	/** Steps a trace through every wall between two points, multiplying in how much each one lets through */
+	float TraceOcclusion(const FVector& From, const FVector& To, AActor* IgnoredActor, bool bDrawDebug) const;
 
 	/** Draws the noise range when tallow.Noise.Debug is on */
 	void DrawNoiseDebug(const FTallowNoiseEvent& NoiseEvent) const;
