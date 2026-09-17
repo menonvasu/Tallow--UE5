@@ -2,8 +2,9 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
-#include "TallowCreature.h"
+#include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "TallowCreature.h"
 
 ATallowAIController::ATallowAIController()
 {
@@ -24,7 +25,21 @@ ATallowAIController::ATallowAIController()
 		HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
 	
 		AIPerceptionComponent->ConfigureSense(*HearingConfig);
-		AIPerceptionComponent->SetDominantSense(HearingConfig->GetSenseImplementation());
+	}
+
+	// Sight Params
+	SightConfig = this->CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
+	if (SightConfig)
+	{
+		SightConfig->SightRadius = 2000.0f;
+		SightConfig->LoseSightRadius = 2500.0f;
+		SightConfig->PeripheralVisionAngleDegrees = 60.0f;
+		SightConfig->DetectionByAffiliation.bDetectEnemies = true;
+		SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
+		SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+
+		AIPerceptionComponent->ConfigureSense(*SightConfig);
+		AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 	}
 }
 
@@ -51,12 +66,30 @@ void ATallowAIController::OnPossess(APawn* InPawn)
 	}
 }
 
-// Call event on noise heard
+// Call event on noise heard or sight seen
 void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
+	const FAISenseID HearingSenseID = UAISense::GetSenseID<UAISense_Hearing>();
+	const FAISenseID SightSenseID = UAISense::GetSenseID<UAISense_Sight>();
+
+	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == HearingSenseID)
 	{
 		LastHeardNoiseLocation = Stimulus.StimulusLocation;
 		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
+	}
+
+	else if (Stimulus.Type == SightSenseID)
+	{
+		if (Stimulus.WasSuccessfullySensed())
+		{
+			TargetActor = Actor;
+			StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerSpottedTag));
+		}
+		else
+		{
+			LastHeardNoiseLocation = Stimulus.StimulusLocation;
+			TargetActor = nullptr;
+			StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerLostTag));
+		}
 	}
 }

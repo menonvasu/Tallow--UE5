@@ -8,6 +8,7 @@
 class UAIPerceptionComponent;
 class UStateTreeAIComponent;
 class UAISenseConfig_Hearing;
+class UAISenseConfig_Sight;
 class ATallowPatrolPoint;
 
 /**
@@ -31,6 +32,10 @@ public:
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* SourceActor, FAIStimulus Stimulus);
 
+	/** Stores Player Actor */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player")
+	TObjectPtr<AActor> TargetActor;
+
 	/** Stores the location of the last heard sound*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI")
 	FVector LastHeardNoiseLocation = FVector::ZeroVector;
@@ -53,8 +58,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI Perception")
 	TObjectPtr<UAISenseConfig_Hearing> HearingConfig;
 
+	/** Sight Configuration Component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI Perception")
+	TObjectPtr<UAISenseConfig_Sight> SightConfig;
+
 	/** Tag to set in StateTree for noise heard */
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
 	FGameplayTag NoiseHeardTag;
 
+	/** Player sight spotted tags */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
+	FGameplayTag PlayerSpottedTag;
+
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
+	FGameplayTag PlayerLostTag;
 };
