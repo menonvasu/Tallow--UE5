@@ -20,8 +20,14 @@ ATallowCreature::ATallowCreature()
 	AutoPossessPlayer = EAutoReceiveInput::Disabled;
 }
 
+void ATallowCreature::BeginPlay()
+{
+	Super::BeginPlay();
 
-
-
+	if (AutoPossessAI != EAutoPossessAI::Disabled && Controller == nullptr)
+	{
+		SpawnDefaultController();
+	}
+}
 
 

@@ -1,7 +1,8 @@
 #include "AI/TallowAIController.h"
 #include "Perception/AIPerceptionComponent.h"
-#include "Components/StateTreeComponent.h"
+#include "Components/StateTreeAIComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
+#include "TallowCreature.h"
 #include "Perception/AIPerceptionTypes.h"
 
 ATallowAIController::ATallowAIController()
@@ -10,7 +11,8 @@ ATallowAIController::ATallowAIController()
 	AIPerceptionComponent = this->CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
 	SetPerceptionComponent(*AIPerceptionComponent);
 
-	StateTreeComponent = this->CreateDefaultSubobject<UStateTreeComponent>(TEXT("StateTree"));
+	StateTreeAIComponent = this->CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTree"));
+	StateTreeAIComponent->SetStartLogicAutomatically(false);
 
 	// Hearing Params
 	HearingConfig = this->CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
@@ -26,20 +28,35 @@ ATallowAIController::ATallowAIController()
 	}
 }
 
+// Dynamic reflection on target perception 
 void ATallowAIController::BeginPlay()
 {
 	Super::BeginPlay();
 	AIPerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ATallowAIController::HandleTargetPerceptionUpdated);
 }
 
+// Set starting patrol point
+void ATallowAIController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	if (ATallowCreature* Creature = Cast<ATallowCreature>(InPawn))
+	{
+		CurrentPatrolPoint = Creature->StartingPatrolPoint;
+	}
+
+	if (StateTreeAIComponent)
+	{
+		StateTreeAIComponent->StartLogic();
+	}
+}
+
+// Call event on noise heard
 void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
 	{
 		LastHeardNoiseLocation = Stimulus.StimulusLocation;
-
-		StateTreeComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
-	
+		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
 	}
-
 }
