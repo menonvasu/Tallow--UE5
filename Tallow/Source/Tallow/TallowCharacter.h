@@ -16,65 +16,105 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 /**
- *  A basic first person character
+ *  A first person character
  */
 UCLASS(abstract)
 class ATallowCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Pawn mesh: first person view (arms; seen only by self) */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	/** First person camera */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* FirstPersonCameraComponent;
+	
+	/** First person mesh */
+	UPROPERTY(VisibleAnywhere, Category = "Mesh")
 	USkeletalMeshComponent* FirstPersonMesh;
 
-	/** First person camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FirstPersonCameraComponent;
-
 protected:
-
 	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* JumpAction;
 
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	UInputAction* MoveAction;
+	/** Crouch Input Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* CrouchAction;
+
+	/** Walk Input Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* WalkAction;
+
+	/** Run Input Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* RunAction;
 
 	/** Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* LookAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* LookAction;
 
 	/** Mouse Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* MouseLookAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* MouseLookAction;
+
+	/** Interaction Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* InteractAction;
+
+	/** Movement Speeds */
+	UPROPERTY(EditAnywhere, Category = "Params")
+	float RunSpeed = 450.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Params")
+	float Walkspeed = 250.0f;
 	
 public:
 	ATallowCharacter();
 
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 
-	/** Called from Input Actions for movement input */
+	/** Movement input */
 	void MoveInput(const FInputActionValue& Value);
 
-	/** Called from Input Actions for looking input */
+	/** Looking input */
 	void LookInput(const FInputActionValue& Value);
 
-	/** Handles aim inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	/** Handles aim inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoAim(float Yaw, float Pitch);
 
-	/** Handles move inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	/** Handles move inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles jump start inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	/** Handles run start inputs */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoRunStart();
+
+	/** Handles run end inputs */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoRunEnd();
+
+	/** Handles jump start inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump end inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
+	/** Handles jump end inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoJumpEnd();
+
+	/** Handles crouch start inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
+	virtual void DoCrouch();
+
+	/** Handles crouch end inputs */
+	UFUNCTION(BlueprintCallable, Category= "Input")
+	virtual void DoCrouchEnd();
+
+	/** Handles interact */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoInteract();
 
 protected:
 
@@ -83,9 +123,6 @@ protected:
 	
 
 public:
-
-	/** Returns the first person mesh **/
-	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }

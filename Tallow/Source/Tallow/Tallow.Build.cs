@@ -24,13 +24,7 @@ public class Tallow : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"Tallow",
-			"Tallow/Variant_Horror",
-			"Tallow/Variant_Horror/UI",
-			"Tallow/Variant_Shooter",
-			"Tallow/Variant_Shooter/AI",
-			"Tallow/Variant_Shooter/UI",
-			"Tallow/Variant_Shooter/Weapons"
+			"Tallow"
 		});
 
 		// Uncomment if you are using Slate UI
