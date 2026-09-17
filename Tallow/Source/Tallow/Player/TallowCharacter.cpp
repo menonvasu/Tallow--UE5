@@ -1,5 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "TallowCharacter.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
@@ -9,7 +7,7 @@
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "IInteractable.h"
+#include "Interactable/IInteractable.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
