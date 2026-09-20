@@ -12,6 +12,8 @@ class USkeletalMeshComponent;
 class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
+class UTallowCandleComponent;
+class UPointLightComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -23,15 +25,22 @@ class ATallowCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+protected:
+
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FirstPersonCameraComponent;
+	TObjectPtr<UCameraComponent> FirstPersonCameraComponent;
 	
 	/** First person mesh */
-	UPROPERTY(VisibleAnywhere, Category = "Mesh")
-	USkeletalMeshComponent* FirstPersonMesh;
+	UPROPERTY(VisibleAnywhere, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> FirstPersonMesh;
 
-protected:
+	UPROPERTY(VisibleAnywhere, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTallowCandleComponent> CandleComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Candle|Light")
+	TObjectPtr<UPointLightComponent> CandleLightComponent;
+
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* JumpAction;
@@ -59,6 +68,21 @@ protected:
 	/** Interaction Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* InteractAction;
+	
+	/** Cupping Action */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* CupAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* RelightAction;
+
+public:
+	ATallowCharacter();
+
+	virtual void Tick(float DeltaTime) override;
+
+	/** Returns first person camera component **/
+	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
 	/** Movement Speeds */
 	UPROPERTY(EditAnywhere, Category = "Params")
@@ -66,11 +90,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Params")
 	float Walkspeed = 250.0f;
-	
-public:
-	ATallowCharacter();
 
-	virtual void Tick(float DeltaTime) override;
 
 protected:
 
@@ -116,16 +136,20 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoInteract();
 
-protected:
+	/** Handles cupping candle */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoCup();
+
+	/** Handles cupping end */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoCupEnd();
+
+	/** Handles relighting candle*/
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoRelight();
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-	
-
-public:
-
-	/** Returns first person camera component **/
-	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
 };
 
