@@ -36,13 +36,19 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
 
 	CurrentState = NewState;
 
-    // If the flame goes out or is cupped, cancel any active sprint struggle:
+    // If the flame goes out or is cupped, cancel any active struggle:
     if (CurrentState == ECandleState::Out || CurrentState == ECandleState::Cupped)
     {
+        OnCandleGutteringChanged.Broadcast(false);
+
         if (GetWorld()->GetTimerManager().IsTimerActive(SprintExtinguishTimerHandle))
         {
             GetWorld()->GetTimerManager().ClearTimer(SprintExtinguishTimerHandle);
-            OnCandleGutteringChanged.Broadcast(false);
+        }
+
+        if (GetWorld()->GetTimerManager().IsTimerActive(DraftExtinguishTimerHandle))
+        {
+            GetWorld()->GetTimerManager().ClearTimer(DraftExtinguishTimerHandle);
         }
     }
 
@@ -59,6 +65,21 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
         break;
 
     case ECandleState::Lit:
+        if (IsInDraft())
+        {
+            // start extinguish timer
+            if (!GetWorld()->GetTimerManager().IsTimerActive(DraftExtinguishTimerHandle))
+            {
+                OnCandleGutteringChanged.Broadcast(true);
+                GetWorld()->GetTimerManager().SetTimer(
+                    DraftExtinguishTimerHandle,
+                    this,
+                    &UTallowCandleComponent::HandleDraftExtinguishTimerExpired,
+                    DraftExtinguishGracePeriod,
+                    false
+                );
+            }
+        }
         // normal lit radius and visible with normal walk speed
         if (CachedLightComponent)
         {
@@ -155,4 +176,44 @@ void UTallowCandleComponent::HandleSprintExtinguishTimerExpired()
     {
         SetCandleState(ECandleState::Out);
     }
+}
+
+void UTallowCandleComponent::EnterDraft()
+{
+    // add to active drafts
+    ActiveDraftCount++;
+    if (CurrentState == ECandleState::Lit) 
+    {
+        if (GetWorld()->GetTimerManager().IsTimerActive(DraftExtinguishTimerHandle)) return;
+     
+        // start guttering 
+        OnCandleGutteringChanged.Broadcast(true);
+
+        GetWorld()->GetTimerManager().SetTimer(
+            DraftExtinguishTimerHandle,
+            this,
+            &UTallowCandleComponent::HandleDraftExtinguishTimerExpired,
+            DraftExtinguishGracePeriod,
+            false
+        );
+    }
+}
+
+void UTallowCandleComponent::ExitDraft()
+{
+    // drop from active drafts
+    ActiveDraftCount = FMath::Max(0, ActiveDraftCount - 1);
+
+    // flame stabilized
+    if (ActiveDraftCount == 0)
+    {
+        GetWorld()->GetTimerManager().ClearTimer(DraftExtinguishTimerHandle);
+        OnCandleGutteringChanged.Broadcast(false);
+    }
+}
+
+void UTallowCandleComponent::HandleDraftExtinguishTimerExpired()
+{   
+    // set out on expired
+    SetCandleState(ECandleState::Out);
 }

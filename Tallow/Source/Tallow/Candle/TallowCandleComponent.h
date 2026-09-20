@@ -56,8 +56,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Candle")
 	bool IsGuttering() const
 	{
-		return GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(SprintExtinguishTimerHandle);
+		if (!GetWorld()) return false;
+		const FTimerManager& TM = GetWorld()->GetTimerManager();
+		return TM.IsTimerActive(SprintExtinguishTimerHandle) || TM.IsTimerActive(DraftExtinguishTimerHandle);
 	}
+
+	/** Enter and exit drafts */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void EnterDraft();
+
+	UFUNCTION()
+	void ExitDraft();
+
+	/** Get if in draft */
+	UFUNCTION(BlueprintPure, Category = "Candle")
+	bool IsInDraft() const { return ActiveDraftCount > 0; }
 
 	/** Exposed delegate properties */
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
@@ -113,9 +126,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
 	float SprintExtinguishGracePeriod = 1.5f;
 
+	/** Count of draft sources, handles candle extinguish on draft */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Candle|State")
+	int32 ActiveDraftCount = 0;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
+	float DraftExtinguishGracePeriod = 1.5f;
+
+	FTimerHandle DraftExtinguishTimerHandle;
+
+	UFUNCTION()
+	void HandleDraftExtinguishTimerExpired();
+
 	/** Called when game starts */
 	virtual void BeginPlay() override;
-
-
 
 };
