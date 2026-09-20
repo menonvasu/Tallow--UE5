@@ -8,6 +8,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactable/IInteractable.h"
+#include "Candle/TallowCandleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -55,6 +57,17 @@ ATallowCharacter::ATallowCharacter()
 	GetCharacterMovement()->AirControl = 0.5f;
 	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	GetCharacterMovement()->SetCrouchedHalfHeight(PlayerHalfHeight / 2.0f);
+
+	// Create candle and light component
+	CandleComponent = CreateDefaultSubobject<UTallowCandleComponent>(TEXT("Candle Component"));
+	CandleLightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("CandleLight"));
+
+	// Configure light
+	CandleLightComponent->SetupAttachment(FirstPersonCameraComponent);
+	CandleLightComponent->SetRelativeLocation(FVector(40.0f, 25.0f, -15.0f));
+	CandleLightComponent->SetAttenuationRadius(800.0f);
+	CandleLightComponent->SetIntensity(3000.0f);
+
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -83,6 +96,13 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 		// Interact
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
+	
+		// Cupping candle
+		EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Started, this, &ATallowCharacter::DoCup);
+		EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoCupEnd);
+
+		// Relight candle
+		EnhancedInputComponent->BindAction(RelightAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRelight);
 	}
 	else
 	{
@@ -90,6 +110,10 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
+void ATallowCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+}
 
 void ATallowCharacter::MoveInput(const FInputActionValue& Value)
 {
@@ -134,14 +158,25 @@ void ATallowCharacter::DoMove(float Right, float Forward)
 
 void ATallowCharacter::DoRunStart()
 {
-	// pass run speed to maxwalkspeed
+	// return early (cannot sprint while cupping)
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+
+	// pass run speed to maxwalkspeed and call sprint start in candle component to extinguish flame
 	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+	if (CandleComponent)
+	{
+		CandleComponent->HandleSprintStarted();
+	}
 }
 
 void ATallowCharacter::DoRunEnd()
 {
 	// pass walk speed to maxwalkspeed
 	GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
+	if (CandleComponent)
+	{
+		CandleComponent->HandleSprintEnded();
+	}
 }
 
 void ATallowCharacter::DoJumpStart()
@@ -177,6 +212,7 @@ void ATallowCharacter::DoInteract()
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this); // ignore self
 
+	// run raycast
 	bool bHit = GetWorld()->LineTraceSingleByChannel(
 		HitResult,
 		StartLocation,
@@ -185,13 +221,35 @@ void ATallowCharacter::DoInteract()
 		QueryParams
 	);
 
+	// if hit, run interact
 	if (bHit && HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
 	{
 		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
 	}
 }
 
-void ATallowCharacter::Tick(float DeltaTime)
+void ATallowCharacter::DoCup()
 {
-	Super::Tick(DeltaTime);
+	// set state to cupped only if lit
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Lit)
+	{
+		CandleComponent->SetCandleState(ECandleState::Cupped);
+	}
+}
+
+void ATallowCharacter::DoCupEnd()
+{
+	// set state to lit only if cupped
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped)
+	{
+		CandleComponent->SetCandleState(ECandleState::Lit);
+	}
+}
+
+void ATallowCharacter::DoRelight()
+{
+	if (CandleComponent)
+	{
+		CandleComponent->StartRelighting();
+	}
 }
