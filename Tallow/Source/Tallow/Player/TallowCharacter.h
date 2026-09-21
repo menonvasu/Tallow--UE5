@@ -13,6 +13,7 @@ class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
 class UTallowCandleComponent;
+class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -40,6 +41,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Candle|Light")
 	TObjectPtr<UPointLightComponent> CandleLightComponent;
+
+	/** Emits movement and landing noise events for the AI hearing system. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Noise", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTallowFootstepNoiseComponent> FootstepNoiseComponent;
 
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -152,4 +157,3 @@ protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
 };
-
