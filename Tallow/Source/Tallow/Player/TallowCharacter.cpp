@@ -205,6 +205,9 @@ void ATallowCharacter::DoCrouchEnd()
 
 void ATallowCharacter::DoInteract()
 {
+	// if player is cupping, interact hand is occupied
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+
 	FHitResult HitResult;
 	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();
 	FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 200.0f);
