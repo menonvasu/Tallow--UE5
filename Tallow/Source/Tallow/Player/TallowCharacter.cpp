@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactable/IInteractable.h"
 #include "Candle/TallowCandleComponent.h"
+#include "Noise/TallowFootstepNoiseComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Tallow.h"
 
@@ -60,6 +61,7 @@ ATallowCharacter::ATallowCharacter()
 
 	// Create candle and light component
 	CandleComponent = CreateDefaultSubobject<UTallowCandleComponent>(TEXT("Candle Component"));
+	FootstepNoiseComponent = CreateDefaultSubobject<UTallowFootstepNoiseComponent>(TEXT("Footstep Noise Component"));
 	CandleLightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("CandleLight"));
 
 	// Configure light
@@ -95,14 +97,23 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 
 		// Interact
-		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
-	
-		// Cupping candle
-		EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Started, this, &ATallowCharacter::DoCup);
-		EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoCupEnd);
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
+		}
+
+		// Cupping candle (actions come from the candle MR; skip if the BP has not wired them yet)
+		if (CupAction)
+		{
+			EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Started, this, &ATallowCharacter::DoCup);
+			EnhancedInputComponent->BindAction(CupAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoCupEnd);
+		}
 
 		// Relight candle
-		EnhancedInputComponent->BindAction(RelightAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRelight);
+		if (RelightAction)
+		{
+			EnhancedInputComponent->BindAction(RelightAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRelight);
+		}
 	}
 	else
 	{
@@ -171,11 +182,13 @@ void ATallowCharacter::DoRunStart()
 
 void ATallowCharacter::DoRunEnd()
 {
-	// pass walk speed to maxwalkspeed
-	GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
 	if (CandleComponent)
 	{
 		CandleComponent->HandleSprintEnded();
+	}
+	else
+	{
+		GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
 	}
 }
 

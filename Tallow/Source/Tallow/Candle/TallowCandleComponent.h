@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "TallowCandleComponent.generated.h"
 
 class UCharacterMovementComponent;
 class UPointLightComponent;
-struct FTimerHandle;
 
 UENUM(BlueprintType)
 enum class ECandleState : uint8

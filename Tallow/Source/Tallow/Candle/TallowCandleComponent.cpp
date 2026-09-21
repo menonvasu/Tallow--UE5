@@ -167,6 +167,15 @@ void UTallowCandleComponent::HandleSprintEnded()
 
     // reset timer on stopped sprint
     GetWorld()->GetTimerManager().ClearTimer(SprintExtinguishTimerHandle);
+
+	// Restore walk speed for the current candle state (cupped stays slow)
+	if (CachedMovementComponent)
+	{
+		CachedMovementComponent->MaxWalkSpeed =
+			(CurrentState == ECandleState::Cupped)
+				? DefaultWalkSpeed * CuppedSpeedMultiplier
+				: DefaultWalkSpeed;
+	}
 }
 
 void UTallowCandleComponent::HandleSprintExtinguishTimerExpired()
