@@ -21,12 +21,21 @@ void UTallowCandleComponent::BeginPlay()
 	{
 		DefaultWalkSpeed = CachedMovementComponent->MaxWalkSpeed;
 	}
-	if (CachedLightComponent)
+	if (CachedLightComponent && !bIsAcquired)
 	{
-        const bool bIsLitOrCupped = (CurrentState != ECandleState::Out);
-        CachedLightComponent->SetVisibility(bIsLitOrCupped);
-		CachedLightComponent->SetAttenuationRadius(CurrentState == ECandleState::Cupped ? CuppedLightRadius : LitLightRadius);
+        CachedLightComponent->SetVisibility(false);
 	}
+}
+
+void UTallowCandleComponent::AcquireCandle(bool bStartLit)
+{
+    bIsAcquired = true;
+    OnAcquireCandle.Broadcast();
+
+    if (bStartLit)
+    {
+        SetCandleState(ECandleState::Lit);   
+    }
 }
 
 void UTallowCandleComponent::SetCandleState(ECandleState NewState)
@@ -109,6 +118,10 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
 
 void UTallowCandleComponent::StartRelighting()
 {
+    // if not acquired, return
+    if (!bIsAcquired) return;
+    // if lit, return
+    if (CurrentState == ECandleState::Lit) return;
     // if candle already out or no matches left or still currently relighting, end early
 	if (CurrentState != ECandleState::Out  || MatchCount <= 0) return;
 	if (GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle)) return;

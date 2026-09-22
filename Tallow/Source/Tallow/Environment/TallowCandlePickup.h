@@ -1,0 +1,28 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Interactable/IInteractable.h"
+#include "TallowCandlePickup.generated.h"
+
+class UStaticMeshComponent;
+class UPointLightComponent;
+
+UCLASS()
+class TALLOW_API ATallowCandlePickup : public AActor, public IInteractable
+{
+	
+	GENERATED_BODY()
+
+public:
+	ATallowCandlePickup();
+
+	virtual void OnInteract_Implementation(AActor* Interactor) override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup")
+	TObjectPtr<UStaticMeshComponent> PickupMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup")
+	TObjectPtr<UPointLightComponent> TableLightComponent;
+
+};

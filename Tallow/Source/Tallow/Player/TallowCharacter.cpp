@@ -11,6 +11,7 @@
 #include "Candle/TallowCandleComponent.h"
 #include "Noise/TallowFootstepNoiseComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Tasks/TallowChairEscape.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -194,7 +195,12 @@ void ATallowCharacter::DoRunEnd()
 
 void ATallowCharacter::DoJumpStart()
 {
-	// pass Jump to the character
+	// if tied rock, else jump
+	if (CurrentTiedChair)
+	{
+		CurrentTiedChair->AttemptRock();
+		return;
+	}
 	Jump();
 }
 
@@ -238,7 +244,7 @@ void ATallowCharacter::DoInteract()
 	);
 
 	// if hit, run interact
-	if (bHit && HitResult.GetActor()->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
+	if (bHit && HitResult.GetActor()->Implements<UInteractable>())
 	{
 		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
 	}

@@ -20,6 +20,7 @@ enum class ECandleState : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleStateChanged, ECandleState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRelightStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleGutteringChanged, bool, bIsGuttering);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAcquireCandle);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TALLOW_API UTallowCandleComponent : public UActorComponent
@@ -72,6 +73,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Candle")
 	bool IsInDraft() const { return ActiveDraftCount > 0; }
 
+	/** Get candle and check */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void AcquireCandle(bool bStartLit = true);
+
+	UFUNCTION(BlueprintPure, Category = "Candle")
+	bool IsAcquired() const { return bIsAcquired; }
+
 	/** Exposed delegate properties */
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnCandleStateChanged OnCandleStateChanged;
@@ -82,9 +90,16 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnCandleGutteringChanged OnCandleGutteringChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
+	FOnAcquireCandle OnAcquireCandle;
+
 protected:
 	/** Current Candle state variable */
 	ECandleState CurrentState = ECandleState::Out;
+
+	/** Property for if acquired? */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Candle|State")
+	bool bIsAcquired = false;
 
 	/** Pointers to character movement and light*/
 	UPROPERTY(VisibleAnywhere, Category = "Candle|Components")
