@@ -28,6 +28,13 @@ void ATallowCreature::BeginPlay()
 	{
 		SpawnDefaultController();
 	}
+
+	InitialSpawnTransform = GetActorTransform();
+}
+
+void ATallowCreature::ResetToSpawn()
+{
+	SetActorTransform(InitialSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 

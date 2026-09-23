@@ -18,7 +18,13 @@ public:
 	/** Pawn BeginPlay implementation */
 	virtual void BeginPlay() override;
 
+	/** Reset to spawn */
+	void ResetToSpawn();
+		
 	/** Set starting patrol point */
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "AI|Patrol")
 	TObjectPtr<ATallowPatrolPoint> StartingPatrolPoint;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FTransform InitialSpawnTransform;
 };

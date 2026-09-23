@@ -28,6 +28,8 @@ public:
 
 	virtual void OnPossess(APawn* InPawn) override;
 
+	void ResetBrain();
+
 	/** Called when perception detected */
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* SourceActor, FAIStimulus Stimulus);

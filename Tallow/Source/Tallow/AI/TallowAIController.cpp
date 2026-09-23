@@ -50,6 +50,21 @@ void ATallowAIController::BeginPlay()
 	AIPerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ATallowAIController::HandleTargetPerceptionUpdated);
 }
 
+// Reset logic
+void ATallowAIController::ResetBrain()
+{
+	TargetActor = nullptr;
+	ATallowCreature* Creature = Cast<ATallowCreature>(GetPawn());
+	if (Creature)
+	{
+		CurrentPatrolPoint = Creature->StartingPatrolPoint;
+	}
+	if (StateTreeAIComponent)
+	{
+		StateTreeAIComponent->RestartLogic();
+	}
+}
+
 // Set starting patrol point
 void ATallowAIController::OnPossess(APawn* InPawn)
 {

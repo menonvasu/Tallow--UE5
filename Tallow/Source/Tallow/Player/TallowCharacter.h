@@ -14,6 +14,8 @@ class UTallowCandleComponent;
 class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
 class ATallowChairEscape;
+class UAIPerceptionStimuliSourceComponent;
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -44,6 +46,10 @@ protected:
 	/** Emits movement and landing noise events for the AI hearing system. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Noise", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UTallowFootstepNoiseComponent> FootstepNoiseComponent;
+
+	/** Stimulus component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
+	TObjectPtr<UAIPerceptionStimuliSourceComponent> StimulusSourceComponent;
 
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -84,6 +90,12 @@ public:
 	ATallowCharacter();
 
 	virtual void Tick(float DeltaTime) override;
+
+	virtual void BeginPlay() override;
+
+	/** Sets the AI to only perceive player on light */
+	UFUNCTION()
+	void SetLightPerception(ECandleState NewState);
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }

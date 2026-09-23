@@ -11,6 +11,8 @@
 #include "Candle/TallowCandleComponent.h"
 #include "Noise/TallowFootstepNoiseComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Tallow.h"
 
@@ -71,6 +73,9 @@ ATallowCharacter::ATallowCharacter()
 	CandleLightComponent->SetAttenuationRadius(800.0f);
 	CandleLightComponent->SetIntensity(3000.0f);
 
+	// Create stimulus
+	StimulusSourceComponent = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimulusSourceComponent"));
+
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -125,6 +130,35 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 void ATallowCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void ATallowCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Start unregistered
+	if (StimulusSourceComponent)
+	{
+		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
+	}
+
+	// Bind event to set light perception
+	if (CandleComponent)
+	{
+		CandleComponent->OnCandleStateChanged.AddDynamic(this, &ATallowCharacter::SetLightPerception);
+	}
+}
+
+void ATallowCharacter::SetLightPerception(ECandleState NewState)
+{
+	if (NewState == ECandleState::Out)
+	{
+		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
+	}
+	if (NewState == ECandleState::Lit || NewState == ECandleState::Cupped)
+	{
+		StimulusSourceComponent->RegisterForSense(UAISense_Sight::StaticClass());
+	}
 }
 
 void ATallowCharacter::MoveInput(const FInputActionValue& Value)
@@ -187,10 +221,8 @@ void ATallowCharacter::DoRunEnd()
 	{
 		CandleComponent->HandleSprintEnded();
 	}
-	else
-	{
-		GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
-	}
+	
+	GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
 }
 
 void ATallowCharacter::DoJumpStart()
@@ -275,3 +307,4 @@ void ATallowCharacter::DoRelight()
 		CandleComponent->StartRelighting();
 	}
 }
+
