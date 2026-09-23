@@ -89,8 +89,6 @@ protected:
 public:
 	ATallowCharacter();
 
-	virtual void Tick(float DeltaTime) override;
-
 	virtual void BeginPlay() override;
 
 	/** Sets the AI to only perceive player on light */

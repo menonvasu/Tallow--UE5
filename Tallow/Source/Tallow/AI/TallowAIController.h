@@ -34,6 +34,9 @@ public:
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* SourceActor, FAIStimulus Stimulus);
 
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	void TriggerPlayerCapture();
+
 	/** Stores Player Actor */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player")
 	TObjectPtr<AActor> TargetActor;

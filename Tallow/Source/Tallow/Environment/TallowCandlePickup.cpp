@@ -22,6 +22,19 @@ void ATallowCandlePickup::OnInteract_Implementation(AActor* Interactor)
 	if (UTallowCandleComponent* Candle = Interactor->FindComponentByClass<UTallowCandleComponent>())
 	{
 		Candle->AcquireCandle(true);
-		Destroy();
+		SetActorHiddenInGame(true);
+		SetActorEnableCollision(false);
+	}
+}
+
+void ATallowCandlePickup::ResetPickup(AActor* Interactor)
+{
+	if (!Interactor) return;
+
+	if (UTallowCandleComponent* Candle = Interactor->FindComponentByClass<UTallowCandleComponent>())
+	{
+		Candle->ResetCandle();
+		SetActorHiddenInGame(false);
+		SetActorEnableCollision(true);
 	}
 }

@@ -80,6 +80,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Candle")
 	bool IsAcquired() const { return bIsAcquired; }
 
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void ResetCandle();
+
+	/** Helper: Reset match count */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void ResetMatchCount() { MatchCount = 0; }
+
 	/** Exposed delegate properties */
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnCandleStateChanged OnCandleStateChanged;

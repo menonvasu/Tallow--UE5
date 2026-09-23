@@ -35,6 +35,11 @@ void ATallowCreature::BeginPlay()
 void ATallowCreature::ResetToSpawn()
 {
 	SetActorTransform(InitialSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+
+	if (ATallowAIController* AICon = GetController<ATallowAIController>())
+	{
+		AICon->ResetBrain();
+	}
 }
 
 

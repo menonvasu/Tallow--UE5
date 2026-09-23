@@ -4,6 +4,7 @@
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "GameMode/TallowGameMode.h"
 #include "TallowCreature.h"
 
 ATallowAIController::ATallowAIController()
@@ -106,5 +107,13 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 			TargetActor = nullptr;
 			StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerLostTag));
 		}
+	}
+}
+
+void ATallowAIController::TriggerPlayerCapture()
+{
+	if (ATallowGameMode* GM = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		GM->HandlePlayerCaptured();
 	}
 }

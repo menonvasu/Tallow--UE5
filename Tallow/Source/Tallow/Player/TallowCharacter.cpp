@@ -18,6 +18,8 @@
 
 ATallowCharacter::ATallowCharacter()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 	// Set size for collision capsule
 	constexpr float PlayerHalfHeight = 60.0f;
 	GetCapsuleComponent()->InitCapsuleSize(30.f, PlayerHalfHeight);
@@ -125,11 +127,6 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	{
 		UE_LOG(LogTallow, Error, TEXT("'%s' Failed to find an Enhanced Input Component!"), *GetNameSafe(this));
 	}
-}
-
-void ATallowCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
 }
 
 void ATallowCharacter::BeginPlay()
