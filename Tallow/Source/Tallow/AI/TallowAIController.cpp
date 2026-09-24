@@ -38,6 +38,7 @@ ATallowAIController::ATallowAIController()
 		SightConfig->DetectionByAffiliation.bDetectEnemies = true;
 		SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
 		SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+		SightConfig->AutoSuccessRangeFromLastSeenLocation = 150.0f;
 
 		AIPerceptionComponent->ConfigureSense(*SightConfig);
 		AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
@@ -112,6 +113,7 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 
 void ATallowAIController::TriggerPlayerCapture()
 {
+
 	if (ATallowGameMode* GM = GetWorld()->GetAuthGameMode<ATallowGameMode>())
 	{
 		GM->HandlePlayerCaptured();

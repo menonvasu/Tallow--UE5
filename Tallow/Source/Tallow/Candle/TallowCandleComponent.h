@@ -21,6 +21,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleStateChanged, ECandleState,
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRelightStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleGutteringChanged, bool, bIsGuttering);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAcquireCandle);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCandleReset);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TALLOW_API UTallowCandleComponent : public UActorComponent
@@ -99,6 +100,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnAcquireCandle OnAcquireCandle;
+
+	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
+	FOnCandleReset OnCandleReset;
 
 protected:
 	/** Current Candle state variable */

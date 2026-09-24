@@ -49,7 +49,7 @@ void ATallowGameMode::HandlePlayerCaptured()
 		ResetTimerHandle,
 		this,
 		&ATallowGameMode::ResetGame,
-		FadeOutTimer,
+		FadeOutTimer + BlackoutTimer,
 		false
 	);
 }

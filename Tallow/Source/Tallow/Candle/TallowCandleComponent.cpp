@@ -251,4 +251,5 @@ void UTallowCandleComponent::ResetCandle()
     bIsAcquired = false;
     SetCandleState(ECandleState::Out);
     ResetMatchCount();
+    OnCandleReset.Broadcast();
 }

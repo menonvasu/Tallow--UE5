@@ -51,10 +51,13 @@ protected:
 	FTimerHandle ResetTimerHandle;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
-	float FadeOutTimer = 0.6f;
+	float FadeOutTimer = 0.8f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
 	float FadeInTimer = 1.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
+	float BlackoutTimer = 1.0f;
 };
 
 

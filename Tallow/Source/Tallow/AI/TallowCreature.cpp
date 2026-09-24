@@ -36,6 +36,11 @@ void ATallowCreature::ResetToSpawn()
 {
 	SetActorTransform(InitialSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+
 	if (ATallowAIController* AICon = GetController<ATallowAIController>())
 	{
 		AICon->ResetBrain();
