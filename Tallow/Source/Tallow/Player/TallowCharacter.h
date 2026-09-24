@@ -1,5 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -15,6 +13,7 @@ struct FInputActionValue;
 class UTallowCandleComponent;
 class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
+class ATallowChairEscape;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -96,7 +95,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Params")
 	float Walkspeed = 250.0f;
 
+	/** Sets player tied to chair */
+	void SetTiedChair(ATallowChairEscape* InChair) { CurrentTiedChair = InChair; }
 
+	/** Gets candle component */
+	UFUNCTION(BlueprintCallable, Category = "Components")
+	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
+	
 protected:
 
 	/** Movement input */
@@ -152,6 +157,10 @@ protected:
 	/** Handles relighting candle*/
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoRelight();
+
+	/** Reference to track if player is in chair */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair")
+	TObjectPtr<ATallowChairEscape> CurrentTiedChair;
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
