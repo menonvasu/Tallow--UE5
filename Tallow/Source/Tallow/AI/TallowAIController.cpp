@@ -1,10 +1,12 @@
 #include "AI/TallowAIController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "GameMode/TallowGameMode.h"
+#include "Player/TallowCharacter.h"
 #include "TallowCreature.h"
 
 ATallowAIController::ATallowAIController()
@@ -91,6 +93,15 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 
 	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == HearingSenseID)
 	{
+		const double CurrentTime = GetWorld()->GetTimeSeconds();
+		const float DistanceFromLastNoise = FVector::Dist(LastHeardNoiseLocation, Stimulus.StimulusLocation);
+		const bool bIsTooSoon = (CurrentTime - LastNoiseProcessTime) < MinNoiseRepathDelay;
+		const bool bIsTooClose = DistanceFromLastNoise < NoiseRepathDistanceThreshold;
+
+		// supress event if too soon and close, reduce recalculation
+		if (bIsTooClose && bIsTooSoon) return;
+
+		LastNoiseProcessTime = CurrentTime;
 		LastHeardNoiseLocation = Stimulus.StimulusLocation;
 		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
 	}
@@ -108,6 +119,21 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 			TargetActor = nullptr;
 			StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerLostTag));
 		}
+	}
+}
+
+void ATallowAIController::NotifyPlayerTouched(AActor* TouchedActor)
+{
+	if (!TouchedActor) return;
+	ATallowCharacter* Player = Cast<ATallowCharacter>(TouchedActor);
+	if (!Player) return;
+
+	// if still tied to chair, return early
+	if (Player->IsTiedToChair()) return;
+
+	if (StateTreeAIComponent)
+	{
+		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerCaughtTag));
 	}
 }
 

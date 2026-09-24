@@ -33,11 +33,13 @@ public:
 	/** Called when perception detected */
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* SourceActor, FAIStimulus Stimulus);
-
+	
 	UFUNCTION(BlueprintCallable, Category = "AI")
 	void TriggerPlayerCapture();
 
-	/** Stores Player Actor */
+	void NotifyPlayerTouched(AActor* TouchedActor);
+
+	/** Stores Player Actor */ 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player")
 	TObjectPtr<AActor> TargetActor;
 
@@ -77,4 +79,16 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
 	FGameplayTag PlayerLostTag;
+
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
+	FGameplayTag PlayerCaughtTag;
+
+	/** Variables to reduce path retrack */
+	double LastNoiseProcessTime = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Tuning")
+	float MinNoiseRepathDelay = 0.6f; // Min seconds between path updates
+
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Tuning")
+	float NoiseRepathDistanceThreshold = 200.0f; // Min distance to care about new steps
 };

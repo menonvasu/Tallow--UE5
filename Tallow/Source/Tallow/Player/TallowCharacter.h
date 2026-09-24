@@ -108,6 +108,10 @@ public:
 	/** Sets player tied to chair */
 	void SetTiedChair(ATallowChairEscape* InChair) { CurrentTiedChair = InChair; }
 
+	/** Get if player tied to chair */
+	UFUNCTION(BlueprintPure, Category = "Player|State")
+	bool IsTiedToChair() const { return CurrentTiedChair != nullptr; }
+
 	/** Gets candle component */
 	UFUNCTION(BlueprintCallable, Category = "Components")
 	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
