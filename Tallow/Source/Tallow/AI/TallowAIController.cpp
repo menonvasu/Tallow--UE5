@@ -5,6 +5,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "TallowCreature.h"
+#include "Navigation/TallowNavFilter_PhaseOne.h"
 
 ATallowAIController::ATallowAIController()
 {
@@ -14,6 +15,9 @@ ATallowAIController::ATallowAIController()
 
 	StateTreeAIComponent = this->CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTree"));
 	StateTreeAIComponent->SetStartLogicAutomatically(false);
+
+	// Phase one stays out of the child gaps, phase two has no restriction
+	PhaseOneNavigationFilter = UTallowNavFilter_PhaseOne::StaticClass();
 
 	// Hearing Params
 	HearingConfig = this->CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
@@ -58,12 +62,22 @@ void ATallowAIController::OnPossess(APawn* InPawn)
 	if (ATallowCreature* Creature = Cast<ATallowCreature>(InPawn))
 	{
 		CurrentPatrolPoint = Creature->StartingPatrolPoint;
+		ApplyPhaseNavigationFilter(Creature->GetPhase());
 	}
 
 	if (StateTreeAIComponent)
 	{
 		StateTreeAIComponent->StartLogic();
 	}
+}
+
+// Move To tasks fall back to DefaultNavigationFilterClass, so this is all the
+// State Tree needs to respect the phase
+void ATallowAIController::ApplyPhaseNavigationFilter(ETallowCreaturePhase Phase)
+{
+	DefaultNavigationFilterClass = (Phase == ETallowCreaturePhase::PhaseOne)
+		? PhaseOneNavigationFilter
+		: PhaseTwoNavigationFilter;
 }
 
 // Call event on noise heard or sight seen

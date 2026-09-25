@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "GameplayTagContainer.h"
+#include "TallowCreature.h"
 #include "TallowAIController.generated.h"
 
 class UAIPerceptionComponent;
@@ -31,6 +32,9 @@ public:
 	/** Called when perception detected */
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* SourceActor, FAIStimulus Stimulus);
+
+	/** Phase one keeps out of child gaps, phase two may use them (#23) */
+	void ApplyPhaseNavigationFilter(ETallowCreaturePhase Phase);
 
 	/** Stores Player Actor */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player")
@@ -72,4 +76,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Events")
 	FGameplayTag PlayerLostTag;
+
+	/** Pathfinding filter while in phase one. Excludes child gaps by default */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Navigation")
+	TSubclassOf<UNavigationQueryFilter> PhaseOneNavigationFilter;
+
+	/** Pathfinding filter while in phase two. Empty means every route is open */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Navigation")
+	TSubclassOf<UNavigationQueryFilter> PhaseTwoNavigationFilter;
 };
