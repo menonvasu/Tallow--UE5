@@ -122,6 +122,14 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		{
 			EnhancedInputComponent->BindAction(RelightAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRelight);
 		}
+
+		// Stillness
+		if (StillnessAction)
+		{
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Started, this, &ATallowCharacter::DoStillnessStart);
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoStillnessEnd);
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoStillnessEnd);
+		}
 	}
 	else
 	{
@@ -305,3 +313,53 @@ void ATallowCharacter::DoRelight()
 	}
 }
 
+void ATallowCharacter::DoStillnessStart()
+{
+	if (IsTiedToChair()) return;
+
+	StillnessStartTime = GetWorld()->GetTimeSeconds();
+
+	bIsHoldingStill = true;
+	OnStill.Broadcast(bIsHoldingStill);
+
+	// Disable movement
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetIgnoreMoveInput(true);
+		PC->SetIgnoreLookInput(true);
+	}
+
+	// Make player immune
+	if (StimulusSourceComponent)
+	{
+		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
+	}
+}
+
+void ATallowCharacter::DoStillnessEnd()
+{
+	const double HoldDuration = GetWorld()->GetTimeSeconds() - StillnessStartTime;
+
+	bIsHoldingStill = false;
+	OnStill.Broadcast(bIsHoldingStill);
+
+	// only transform if reasonably held 
+	if (HoldDuration >= MinStillnessHoldDuration)
+	{
+		TransformationLevel++;
+		OnTransformation.Broadcast(TransformationLevel);
+	}
+
+	// Re-enable movement
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetIgnoreMoveInput(false);
+		PC->SetIgnoreLookInput(false);
+	}
+
+	// Restore sight
+	if (CandleComponent)
+	{
+		SetLightPerception(GetCandleComponent()->GetCandleState());
+	}
+}

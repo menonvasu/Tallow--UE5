@@ -37,8 +37,6 @@ public:
 
 	/** Phase one keeps out of child gaps, phase two may use them (#23) */
 	void ApplyPhaseNavigationFilter(ETallowCreaturePhase Phase);
-
-	/** Stores Player Actor */
 	
 	UFUNCTION(BlueprintCallable, Category = "AI")
 	void TriggerPlayerCapture();
@@ -56,6 +54,12 @@ public:
 	/** Stores current patrol point */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Patrol")
 	TObjectPtr<ATallowPatrolPoint> CurrentPatrolPoint;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Search")
+	int32 CurrentSearchCount;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Search")
+	int32 MaxSearchSpots = 2;
 
 protected:
 

@@ -145,6 +145,9 @@ void ATallowAIController::NotifyPlayerTouched(AActor* TouchedActor)
 	// if still tied to chair, return early
 	if (Player->IsTiedToChair()) return;
 
+	// if player holding stillness, return early
+	if (Player->IsHoldingStill()) return;
+
 	if (StateTreeAIComponent)
 	{
 		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerCaughtTag));
