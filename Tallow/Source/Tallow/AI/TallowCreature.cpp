@@ -68,3 +68,14 @@ void ATallowCreature::ResetToSpawn()
 }
 
 
+
+void ATallowCreature::SetPhase(ETallowCreaturePhase NewPhase)
+{
+	Phase = NewPhase;
+
+	// Swap which routes the controller is allowed to path through
+	if (ATallowAIController* AIController = Cast<ATallowAIController>(GetController()))
+	{
+		AIController->ApplyPhaseNavigationFilter(Phase);
+	}
+}
