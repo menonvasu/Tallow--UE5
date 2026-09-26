@@ -115,6 +115,12 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 		// supress event if too soon and close, reduce recalculation
 		if (bIsTooClose && bIsTooSoon) return;
 
+		// update boolean 
+		if (const ATallowCharacter* Player = Cast<ATallowCharacter>(UGameplayStatics::GetPlayerCharacter(this, 0)))
+		{
+			bIsTargetTiedToChair = Player->IsTiedToChair();
+		}
+
 		LastNoiseProcessTime = CurrentTime;
 		LastHeardNoiseLocation = Stimulus.StimulusLocation;
 		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
@@ -162,3 +168,4 @@ void ATallowAIController::TriggerPlayerCapture()
 		GM->HandlePlayerCaptured();
 	}
 }
+

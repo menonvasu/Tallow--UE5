@@ -13,6 +13,7 @@
 #include "Components/PointLightComponent.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Sight.h"
+#include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Tallow.h"
 
@@ -77,6 +78,10 @@ ATallowCharacter::ATallowCharacter()
 
 	// Create stimulus
 	StimulusSourceComponent = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimulusSourceComponent"));
+	if (StimulusSourceComponent)
+	{
+		StimulusSourceComponent->bAutoRegister = true;
+	}
 
 }
 
@@ -141,28 +146,29 @@ void ATallowCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Start unregistered
-	if (StimulusSourceComponent)
-	{
-		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
-	}
-
 	// Bind event to set light perception
 	if (CandleComponent)
 	{
 		CandleComponent->OnCandleStateChanged.AddDynamic(this, &ATallowCharacter::SetLightPerception);
+		SetLightPerception(CandleComponent->GetCandleState());
 	}
 }
 
 void ATallowCharacter::SetLightPerception(ECandleState NewState)
 {
+	UAIPerceptionSystem* PerceptionSystem = UAIPerceptionSystem::GetCurrent(GetWorld());
+	if (!PerceptionSystem)
+	{
+		return;
+	}
+
 	if (NewState == ECandleState::Out)
 	{
-		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
+		PerceptionSystem->UnregisterSource(*this, UAISense_Sight::StaticClass());
 	}
 	if (NewState == ECandleState::Lit || NewState == ECandleState::Cupped)
 	{
-		StimulusSourceComponent->RegisterForSense(UAISense_Sight::StaticClass());
+		PerceptionSystem->RegisterSourceForSenseClass(UAISense_Sight::StaticClass(), *this);
 	}
 }
 
@@ -322,6 +328,9 @@ void ATallowCharacter::DoStillnessStart()
 	bIsHoldingStill = true;
 	OnStill.Broadcast(bIsHoldingStill);
 
+	// Ignore player capsule
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
 	// Disable movement
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -349,6 +358,9 @@ void ATallowCharacter::DoStillnessEnd()
 		TransformationLevel++;
 		OnTransformation.Broadcast(TransformationLevel);
 	}
+
+	// Restore collision 
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 
 	// Re-enable movement
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))

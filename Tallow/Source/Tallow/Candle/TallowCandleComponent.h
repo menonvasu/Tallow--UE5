@@ -86,7 +86,7 @@ public:
 
 	/** Helper: Reset match count */
 	UFUNCTION(BlueprintCallable, Category = "Candle")
-	void ResetMatchCount() { MatchCount = 0; }
+	void ResetMatchCount() { MatchCount = 3; }
 
 	/** Exposed delegate properties */
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")

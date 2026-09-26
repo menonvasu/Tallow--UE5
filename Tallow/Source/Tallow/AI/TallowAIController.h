@@ -1,9 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AIController.h"
 #include "GameplayTagContainer.h"
 #include "TallowCreature.h"
+#include "AIController.h"
 #include "TallowAIController.generated.h"
 
 class UAIPerceptionComponent;
@@ -11,6 +11,7 @@ class UStateTreeAIComponent;
 class UAISenseConfig_Hearing;
 class UAISenseConfig_Sight;
 class ATallowPatrolPoint;
+class ATallowCharacter;
 
 /**
  * 
@@ -51,6 +52,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI")
 	FVector LastHeardNoiseLocation = FVector::ZeroVector;
 
+	/** Stores last search location for better search */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Search")
+	FVector LastSearchLocation = FVector::ZeroVector;
+
 	/** Stores current patrol point */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Patrol")
 	TObjectPtr<ATallowPatrolPoint> CurrentPatrolPoint;
@@ -60,6 +65,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Search")
 	int32 MaxSearchSpots = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	bool bIsTargetTiedToChair = false;
 
 protected:
 

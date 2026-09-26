@@ -67,8 +67,6 @@ void ATallowCreature::ResetToSpawn()
 	}
 }
 
-
-
 void ATallowCreature::SetPhase(ETallowCreaturePhase NewPhase)
 {
 	Phase = NewPhase;
@@ -78,4 +76,27 @@ void ATallowCreature::SetPhase(ETallowCreaturePhase NewPhase)
 	{
 		AIController->ApplyPhaseNavigationFilter(Phase);
 	}
+}
+
+void ATallowCreature::SetCreatureVisualState(ETallowCreatureState NewVisualState)
+{
+	if (CurrentState == NewVisualState) return;
+	CurrentState = NewVisualState;
+	OnCreatureStateChanged.Broadcast(NewVisualState);
+}
+
+void ATallowCreature::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
+{
+	/** if (GetMesh())
+	{
+		const FName HeadSocketName = TEXT("Head");
+		if (GetMesh()->DoesSocketExist(HeadSocketName))
+		{
+			OutLocation = GetMesh()->GetSocketLocation(HeadSocketName);
+			OutRotation = GetMesh()->GetSocketRotation(HeadSocketName);
+			return;
+		}
+	} */
+
+	Super::GetActorEyesViewPoint(OutLocation, OutRotation);
 }

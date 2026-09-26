@@ -1,6 +1,7 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Perception/AISense_Hearing.h"
 #include "Player/TallowCharacter.h"
 #include "Kismet/GameplayStatics.h"
@@ -121,6 +122,8 @@ void ATallowChairEscape::AttemptRock()
 			TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 			TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 			TiedPlayerCharacter->SetTiedChair(nullptr);
+			TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			TiedPlayerCharacter->bUseControllerRotationYaw = true;
 			TiedPlayerCharacter = nullptr;
 		}
 
@@ -152,10 +155,12 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	AngularVelocity = 0.0f;
 	ChairMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	
-	// attach player to component and disable movement, re-enable tick
+	// attach player to component, ignore pawn, disable movement, re-enable tick
 	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	InPlayer->GetCharacterMovement()->DisableMovement();
 	InPlayer->SetTiedChair(this);
+	InPlayer->bUseControllerRotationYaw = false;
 	SetActorTickEnabled(true);
 }
 

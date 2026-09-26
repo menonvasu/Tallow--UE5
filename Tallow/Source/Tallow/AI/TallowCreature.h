@@ -15,6 +15,18 @@ enum class ETallowCreaturePhase : uint8
 	PhaseTwo	UMETA(DisplayName = "Phase Two")
 };
 
+UENUM(BlueprintType)
+enum class ETallowCreatureState : uint8
+{
+	Patrol,
+	Investigating,
+	SuspiciousIdle,
+	SearchingCorner,
+	Chasing,
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCreatureStateChanged, ETallowCreatureState, NewState);
+
 UCLASS()
 class TALLOW_API ATallowCreature : public ACharacter
 {
@@ -42,9 +54,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Phase")
 	void SetPhase(ETallowCreaturePhase NewPhase);
 
+	/** To set animation on state change*/
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	void SetCreatureVisualState(ETallowCreatureState NewVisualState);
+
+	/** Overriden to sweep around on inspecting points */
+	virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
+
 	/** Get current form */
 	UFUNCTION(BlueprintPure, Category = "AI|Phase")
 	ETallowCreaturePhase GetPhase() const { return Phase; }
+
+	UPROPERTY(BlueprintAssignable, Category = "AI|Events")
+	FOnCreatureStateChanged OnCreatureStateChanged;
+
+	UPROPERTY(VisibleAnywhere, Category = "AI|State")
+	ETallowCreatureState CurrentState = ETallowCreatureState::Patrol;
 
 protected:
 
