@@ -1,0 +1,2253 @@
+{
+  "tests": [
+    {
+      "name": "surface route starts",
+      "passed": true
+    },
+    {
+      "name": "floor-wall-ceiling-floor completion",
+      "passed": true,
+      "wall": true,
+      "ceiling": true,
+      "position": [
+        800.0,
+        -500.0,
+        -224.0
+      ]
+    },
+    {
+      "name": "route collision retained and no overlapping poses",
+      "passed": true
+    },
+    {
+      "name": "brain resumed at ground",
+      "passed": true
+    },
+    {
+      "name": "blocked route starts",
+      "passed": true
+    },
+    {
+      "name": "dynamic blocker causes safe grounded retreat",
+      "passed": true,
+      "max_y": -752.9712704661293,
+      "position": [
+        800.014,
+        -900.0,
+        -224.002
+      ]
+    },
+    {
+      "name": "blocked route collision retained",
+      "passed": true
+    },
+    {
+      "name": "ParlourDoor forward starts",
+      "passed": true
+    },
+    {
+      "name": "ParlourDoor forward crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "ParlourDoor reverse starts",
+      "passed": true
+    },
+    {
+      "name": "ParlourDoor reverse crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "KitchenDoor forward starts",
+      "passed": true
+    },
+    {
+      "name": "KitchenDoor forward crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "KitchenDoor reverse starts",
+      "passed": true
+    },
+    {
+      "name": "KitchenDoor reverse crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "FilmRoomDoor forward starts",
+      "passed": true
+    },
+    {
+      "name": "FilmRoomDoor forward crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "FilmRoomDoor reverse starts",
+      "passed": true
+    },
+    {
+      "name": "FilmRoomDoor reverse crosses doorway",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "automatic chase squeeze despite surface cooldown",
+      "passed": true,
+      "distance_to_exit_cm": 0.0
+    },
+    {
+      "name": "capture freeze starts",
+      "passed": true
+    },
+    {
+      "name": "capture freezes traversal without pose snap",
+      "passed": true
+    },
+    {
+      "name": "reset clears traversal and resumes brain",
+      "passed": true
+    },
+    {
+      "name": "route can restart after capture reset",
+      "passed": true
+    },
+    {
+      "name": "automatic traversal clips selected",
+      "passed": true,
+      "observed": [
+        "AN_Keeper_WallCrawl",
+        "AN_Keeper_CeilingCrawl",
+        "AN_Keeper_Squeeze"
+      ]
+    }
+  ],
+  "errors": [],
+  "test_only_teleports": true,
+  "samples": [
+    {
+      "stage": "surface route",
+      "position": [
+        800.0,
+        -900.0,
+        -224.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        810.397,
+        -900.0,
+        -225.356
+      ],
+      "normal": [
+        -0.348,
+        0.0,
+        0.938
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        820.549,
+        -900.0,
+        -226.68
+      ],
+      "normal": [
+        -0.646,
+        0.0,
+        0.764
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        829.924,
+        -900.0,
+        -227.903
+      ],
+      "normal": [
+        -0.853,
+        -0.0,
+        0.522
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        840.077,
+        -900.0,
+        -229.227
+      ],
+      "normal": [
+        -0.98,
+        -0.0,
+        0.201
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        845.621,
+        -900.0,
+        -214.94
+      ],
+      "normal": [
+        -1.0,
+        -0.0,
+        0.013
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        845.818,
+        -900.0,
+        -175.94
+      ],
+      "normal": [
+        -1.0,
+        -0.0,
+        0.006
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        844.88,
+        -900.0,
+        -139.932
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        -0.027
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        831.434,
+        -900.0,
+        -139.117
+      ],
+      "normal": [
+        -0.941,
+        0.0,
+        -0.34
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        816.867,
+        -900.0,
+        -138.234
+      ],
+      "normal": [
+        -0.769,
+        -0.0,
+        -0.639
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        803.368,
+        -900.0,
+        -137.416
+      ],
+      "normal": [
+        -0.528,
+        -0.0,
+        -0.849
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        788.802,
+        -900.0,
+        -136.533
+      ],
+      "normal": [
+        -0.208,
+        -0.0,
+        -0.978
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -885.0,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -845.989,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -809.988,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -773.986,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -734.983,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -698.981,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -659.976,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -623.91,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -584.909,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -545.907,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        780.0,
+        -509.906,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        790.084,
+        -500.767,
+        -136.611
+      ],
+      "normal": [
+        -0.238,
+        0.0,
+        -0.971
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        803.53,
+        -500.583,
+        -137.426
+      ],
+      "normal": [
+        -0.531,
+        -0.0,
+        -0.847
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        816.977,
+        -500.398,
+        -138.241
+      ],
+      "normal": [
+        -0.771,
+        -0.0,
+        -0.637
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        830.423,
+        -500.214,
+        -139.056
+      ],
+      "normal": [
+        -0.932,
+        -0.0,
+        -0.362
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        843.876,
+        -500.029,
+        -139.871
+      ],
+      "normal": [
+        -0.999,
+        -0.0,
+        -0.051
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        846.0,
+        -500.0,
+        -173.002
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        846.0,
+        -500.0,
+        -209.003
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        841.314,
+        -500.0,
+        -229.389
+      ],
+      "normal": [
+        -0.987,
+        -0.0,
+        0.159
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        831.162,
+        -500.0,
+        -228.065
+      ],
+      "normal": [
+        -0.874,
+        -0.0,
+        0.485
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        821.79,
+        -500.0,
+        -226.842
+      ],
+      "normal": [
+        -0.677,
+        -0.0,
+        0.736
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        811.638,
+        -500.0,
+        -225.518
+      ],
+      "normal": [
+        -0.387,
+        -0.0,
+        0.922
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "surface route",
+      "position": [
+        801.486,
+        -500.0,
+        -224.194
+      ],
+      "normal": [
+        -0.051,
+        -0.0,
+        0.999
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        806.248,
+        -900.0,
+        -224.815
+      ],
+      "normal": [
+        -0.212,
+        0.0,
+        0.977
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        815.633,
+        -900.0,
+        -226.039
+      ],
+      "normal": [
+        -0.509,
+        -0.0,
+        0.861
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        825.005,
+        -900.0,
+        -227.261
+      ],
+      "normal": [
+        -0.754,
+        -0.0,
+        0.657
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        835.157,
+        -900.0,
+        -228.586
+      ],
+      "normal": [
+        -0.932,
+        -0.0,
+        0.362
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        844.554,
+        -900.0,
+        -229.811
+      ],
+      "normal": [
+        -0.999,
+        -0.0,
+        0.049
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        846.0,
+        -900.0,
+        -196.999
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        846.0,
+        -900.0,
+        -157.998
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        839.277,
+        -900.0,
+        -139.593
+      ],
+      "normal": [
+        -0.987,
+        0.0,
+        -0.159
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        824.7,
+        -900.0,
+        -138.709
+      ],
+      "normal": [
+        -0.874,
+        0.0,
+        -0.486
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        811.254,
+        -900.0,
+        -137.894
+      ],
+      "normal": [
+        -0.677,
+        -0.0,
+        -0.736
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        797.769,
+        -900.0,
+        -137.077
+      ],
+      "normal": [
+        -0.41,
+        -0.0,
+        -0.912
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        783.201,
+        -900.0,
+        -136.194
+      ],
+      "normal": [
+        -0.076,
+        -0.0,
+        -0.997
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -869.999,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -833.997,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -797.973,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -758.971,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -779.972,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -818.974,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        780.0,
+        -857.977,
+        -136.0
+      ],
+      "normal": [
+        -0.0,
+        0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        781.12,
+        -892.294,
+        -136.068
+      ],
+      "normal": [
+        -0.027,
+        -0.0,
+        -1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        795.526,
+        -900.0,
+        -136.941
+      ],
+      "normal": [
+        -0.361,
+        -0.0,
+        -0.933
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        810.092,
+        -900.0,
+        -137.824
+      ],
+      "normal": [
+        -0.657,
+        -0.0,
+        -0.754
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        823.538,
+        -900.0,
+        -138.639
+      ],
+      "normal": [
+        -0.86,
+        0.0,
+        -0.509
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        836.989,
+        -900.0,
+        -139.454
+      ],
+      "normal": [
+        -0.977,
+        0.0,
+        -0.213
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        846.0,
+        -900.0,
+        -160.959
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        846.0,
+        -900.0,
+        -199.961
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        841.314,
+        -900.0,
+        -227.891
+      ],
+      "normal": [
+        -0.987,
+        -0.0,
+        0.159
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        832.058,
+        -900.0,
+        -228.181
+      ],
+      "normal": [
+        -0.889,
+        -0.0,
+        0.458
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        822.662,
+        -900.0,
+        -226.956
+      ],
+      "normal": [
+        -0.699,
+        -0.0,
+        0.715
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        812.509,
+        -900.0,
+        -225.632
+      ],
+      "normal": [
+        -0.414,
+        -0.0,
+        0.91
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "blocked route",
+      "position": [
+        803.138,
+        -900.0,
+        -224.409
+      ],
+      "normal": [
+        -0.107,
+        -0.0,
+        0.994
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        652.419,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        622.397,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        589.896,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        559.896,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        529.895,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        497.394,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        520.001,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        550.002,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        580.003,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        610.005,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        640.009,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        672.517,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        890.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        890.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        890.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        890.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        892.5,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        922.601,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        955.103,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        985.104,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1017.605,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1047.607,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1060.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1060.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1060.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1060.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1060.0,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1034.999,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        1002.475,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        972.473,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        942.472,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        909.971,
+        -936.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        680.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        662.499,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        632.498,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        599.924,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        567.423,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        537.422,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        504.92,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        490.0,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        515.007,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        547.508,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        577.509,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        610.01,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        642.512,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "squeeze",
+      "position": [
+        672.513,
+        -1105.0,
+        489.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        711.291,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        704.916,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        698.541,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        691.632,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        684.726,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        672.497,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        639.996,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        607.494,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        577.493,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        547.396,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "automatic chase squeeze",
+      "position": [
+        517.395,
+        -325.0,
+        99.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        800.0,
+        -900.0,
+        -224.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        810.152,
+        -900.0,
+        -225.324
+      ],
+      "normal": [
+        -0.34,
+        -0.0,
+        0.941
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        819.527,
+        -900.0,
+        -226.547
+      ],
+      "normal": [
+        -0.618,
+        -0.0,
+        0.786
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        829.68,
+        -900.0,
+        -227.871
+      ],
+      "normal": [
+        -0.849,
+        -0.0,
+        0.529
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        839.051,
+        -900.0,
+        -229.094
+      ],
+      "normal": [
+        -0.972,
+        -0.0,
+        0.235
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        846.0,
+        -900.0,
+        -230.0
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        846.0,
+        -900.0,
+        -230.0
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        846.0,
+        -900.0,
+        -230.0
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        846.0,
+        -900.0,
+        -230.0
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    },
+    {
+      "stage": "capture freeze",
+      "position": [
+        846.0,
+        -900.0,
+        -230.0
+      ],
+      "normal": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "pose_clear": true
+    }
+  ],
+  "observed_clips": [
+    "AN_Keeper_WallCrawl",
+    "AN_Keeper_CeilingCrawl",
+    "AN_Keeper_Squeeze"
+  ],
+  "passed": true
+}

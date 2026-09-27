@@ -6,6 +6,8 @@
 
 class ATallowPatrolPoint;
 class USphereComponent;
+class UTallowCreatureAnimationComponent;
+class UTallowSurfaceTraversalComponent;
 
 /** The creature's two forms. Phase two is the spider form (#25) */
 UENUM(BlueprintType)
@@ -35,6 +37,12 @@ class TALLOW_API ATallowCreature : public ACharacter
 public:
 	// Sets default values for this AI's properties
 	ATallowCreature();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Keeper")
+	TObjectPtr<UTallowCreatureAnimationComponent> KeeperAnimation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Keeper")
+	TObjectPtr<UTallowSurfaceTraversalComponent> SurfaceTraversal;
 
 	/** Pawn BeginPlay implementation */
 	virtual void BeginPlay() override;

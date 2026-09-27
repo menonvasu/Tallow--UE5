@@ -1,5 +1,5 @@
 {
-  "status": "Route anchors only; teammate must implement traversal and squeeze movement/animation",
+  "status": "Active native Keeper surface route and doorway squeezing; authored compact animations",
   "units": "Unreal centimetres",
   "surface_route": [
     {
@@ -41,7 +41,7 @@
       "contact_cm": [
         952,
         -900,
-        -100
+        -140
       ],
       "outward_normal": [
         -1,
@@ -55,7 +55,7 @@
       "actor": "HANDOFF_Surface_B03_Ceiling",
       "surface": "Ceiling",
       "contact_cm": [
-        850,
+        780,
         -900,
         -30
       ],
@@ -71,7 +71,7 @@
       "actor": "HANDOFF_Surface_B04_Ceiling",
       "surface": "Ceiling",
       "contact_cm": [
-        850,
+        780,
         -500,
         -30
       ],
@@ -89,7 +89,7 @@
       "contact_cm": [
         952,
         -500,
-        -100
+        -140
       ],
       "outward_normal": [
         -1,
@@ -194,10 +194,9 @@
     }
   ],
   "implementation_notes": [
-    "Contact points lie on the surface, not at actor centres. Offset by the active collision shape support distance along outward_normal.",
-    "Ground StateTree MoveTo cannot follow these wall and ceiling anchors. Switch to an explicit traversal movement mode and then return to ground navigation.",
-    "Interpolate surface orientation at transitions and sweep the full body; validate feet/legs separately.",
-    "Keep perception, capture and reset active; on interruption choose a reachable ground exit.",
-    "Full extended spider legs are not integrated in this proxy. Fold or plant them against nearby surfaces before enabling these routes."
+    "TallowSurfaceTraversalComponent follows these explicit routes with full capsule translation sweeps and intermediate rotation overlap checks.",
+    "Surface movement pauses the StateTree and restores ground movement after completion or safe retreat.",
+    "Compact authored wall/ceiling poses preserve leg segment lengths. This is not arbitrary per-leg surface IK.",
+    "Door squeeze plays a concealed-leg pose with temporary width/height compression; collision remains enabled."
   ]
 }
