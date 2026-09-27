@@ -32,3 +32,13 @@ Thumbs.db
 .env
 
 # Keep: Config/, Content/ (assets via LFS), Source/, *.uproject
+
+# Generated reports from Tools/ scripts (rerun the script to regenerate)
+Tools/keeper-surface-fit.json
+Tools/keeper-pose-review.json
+Tools/keeper-animation-validation.json
+Tools/keeper-traversal-validation.json
+Tools/keeper-animation-import.json
+Tools/m3-validation.json
+Tools/m3-stair-movement.json
+Tools/m3-layout.json
