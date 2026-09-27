@@ -49,6 +49,13 @@ protected:
 
 	/** Screen fade timer */
 	FTimerHandle ResetTimerHandle;
+	FTimerHandle CaptureFadeTimerHandle;
+	bool bCaptureInProgress = false;
+	bool bCaptureLockedLook = false;
+	void BeginCaptureFade();
+	/** Preserve the authored capture before fading; unconfigured creatures retain the original timing. */
+	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
+	bool bShowAuthoredCapture = true;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
 	float FadeOutTimer = 0.8f;
@@ -59,6 +66,5 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Tallow|Game")
 	float BlackoutTimer = 1.0f;
 };
-
 
 

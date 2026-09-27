@@ -1,0 +1,22 @@
+{
+  "reimport_animations": false,
+  "mesh_location_cm": [
+    0,
+    0,
+    -96
+  ],
+  "mesh_rotation_deg": [
+    0,
+    -90,
+    0
+  ],
+  "mesh_scale": [
+    1,
+    1,
+    1
+  ],
+  "reimport_animation_names": [
+    "WallCrawl",
+    "CeilingCrawl"
+  ]
+}
