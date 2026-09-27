@@ -62,6 +62,8 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<ATallowCharacter> TiedPlayerCharacter;
 
+	FTransform InitialChairRelativeTransform;
+
 	/** Event properties */
 	UPROPERTY(BlueprintAssignable, Category = "Chair|Events")
 	FOnChairEscaped OnChairEscaped;

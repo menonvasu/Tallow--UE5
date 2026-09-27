@@ -43,6 +43,11 @@ void ATallowChairEscape::BeginPlay()
 	{
 		TiePlayerToChair(TiedPlayerCharacter);
 	}
+
+	if (ChairMesh)
+	{
+		InitialChairRelativeTransform = ChairMesh->GetRelativeTransform();
+	}
 }
 
 // Called every frame
@@ -214,10 +219,14 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	}
 
 	// Reattach chair mesh if not already
-	ChairMesh->SetSimulatePhysics(false);
-	if (ChairMesh && RockingPivot && (ChairMesh->GetAttachParent() != RockingPivot))
+	if (ChairMesh)
 	{
-		ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::KeepWorldTransform);
+		ChairMesh->SetSimulatePhysics(false);
+		if (RockingPivot && ChairMesh->GetAttachParent() != RockingPivot)
+		{
+			ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			ChairMesh->SetRelativeTransform(InitialChairRelativeTransform);
+		}
 	}
 
 	// set properties back to defaults
