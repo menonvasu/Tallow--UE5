@@ -11,11 +11,16 @@
 #include "Candle/TallowCandleComponent.h"
 #include "Noise/TallowFootstepNoiseComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
+#include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
 {
+	PrimaryActorTick.bCanEverTick = false;
+
 	// Set size for collision capsule
 	constexpr float PlayerHalfHeight = 60.0f;
 	GetCapsuleComponent()->InitCapsuleSize(30.f, PlayerHalfHeight);
@@ -71,6 +76,13 @@ ATallowCharacter::ATallowCharacter()
 	CandleLightComponent->SetAttenuationRadius(800.0f);
 	CandleLightComponent->SetIntensity(3000.0f);
 
+	// Create stimulus
+	StimulusSourceComponent = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimulusSourceComponent"));
+	if (StimulusSourceComponent)
+	{
+		StimulusSourceComponent->bAutoRegister = true;
+	}
+
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -115,6 +127,14 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		{
 			EnhancedInputComponent->BindAction(RelightAction, ETriggerEvent::Started, this, &ATallowCharacter::DoRelight);
 		}
+
+		// Stillness
+		if (StillnessAction)
+		{
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Started, this, &ATallowCharacter::DoStillnessStart);
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoStillnessEnd);
+			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoStillnessEnd);
+		}
 	}
 	else
 	{
@@ -122,9 +142,34 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
-void ATallowCharacter::Tick(float DeltaTime)
+void ATallowCharacter::BeginPlay()
 {
-	Super::Tick(DeltaTime);
+	Super::BeginPlay();
+
+	// Bind event to set light perception
+	if (CandleComponent)
+	{
+		CandleComponent->OnCandleStateChanged.AddDynamic(this, &ATallowCharacter::SetLightPerception);
+		SetLightPerception(CandleComponent->GetCandleState());
+	}
+}
+
+void ATallowCharacter::SetLightPerception(ECandleState NewState)
+{
+	UAIPerceptionSystem* PerceptionSystem = UAIPerceptionSystem::GetCurrent(GetWorld());
+	if (!PerceptionSystem)
+	{
+		return;
+	}
+
+	if (NewState == ECandleState::Out)
+	{
+		PerceptionSystem->UnregisterSource(*this, UAISense_Sight::StaticClass());
+	}
+	if (NewState == ECandleState::Lit || NewState == ECandleState::Cupped)
+	{
+		PerceptionSystem->RegisterSourceForSenseClass(UAISense_Sight::StaticClass(), *this);
+	}
 }
 
 void ATallowCharacter::MoveInput(const FInputActionValue& Value)
@@ -187,10 +232,8 @@ void ATallowCharacter::DoRunEnd()
 	{
 		CandleComponent->HandleSprintEnded();
 	}
-	else
-	{
-		GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
-	}
+	
+	GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
 }
 
 void ATallowCharacter::DoJumpStart()
@@ -273,5 +316,62 @@ void ATallowCharacter::DoRelight()
 	if (CandleComponent)
 	{
 		CandleComponent->StartRelighting();
+	}
+}
+
+void ATallowCharacter::DoStillnessStart()
+{
+	if (IsTiedToChair()) return;
+
+	StillnessStartTime = GetWorld()->GetTimeSeconds();
+
+	bIsHoldingStill = true;
+	OnStill.Broadcast(bIsHoldingStill);
+
+	// Ignore player capsule
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+	// Disable movement
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetIgnoreMoveInput(true);
+		PC->SetIgnoreLookInput(true);
+	}
+
+	// Make player immune
+	if (StimulusSourceComponent)
+	{
+		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
+	}
+}
+
+void ATallowCharacter::DoStillnessEnd()
+{
+	const double HoldDuration = GetWorld()->GetTimeSeconds() - StillnessStartTime;
+
+	bIsHoldingStill = false;
+	OnStill.Broadcast(bIsHoldingStill);
+
+	// only transform if reasonably held 
+	if (HoldDuration >= MinStillnessHoldDuration)
+	{
+		TransformationLevel++;
+		OnTransformation.Broadcast(TransformationLevel);
+	}
+
+	// Restore collision 
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+
+	// Re-enable movement
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetIgnoreMoveInput(false);
+		PC->SetIgnoreLookInput(false);
+	}
+
+	// Restore sight
+	if (CandleComponent)
+	{
+		SetLightPerception(GetCandleComponent()->GetCandleState());
 	}
 }

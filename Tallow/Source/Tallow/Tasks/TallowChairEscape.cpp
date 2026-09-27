@@ -1,11 +1,14 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Perception/AISense_Hearing.h"
 #include "Player/TallowCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "Noise/TallowNoiseSubsystem.h"
+#include "Noise/TallowNoiseTypes.h"
 
 // Sets default values
 ATallowChairEscape::ATallowChairEscape()
@@ -69,6 +72,9 @@ void ATallowChairEscape::Tick(float DeltaTime)
 
 void ATallowChairEscape::AttemptRock()
 { 
+	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
+	bool bNoiseSystem = (NoiseSubsystem != nullptr);
+
 	if (!bIsTied) return;
 
 	// initial impulse
@@ -82,7 +88,12 @@ void ATallowChairEscape::AttemptRock()
 	{
 		CurrentRockCount++;
 		OnRockProgressChanged.Broadcast(CurrentRockCount, RequiredRocks);
-		UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetActorLocation(), RhythmicCreakLoudness, this, 0.0f, FName("Successful rock"));
+
+		if (bNoiseSystem)
+		{
+			NoiseSubsystem->EmitNoise(ETallowNoiseType::ChairRock, GetActorLocation(), this, RhythmicCreakLoudness, true);
+		}
+
 		AngularVelocity += RockImpulse;
 	}
 	// amplitude cancels out - reset
@@ -90,7 +101,12 @@ void ATallowChairEscape::AttemptRock()
 	{
 		CurrentRockCount = 0;
 		OnRockProgressChanged.Broadcast(0, RequiredRocks);
-		UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetActorLocation(), MistimedNoiseLoudness, this, 0.0f, FName("Chair rock failed"));
+		
+		if (bNoiseSystem)
+		{
+			NoiseSubsystem->EmitNoise(ETallowNoiseType::ChairRock, GetActorLocation(), this, MistimedNoiseLoudness, true);
+		}
+
 		AngularVelocity = 0.0f;
 	}
 
@@ -106,6 +122,8 @@ void ATallowChairEscape::AttemptRock()
 			TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 			TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 			TiedPlayerCharacter->SetTiedChair(nullptr);
+			TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			TiedPlayerCharacter->bUseControllerRotationYaw = true;
 			TiedPlayerCharacter = nullptr;
 		}
 
@@ -137,10 +155,12 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	AngularVelocity = 0.0f;
 	ChairMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	
-	// attach player to component and disable movement, re-enable tick
+	// attach player to component, ignore pawn, disable movement, re-enable tick
 	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	InPlayer->GetCharacterMovement()->DisableMovement();
 	InPlayer->SetTiedChair(this);
+	InPlayer->bUseControllerRotationYaw = false;
 	SetActorTickEnabled(true);
 }
 

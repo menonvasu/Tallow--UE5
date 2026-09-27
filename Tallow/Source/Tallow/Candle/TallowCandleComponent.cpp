@@ -2,6 +2,9 @@
 #include "Components/PointLightComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Perception/AISense_Hearing.h"
+#include "Noise/TallowNoiseSubsystem.h" 
+#include "Noise/TallowNoiseTypes.h"
+
 
 UTallowCandleComponent::UTallowCandleComponent()
 {
@@ -123,8 +126,8 @@ void UTallowCandleComponent::StartRelighting()
     // if lit, return
     if (CurrentState == ECandleState::Lit) return;
     // if candle already out or no matches left or still currently relighting, end early
-	if (CurrentState != ECandleState::Out  || MatchCount <= 0) return;
-	if (GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle)) return;
+    if (CurrentState != ECandleState::Out || MatchCount <= 0) return;
+    if (GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle)) return;
 
     // Striking a match immediately breaks full sprint:
     if (CachedMovementComponent)
@@ -133,10 +136,13 @@ void UTallowCandleComponent::StartRelighting()
     }
 
     // start ligthing anim
-	OnRelightStarted.Broadcast();
+    OnRelightStarted.Broadcast();
 
     // report candle lit noise
-	UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetOwner()->GetActorLocation(), RelightNoiseLoudness, GetOwner(), 0.0f, FName("Relight"));
+    if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
+    {
+        NoiseSubsystem->EmitNoise(ETallowNoiseType::MatchStrike, GetOwner()->GetActorLocation(), GetOwner(), RelightNoiseLoudness, true);
+    }
 
     // start timer to light up the candle
 	GetWorld()->GetTimerManager().SetTimer(
@@ -238,4 +244,12 @@ void UTallowCandleComponent::HandleDraftExtinguishTimerExpired()
 {   
     // set out on expired
     SetCandleState(ECandleState::Out);
+}
+
+void UTallowCandleComponent::ResetCandle()
+{
+    bIsAcquired = false;
+    SetCandleState(ECandleState::Out);
+    ResetMatchCount();
+    OnCandleReset.Broadcast();
 }

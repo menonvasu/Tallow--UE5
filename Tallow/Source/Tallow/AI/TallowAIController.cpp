@@ -1,9 +1,12 @@
 #include "AI/TallowAIController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "GameMode/TallowGameMode.h"
+#include "Player/TallowCharacter.h"
 #include "TallowCreature.h"
 #include "Navigation/TallowNavFilter_PhaseOne.h"
 
@@ -41,6 +44,7 @@ ATallowAIController::ATallowAIController()
 		SightConfig->DetectionByAffiliation.bDetectEnemies = true;
 		SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
 		SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+		SightConfig->AutoSuccessRangeFromLastSeenLocation = 150.0f;
 
 		AIPerceptionComponent->ConfigureSense(*SightConfig);
 		AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
@@ -52,6 +56,21 @@ void ATallowAIController::BeginPlay()
 {
 	Super::BeginPlay();
 	AIPerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ATallowAIController::HandleTargetPerceptionUpdated);
+}
+
+// Reset logic
+void ATallowAIController::ResetBrain()
+{
+	TargetActor = nullptr;
+	ATallowCreature* Creature = Cast<ATallowCreature>(GetPawn());
+	if (Creature)
+	{
+		CurrentPatrolPoint = Creature->StartingPatrolPoint;
+	}
+	if (StateTreeAIComponent)
+	{
+		StateTreeAIComponent->RestartLogic();
+	}
 }
 
 // Set starting patrol point
@@ -88,6 +107,21 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 
 	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == HearingSenseID)
 	{
+		const double CurrentTime = GetWorld()->GetTimeSeconds();
+		const float DistanceFromLastNoise = FVector::Dist(LastHeardNoiseLocation, Stimulus.StimulusLocation);
+		const bool bIsTooSoon = (CurrentTime - LastNoiseProcessTime) < MinNoiseRepathDelay;
+		const bool bIsTooClose = DistanceFromLastNoise < NoiseRepathDistanceThreshold;
+
+		// supress event if too soon and close, reduce recalculation
+		if (bIsTooClose && bIsTooSoon) return;
+
+		// update boolean 
+		if (const ATallowCharacter* Player = Cast<ATallowCharacter>(UGameplayStatics::GetPlayerCharacter(this, 0)))
+		{
+			bIsTargetTiedToChair = Player->IsTiedToChair();
+		}
+
+		LastNoiseProcessTime = CurrentTime;
 		LastHeardNoiseLocation = Stimulus.StimulusLocation;
 		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(NoiseHeardTag));
 	}
@@ -107,3 +141,31 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 		}
 	}
 }
+
+void ATallowAIController::NotifyPlayerTouched(AActor* TouchedActor)
+{
+	if (!TouchedActor) return;
+	ATallowCharacter* Player = Cast<ATallowCharacter>(TouchedActor);
+	if (!Player) return;
+
+	// if still tied to chair, return early
+	if (Player->IsTiedToChair()) return;
+
+	// if player holding stillness, return early
+	if (Player->IsHoldingStill()) return;
+
+	if (StateTreeAIComponent)
+	{
+		StateTreeAIComponent->SendStateTreeEvent(FStateTreeEvent(PlayerCaughtTag));
+	}
+}
+
+void ATallowAIController::TriggerPlayerCapture()
+{
+
+	if (ATallowGameMode* GM = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		GM->HandlePlayerCaptured();
+	}
+}
+

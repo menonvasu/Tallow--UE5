@@ -2,6 +2,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SphereComponent.h"
 #include "TallowAIController.h"
 
 ATallowCreature::ATallowCreature()
@@ -18,6 +19,12 @@ ATallowCreature::ATallowCreature()
 	// Set possession
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	AutoPossessPlayer = EAutoReceiveInput::Disabled;
+
+	// Setup grab sphere
+	GrabSphere = CreateDefaultSubobject<USphereComponent>(TEXT("Grab Sphere"));
+	GrabSphere->SetupAttachment(GetCapsuleComponent());
+	GrabSphere->SetSphereRadius(85.0f);
+	GrabSphere->SetCollisionProfileName(TEXT("Trigger"));
 }
 
 void ATallowCreature::BeginPlay()
@@ -28,9 +35,37 @@ void ATallowCreature::BeginPlay()
 	{
 		SpawnDefaultController();
 	}
+
+	InitialSpawnTransform = GetActorTransform();
+	
+	if (GrabSphere)
+	{
+		GrabSphere->OnComponentBeginOverlap.AddDynamic(this, &ATallowCreature::OnOverlapBegin);
+	}
 }
 
+void ATallowCreature::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (ATallowAIController* AICon = GetController<ATallowAIController>())
+	{
+		AICon->NotifyPlayerTouched(OtherActor);
+	}
+}
 
+void ATallowCreature::ResetToSpawn()
+{
+	SetActorTransform(InitialSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+
+	if (GetCharacterMovement())
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+
+	if (ATallowAIController* AICon = GetController<ATallowAIController>())
+	{
+		AICon->ResetBrain();
+	}
+}
 
 void ATallowCreature::SetPhase(ETallowCreaturePhase NewPhase)
 {
@@ -41,4 +76,27 @@ void ATallowCreature::SetPhase(ETallowCreaturePhase NewPhase)
 	{
 		AIController->ApplyPhaseNavigationFilter(Phase);
 	}
+}
+
+void ATallowCreature::SetCreatureVisualState(ETallowCreatureState NewVisualState)
+{
+	if (CurrentState == NewVisualState) return;
+	CurrentState = NewVisualState;
+	OnCreatureStateChanged.Broadcast(NewVisualState);
+}
+
+void ATallowCreature::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
+{
+	/** if (GetMesh())
+	{
+		const FName HeadSocketName = TEXT("Head");
+		if (GetMesh()->DoesSocketExist(HeadSocketName))
+		{
+			OutLocation = GetMesh()->GetSocketLocation(HeadSocketName);
+			OutRotation = GetMesh()->GetSocketRotation(HeadSocketName);
+			return;
+		}
+	} */
+
+	Super::GetActorEyesViewPoint(OutLocation, OutRotation);
 }

@@ -19,6 +19,9 @@ public:
 
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 
+	UFUNCTION(BlueprintCallable, Category = "Pickup")
+	void ResetPickup(AActor* Interactor);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup")
 	TObjectPtr<UStaticMeshComponent> PickupMesh;
 
