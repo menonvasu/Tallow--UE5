@@ -1,0 +1,53 @@
+{
+  "checks": [
+    {
+      "name": "Basement stair",
+      "request": "<PathFollowingRequestResult.REQUEST_SUCCESSFUL: 2>",
+      "start_cm": [
+        1480,
+        -800,
+        -232
+      ],
+      "goal_floor_cm": [
+        1248,
+        -1230,
+        0
+      ],
+      "end_cm": [
+        1249.593505901662,
+        -1152.0258184627462,
+        94.99350280650151
+      ],
+      "distance_to_goal_cm": 77.99695688976438,
+      "reached": true,
+      "move_status": "<PathFollowingStatus.IDLE: 0>"
+    },
+    {
+      "name": "Main stair",
+      "request": "<PathFollowingRequestResult.REQUEST_SUCCESSFUL: 2>",
+      "start_cm": [
+        780,
+        -220,
+        98
+      ],
+      "goal_floor_cm": [
+        780,
+        -220,
+        390
+      ],
+      "end_cm": [
+        746.0510533881938,
+        -289.2782938012444,
+        488.010294327888
+      ],
+      "distance_to_goal_cm": 77.1754770075802,
+      "reached": true,
+      "move_status": "<PathFollowingStatus.IDLE: 0>"
+    }
+  ],
+  "errors": [],
+  "movement": {
+    "step_height_cm": 45.0,
+    "speed_cm_s": 600.0
+  }
+}
