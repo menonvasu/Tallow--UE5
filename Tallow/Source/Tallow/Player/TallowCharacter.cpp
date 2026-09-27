@@ -162,11 +162,11 @@ void ATallowCharacter::SetLightPerception(ECandleState NewState)
 		return;
 	}
 
-	if (NewState == ECandleState::Out)
+	if (bIsHoldingStill || NewState == ECandleState::Out)
 	{
 		PerceptionSystem->UnregisterSource(*this, UAISense_Sight::StaticClass());
 	}
-	if (NewState == ECandleState::Lit || NewState == ECandleState::Cupped)
+	else if (NewState == ECandleState::Lit || NewState == ECandleState::Cupped)
 	{
 		PerceptionSystem->RegisterSourceForSenseClass(UAISense_Sight::StaticClass(), *this);
 	}
@@ -321,7 +321,7 @@ void ATallowCharacter::DoRelight()
 
 void ATallowCharacter::DoStillnessStart()
 {
-	if (IsTiedToChair()) return;
+	if (IsTiedToChair() || bIsHoldingStill) return;
 
 	StillnessStartTime = GetWorld()->GetTimeSeconds();
 
@@ -347,6 +347,7 @@ void ATallowCharacter::DoStillnessStart()
 
 void ATallowCharacter::DoStillnessEnd()
 {
+	if (!bIsHoldingStill) return;
 	const double HoldDuration = GetWorld()->GetTimeSeconds() - StillnessStartTime;
 
 	bIsHoldingStill = false;
