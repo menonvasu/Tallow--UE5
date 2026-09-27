@@ -1,0 +1,203 @@
+{
+  "status": "Route anchors only; teammate must implement traversal and squeeze movement/animation",
+  "units": "Unreal centimetres",
+  "surface_route": [
+    {
+      "id": "B00",
+      "actor": "HANDOFF_Surface_B00_Floor",
+      "surface": "Floor",
+      "contact_cm": [
+        800,
+        -900,
+        -330
+      ],
+      "outward_normal": [
+        0,
+        0,
+        1
+      ],
+      "next": "B01"
+    },
+    {
+      "id": "B01",
+      "actor": "HANDOFF_Surface_B01_Wall",
+      "surface": "Wall",
+      "contact_cm": [
+        952,
+        -900,
+        -230
+      ],
+      "outward_normal": [
+        -1,
+        0,
+        0
+      ],
+      "next": "B02"
+    },
+    {
+      "id": "B02",
+      "actor": "HANDOFF_Surface_B02_Wall",
+      "surface": "Wall",
+      "contact_cm": [
+        952,
+        -900,
+        -100
+      ],
+      "outward_normal": [
+        -1,
+        0,
+        0
+      ],
+      "next": "B03"
+    },
+    {
+      "id": "B03",
+      "actor": "HANDOFF_Surface_B03_Ceiling",
+      "surface": "Ceiling",
+      "contact_cm": [
+        850,
+        -900,
+        -30
+      ],
+      "outward_normal": [
+        0,
+        0,
+        -1
+      ],
+      "next": "B04"
+    },
+    {
+      "id": "B04",
+      "actor": "HANDOFF_Surface_B04_Ceiling",
+      "surface": "Ceiling",
+      "contact_cm": [
+        850,
+        -500,
+        -30
+      ],
+      "outward_normal": [
+        0,
+        0,
+        -1
+      ],
+      "next": "B05"
+    },
+    {
+      "id": "B05",
+      "actor": "HANDOFF_Surface_B05_Wall",
+      "surface": "Wall",
+      "contact_cm": [
+        952,
+        -500,
+        -100
+      ],
+      "outward_normal": [
+        -1,
+        0,
+        0
+      ],
+      "next": "B06"
+    },
+    {
+      "id": "B06",
+      "actor": "HANDOFF_Surface_B06_Wall",
+      "surface": "Wall",
+      "contact_cm": [
+        952,
+        -500,
+        -230
+      ],
+      "outward_normal": [
+        -1,
+        0,
+        0
+      ],
+      "next": "B07"
+    },
+    {
+      "id": "B07",
+      "actor": "HANDOFF_Surface_B07_Floor",
+      "surface": "Floor",
+      "contact_cm": [
+        800,
+        -500,
+        -330
+      ],
+      "outward_normal": [
+        0,
+        0,
+        1
+      ],
+      "next": "B00"
+    }
+  ],
+  "squeeze_doors": [
+    {
+      "id": "ParlourDoor",
+      "entry_floor_cm": [
+        680,
+        -325,
+        0
+      ],
+      "exit_floor_cm": [
+        490,
+        -325,
+        0
+      ],
+      "opening_width_cm": 110,
+      "opening_height_cm": 240,
+      "proposed_visual_envelope_cm": {
+        "width": 90,
+        "height": 215
+      },
+      "notes": "Fold limbs and duck head; sweep collision through the opening. Do not teleport or turn collision off."
+    },
+    {
+      "id": "KitchenDoor",
+      "entry_floor_cm": [
+        890,
+        -936,
+        0
+      ],
+      "exit_floor_cm": [
+        1060,
+        -936,
+        0
+      ],
+      "opening_width_cm": 110,
+      "opening_height_cm": 240,
+      "proposed_visual_envelope_cm": {
+        "width": 90,
+        "height": 215
+      },
+      "notes": "Fold limbs and duck head; sweep collision through the opening. Do not teleport or turn collision off."
+    },
+    {
+      "id": "FilmRoomDoor",
+      "entry_floor_cm": [
+        680,
+        -1105,
+        390
+      ],
+      "exit_floor_cm": [
+        490,
+        -1105,
+        390
+      ],
+      "opening_width_cm": 110,
+      "opening_height_cm": 240,
+      "proposed_visual_envelope_cm": {
+        "width": 90,
+        "height": 215
+      },
+      "notes": "Fold limbs and duck head; sweep collision through the opening. Do not teleport or turn collision off."
+    }
+  ],
+  "implementation_notes": [
+    "Contact points lie on the surface, not at actor centres. Offset by the active collision shape support distance along outward_normal.",
+    "Ground StateTree MoveTo cannot follow these wall and ceiling anchors. Switch to an explicit traversal movement mode and then return to ground navigation.",
+    "Interpolate surface orientation at transitions and sweep the full body; validate feet/legs separately.",
+    "Keep perception, capture and reset active; on interruption choose a reachable ground exit.",
+    "Full extended spider legs are not integrated in this proxy. Fold or plant them against nearby surfaces before enabling these routes."
+  ]
+}
