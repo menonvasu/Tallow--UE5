@@ -40,7 +40,7 @@ ATallowCharacter::ATallowCharacter()
 	// Create the Camera Component	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
 	FirstPersonCameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(0.f, 0.f, 0.f), FRotator(0.0f, 0.0f, -90.0f));
+	FirstPersonCameraComponent->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	FirstPersonCameraComponent->bUsePawnControlRotation = false;
 
 	FirstPersonCameraComponent->bEnableFirstPersonFieldOfView = true;
@@ -151,6 +151,11 @@ void ATallowCharacter::BeginPlay()
 	{
 		CandleComponent->OnCandleStateChanged.AddDynamic(this, &ATallowCharacter::SetLightPerception);
 		SetLightPerception(CandleComponent->GetCandleState());
+	}
+
+	if (FirstPersonMesh)
+	{
+		FirstPersonMesh->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
 	}
 }
 
@@ -287,7 +292,8 @@ void ATallowCharacter::DoInteract()
 	);
 
 	// if hit, run interact
-	if (bHit && HitResult.GetActor()->Implements<UInteractable>())
+	AActor* HitActor = HitResult.GetActor();
+	if (bHit && HitActor && HitActor->Implements<UInteractable>())
 	{
 		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
 	}
@@ -343,6 +349,10 @@ void ATallowCharacter::DoStillnessStart()
 	{
 		StimulusSourceComponent->UnregisterFromSense(UAISense_Sight::StaticClass());
 	}
+
+	// RVO Avoidance
+	GetCharacterMovement()->bUseRVOAvoidance = true;
+	GetCharacterMovement()->AvoidanceWeight = 1.0f;
 }
 
 void ATallowCharacter::DoStillnessEnd()
@@ -374,4 +384,6 @@ void ATallowCharacter::DoStillnessEnd()
 	{
 		SetLightPerception(GetCandleComponent()->GetCandleState());
 	}
+
+	GetCharacterMovement()->AvoidanceWeight = 0.0f;
 }

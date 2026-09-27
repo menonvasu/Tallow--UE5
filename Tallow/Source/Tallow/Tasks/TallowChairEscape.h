@@ -8,6 +8,7 @@ class UStaticMeshComponent;
 class USceneComponent;
 class ATallowCharacter;
 class UUserWidget;
+class UCameraShakeBase;
 
 // escape delegate
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnChairEscaped);
@@ -44,10 +45,19 @@ protected:
 
 	/** Mesh, Seat and Player attachment pointers */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
+	TObjectPtr<USceneComponent> SceneRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
+	TObjectPtr<USceneComponent> RockingPivot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<UStaticMeshComponent> ChairMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<USceneComponent> SeatAttachPoint;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
+	TObjectPtr<USceneComponent> EscapeExitPoint;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<ATallowCharacter> TiedPlayerCharacter;
@@ -80,10 +90,13 @@ protected:
 	float Stiffness = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
-	float RockImpulse = 50.0f;
+	float RockImpulse = 90.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
-	float Damping = 2.0f;
+	float Damping = 1.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
+	float CrashForce = 1000.0f;
 
 	/** Tracks success */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair|State")
@@ -96,6 +109,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
 	float MaxSwingAngle = 25.0f;
 
+	/** Camera Shake */
+	UPROPERTY(EditDefaultsOnly, Category = "Chair|Effects")
+	TSubclassOf<UCameraShakeBase> FloorSlamCameraShakeClass;
+
+	/** Camera limits */
+	float CachedPitchMin = 0.0f;
+	float CachedPitchMax = 0.0f;
+	float CachedYawMin = 0.0f;
+	float CachedYawMax = 0.0f;
 
 	/** Widget properties */
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|UI")

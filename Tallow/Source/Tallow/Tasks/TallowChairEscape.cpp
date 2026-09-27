@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Noise/TallowNoiseTypes.h"
 
@@ -15,11 +16,21 @@ ATallowChairEscape::ATallowChairEscape()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	ChairMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Chair Mesh"));
-	RootComponent = ChairMesh;
+	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Chair Root"));
+	RootComponent = SceneRoot;
 
-	SeatAttachPoint = CreateDefaultSubobject<USceneComponent>(TEXT("SeatAttachPoint"));
+	RockingPivot = CreateDefaultSubobject<USceneComponent>(TEXT("Chair Pivot"));
+	RockingPivot->SetupAttachment(SceneRoot);
+
+	ChairMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Chair Mesh"));
+	ChairMesh->SetupAttachment(RockingPivot);
+
+	SeatAttachPoint = CreateDefaultSubobject<USceneComponent>(TEXT("Seat Attach Point"));
 	SeatAttachPoint->SetupAttachment(ChairMesh);
+
+	EscapeExitPoint = CreateDefaultSubobject<USceneComponent>(TEXT("Escape Exit Point"));
+	EscapeExitPoint->SetupAttachment(SceneRoot);
+	EscapeExitPoint->SetRelativeLocation(FVector(75.0f, 0.0f, 60.0f));
 }
 
 // Called when the game starts or when spawned
@@ -57,7 +68,7 @@ void ATallowChairEscape::Tick(float DeltaTime)
 		AngularVelocity = 0.0f; // inelastic collision
 	}
 
-	ChairMesh->SetRelativeRotation(FRotator(-CurrentSwingAngle, 0.0f, 0.0f));
+	RockingPivot->SetRelativeRotation(FRotator(-CurrentSwingAngle, 0.0f, 0.0f));
 
 	// reset count if at rest
 	const bool bIsFlatOnFloor = FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
@@ -66,6 +77,55 @@ void ATallowChairEscape::Tick(float DeltaTime)
 	{
 		CurrentRockCount = 0;
 		OnRockProgressChanged.Broadcast(0, RequiredRocks);
+	}
+
+	// breakout 
+	if (CurrentSwingAngle >= 0.0f && CurrentRockCount >= RequiredRocks && AngularVelocity > 0.0f)
+	{
+		OnChairEscaped.Broadcast();
+		bIsTied = false;
+		
+		APlayerController* PC = TiedPlayerCharacter ? TiedPlayerCharacter->GetController<APlayerController>() : nullptr;
+		if (PC && PC->PlayerCameraManager)
+		{
+			APlayerCameraManager* CamManager = PC->PlayerCameraManager;
+
+			CamManager->ViewPitchMin = CachedPitchMin;
+			CamManager->ViewPitchMax = CachedPitchMax;
+			CamManager->ViewYawMin = CachedYawMin;
+			CamManager->ViewYawMax = CachedYawMax;
+			
+			if (FloorSlamCameraShakeClass)
+			{
+				PC->PlayerCameraManager->StartCameraShake(FloorSlamCameraShakeClass, 1.0f);
+			}
+		}
+
+		if (ChairMesh)
+		{
+			ChairMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+			ChairMesh->SetSimulatePhysics(true);
+			ChairMesh->AddImpulse(GetActorForwardVector() * CrashForce);
+		}
+
+		if (TiedPlayerCharacter)
+		{
+			TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+			TiedPlayerCharacter->TeleportTo(EscapeExitPoint->GetComponentLocation(), EscapeExitPoint->GetComponentRotation(), false, false);
+			TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+			TiedPlayerCharacter->SetTiedChair(nullptr);
+			TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			TiedPlayerCharacter->bUseControllerRotationYaw = true;
+			TiedPlayerCharacter = nullptr;
+		}
+
+		if (ActiveOverlayWidget)
+		{
+			ActiveOverlayWidget->RemoveFromParent();
+			ActiveOverlayWidget = nullptr;
+		}
+
+		SetActorTickEnabled(false);
 	}
 }
 
@@ -76,6 +136,8 @@ void ATallowChairEscape::AttemptRock()
 	bool bNoiseSystem = (NoiseSubsystem != nullptr);
 
 	if (!bIsTied) return;
+
+	APlayerController* PC = TiedPlayerCharacter ? TiedPlayerCharacter->GetController<APlayerController>() : nullptr;
 
 	// initial impulse
 	const bool bIsAtRest = FMath::IsNearlyZero(AngularVelocity, 1.0f) && FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
@@ -102,6 +164,11 @@ void ATallowChairEscape::AttemptRock()
 		CurrentRockCount = 0;
 		OnRockProgressChanged.Broadcast(0, RequiredRocks);
 		
+		if (PC && PC->PlayerCameraManager && FloorSlamCameraShakeClass)
+		{
+			PC->PlayerCameraManager->StartCameraShake(FloorSlamCameraShakeClass, 0.7f);
+		}
+
 		if (bNoiseSystem)
 		{
 			NoiseSubsystem->EmitNoise(ETallowNoiseType::ChairRock, GetActorLocation(), this, MistimedNoiseLoudness, true);
@@ -109,41 +176,48 @@ void ATallowChairEscape::AttemptRock()
 
 		AngularVelocity = 0.0f;
 	}
-
-	// breakout
-	if (CurrentRockCount >= RequiredRocks)
-	{
-		OnChairEscaped.Broadcast();
-		bIsTied = false;
-		SetActorTickEnabled(false);
-
-		if (TiedPlayerCharacter)
-		{
-			TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-			TiedPlayerCharacter->SetTiedChair(nullptr);
-			TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
-			TiedPlayerCharacter->bUseControllerRotationYaw = true;
-			TiedPlayerCharacter = nullptr;
-		}
-
-		if (ActiveOverlayWidget)
-		{
-			ActiveOverlayWidget->RemoveFromParent();
-			ActiveOverlayWidget = nullptr;
-		}
-	}
 }
 
 void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 {
 	if (!InPlayer) return;
 
+	// Set Widget
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
 	{
 		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
 		ActiveOverlayWidget->AddToViewport();
+	}
+
+	if (PC && PC->PlayerCameraManager)
+	{
+		APlayerCameraManager* CamManager = PC->PlayerCameraManager;
+		// Read and save camera defaults
+		CachedPitchMin = CamManager->ViewPitchMin;
+		CachedPitchMax = CamManager->ViewPitchMax;
+		CachedYawMin = CamManager->ViewYawMin;
+		CachedYawMax = CamManager->ViewYawMax;
+
+		// Calculate clamps
+		const float ChairYaw = ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw;
+		const float TargetYawMin = ChairYaw - 40.0f;
+		const float TargetYawMax = ChairYaw + 40.0f;
+	
+		CamManager->ViewPitchMin = -60.0f;
+		CamManager->ViewPitchMax = 30.0f;
+		CamManager->ViewYawMin = FRotator::ClampAxis(TargetYawMin);
+		CamManager->ViewYawMax = FRotator::ClampAxis(TargetYawMax);
+
+		PC->SetControlRotation(FRotator(-60.0f, ChairYaw, 0.0f));
+		
+	}
+
+	// Reattach chair mesh if not already
+	ChairMesh->SetSimulatePhysics(false);
+	if (ChairMesh && RockingPivot && (ChairMesh->GetAttachParent() != RockingPivot))
+	{
+		ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::KeepWorldTransform);
 	}
 
 	// set properties back to defaults
@@ -153,7 +227,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	OnRockProgressChanged.Broadcast(0, RequiredRocks);
 	CurrentSwingAngle = 0.0f;
 	AngularVelocity = 0.0f;
-	ChairMesh->SetRelativeRotation(FRotator::ZeroRotator);
+	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
 	
 	// attach player to component, ignore pawn, disable movement, re-enable tick
 	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
@@ -167,7 +241,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 // Helper: return correct window
 bool ATallowChairEscape::IsTimingWindowOpen() const
 {
-	const bool bIsNearApex = CurrentSwingAngle < -3.0f; 
+	const bool bIsNearApex = CurrentSwingAngle < -3.0f;
 	const bool bIsMovingForward = AngularVelocity > 0.0f;
 
 	return bIsNearApex && bIsMovingForward;
