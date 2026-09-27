@@ -1,4 +1,6 @@
 #include "AI/TallowCreature.h"
+#include "Animation/TallowCreatureAnimationComponent.h"
+#include "AI/Traversal/TallowSurfaceTraversalComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -7,6 +9,9 @@
 
 ATallowCreature::ATallowCreature()
 {
+	KeeperAnimation = CreateDefaultSubobject<UTallowCreatureAnimationComponent>(TEXT("KeeperAnimation"));
+	SurfaceTraversal = CreateDefaultSubobject<UTallowSurfaceTraversalComponent>(TEXT("SurfaceTraversal"));
+
 	// Sets tick to false
 	PrimaryActorTick.bCanEverTick = false;
 
@@ -54,6 +59,8 @@ void ATallowCreature::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, A
 
 void ATallowCreature::ResetToSpawn()
 {
+	if (SurfaceTraversal) SurfaceTraversal->ResetTraversal();
+	if (KeeperAnimation) KeeperAnimation->ResetPlayback();
 	SetActorTransform(InitialSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
 	if (GetCharacterMovement())

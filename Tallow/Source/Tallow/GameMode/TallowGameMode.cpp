@@ -7,6 +7,10 @@
 #include "Environment/TallowCandlePickup.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Animation/TallowCreatureAnimationComponent.h"
+#include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/PlayerController.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -28,10 +32,33 @@ void ATallowGameMode::BeginPlay()
 
 void ATallowGameMode::HandlePlayerCaptured()
 {
-	if (CameraManager)
+	if (bCaptureInProgress) return;
+	bCaptureInProgress = true;
+	float PresentationDuration = 0.f;
+	if (bShowAuthoredCapture && Creature)
 	{
-		CameraManager->StartCameraFade(0.0f, 1.0f, FadeOutTimer, FColor::Black, true, true);
+		if (const auto* Animation = Creature->FindComponentByClass<UTallowCreatureAnimationComponent>())
+		{
+			PresentationDuration = Animation->GetCaptureDuration();
+		}
 	}
+	if (PresentationDuration > 0.f && Player)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(Player->GetController()))
+		{
+			FVector FaceLocation = Creature->GetActorLocation() + FVector(0, 0, 85.f);
+			if (Creature->GetMesh()->DoesSocketExist(TEXT("head")))
+				FaceLocation = Creature->GetMesh()->GetSocketLocation(TEXT("head"));
+			PC->SetControlRotation((FaceLocation - Player->GetFirstPersonCameraComponent()->GetComponentLocation()).Rotation());
+			PC->SetIgnoreLookInput(true);
+			bCaptureLockedLook = true;
+		}
+	}
+	const float FadeDelay = FMath::Max(0.f, PresentationDuration - FadeOutTimer);
+	if (FadeDelay > 0.f)
+		GetWorld()->GetTimerManager().SetTimer(CaptureFadeTimerHandle, this, &ATallowGameMode::BeginCaptureFade, FadeDelay, false);
+	else
+		BeginCaptureFade();
 
 	if (Player && Player->GetCharacterMovement())
 	{
@@ -49,13 +76,26 @@ void ATallowGameMode::HandlePlayerCaptured()
 		ResetTimerHandle,
 		this,
 		&ATallowGameMode::ResetGame,
-		FadeOutTimer + BlackoutTimer,
+		FadeDelay + FadeOutTimer + BlackoutTimer,
 		false
 	);
 }
 
+void ATallowGameMode::BeginCaptureFade()
+{
+	if (CameraManager)
+		CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
+}
+
 void ATallowGameMode::ResetGame()
 {
+	bCaptureInProgress = false;
+	GetWorld()->GetTimerManager().ClearTimer(CaptureFadeTimerHandle);
+	if (bCaptureLockedLook && Player)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(Player->GetController())) PC->SetIgnoreLookInput(false);
+	}
+	bCaptureLockedLook = false;
 	if (Creature)
 	{
 		Creature->ResetToSpawn();
