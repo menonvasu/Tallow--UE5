@@ -49,10 +49,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Chair|UI")
 	bool IsAtRest() const;
 
+
 protected:
 	virtual void BeginPlay() override;
 
 	virtual void Tick(float DeltaTime) override;
+
+	void TryAutoTiePlayer();
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 

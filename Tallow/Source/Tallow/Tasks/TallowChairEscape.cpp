@@ -41,14 +41,25 @@ void ATallowChairEscape::BeginPlay()
 	Super::BeginPlay();
 	Stiffness = FMath::Square(RockingFrequency * 2.0f * UE_PI);
 
-	if ((TiedPlayerCharacter = Cast<ATallowCharacter>(UGameplayStatics::GetPlayerCharacter(this, 0))))
-	{
-		TiePlayerToChair(TiedPlayerCharacter);
-	}
-
 	if (ChairMesh)
 	{
 		InitialChairRelativeTransform = ChairMesh->GetRelativeTransform();
+	}
+
+	TryAutoTiePlayer();
+}
+
+void ATallowChairEscape::TryAutoTiePlayer()
+{
+	ACharacter* RawChar = UGameplayStatics::GetPlayerCharacter(this, 0);
+
+	if (ATallowCharacter* FoundPlayer = Cast<ATallowCharacter>(RawChar))
+	{
+		TiePlayerToChair(FoundPlayer);
+	}
+	else
+	{
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ATallowChairEscape::TryAutoTiePlayer);
 	}
 }
 
@@ -228,14 +239,6 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	AngularVelocity = 0.0f;
 	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
 
-	// attach player to component, ignore pawn, disable movement, re-enable tick
-	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	InPlayer->GetCharacterMovement()->DisableMovement();
-	InPlayer->SetTiedChair(this);
-	InPlayer->bUseControllerRotationYaw = false;
-	SetActorTickEnabled(true);
-
 	// Reattach chair mesh if not already
 	if (ChairMesh)
 	{
@@ -247,12 +250,13 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		}
 	}
 
-	// Set Widget
-	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
-	{
-		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
-		ActiveOverlayWidget->AddToViewport();
-	}
+	// attach player to component, ignore pawn, disable movement, re-enable tick
+	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	InPlayer->GetCharacterMovement()->DisableMovement();
+	InPlayer->SetTiedChair(this);
+	InPlayer->bUseControllerRotationYaw = false;
+	SetActorTickEnabled(true);
 }
 
 // Helper: return correct window
