@@ -81,11 +81,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
 	float KeeperMeshYaw = -90.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.01"))
-	float KeeperMeshScale = 0.8f;   // about 2.4 m to the leg tips; fits the rooms and doors
+	float KeeperMeshScale = 43.f;   // original Keeper (imported at 5.6 cm) to about 2.4 m
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))
 	float SqueezeWidthScale = .60f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))
 	float SqueezeHeightScale = .92f;
+	/** Vertical drift (cm) while the unaware host floats with its legs tucked. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float HostBobHeight = 6.f;
+	/** Seconds the legs stay out after he stops hunting, before tucking back into the floating host. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0"))
+	float LegsOutHold = 10.f;
 
 	/** Overrides locomotion until cleared. Used by wall, ceiling, squeeze and emergence controllers. */
 	UFUNCTION(BlueprintCallable, Category="Keeper|Animation")
@@ -108,6 +114,9 @@ private:
 	bool bTraversalLoop = true;
 	float TraversalRate = 1.f;
 	bool bWasChasing = false;
+	bool bLegsOut = false;
+	float HostTime = 0.f;
+	float LegsOutUntil = -1.f;
 	bool bWasTraversing = false;
 	float RevealTimeRemaining = 0.f;
 	bool bWasStationarySearch = false;

@@ -1,4 +1,5 @@
 #include "Animation/TallowCreatureAnimationComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "AI/TallowCreature.h"
 #include "AI/Traversal/TallowSurfaceTraversalComponent.h"
 #include "Animation/AnimSequence.h"
@@ -48,6 +49,15 @@ void UTallowCreatureAnimationComponent::BeginPlay()
 	}
 	USkeletalMeshComponent* Mesh = Creature->GetMesh();
 	Mesh->SetSkeletalMesh(KeeperMesh);
+	// Materials per slot (Tools/apply_og_keeper_surface.py): slot "Keeper_X" wears MI_Keeper_X. Set here because
+	// slot assignments on the skeletal mesh asset don't persist when scripted.
+	const TArray<FName> Slots = Mesh->GetMaterialSlotNames();
+	for (int32 I = 0; I < Slots.Num(); ++I)
+	{
+		FString Key = Slots[I].ToString(); Key.RemoveFromStart(TEXT("Keeper_"));
+		const FString Path = FString::Printf(TEXT("/Game/Characters/Keeper/Surface/MI_Keeper_%s.MI_Keeper_%s"), *Key, *Key);
+		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, *Path)) Mesh->SetMaterial(Mesh->GetMaterialIndex(Slots[I]), Material);
+	}
 	Mesh->SetRelativeLocationAndRotation(KeeperMeshOffset, FRotator(0.f, KeeperMeshYaw, 0.f));
 	BaseMeshScale = FVector(KeeperMeshScale);
 	Mesh->SetRelativeScale3D(BaseMeshScale);
@@ -106,13 +116,41 @@ void UTallowCreatureAnimationComponent::TickComponent(float DeltaTime, ELevelTic
 		Movement->RotationRate.Yaw = bNowChasing ? ChaseTurnRate : PatrolTurnRate;
 	}
 	if (SurfaceTraversal && SurfaceTraversal->IsTraversing()) RevealTimeRemaining = 0.f;
-	if (RevealAnimation && bNowChasing && !bWasChasing && !(SurfaceTraversal && SurfaceTraversal->IsTraversing()))
+	// Legs are tucked while he drifts unaware; they burst out (Reveal) only when a chase starts from that state.
+	const bool bAware = bNowChasing || bNowTraversing || Creature->CurrentState == ETallowCreatureState::Investigating ||
+		Creature->CurrentState == ETallowCreatureState::SuspiciousIdle || Creature->CurrentState == ETallowCreatureState::SearchingCorner;
+	if (RevealAnimation && bNowChasing && !bWasChasing && !bLegsOut && !(SurfaceTraversal && SurfaceTraversal->IsTraversing()))
 	{
 		RevealTimeRemaining = RevealAnimation->GetPlayLength();
 		ActiveClip = nullptr;
 	}
 	bWasChasing = bNowChasing;
 	bWasTraversing = bNowTraversing;
+	// Once out, the legs stay out for at least LegsOutHold seconds after he stops being aware,
+	// so losing sight of you for a moment doesn't pop him back into the host and re-trigger the reveal
+	HostTime += DeltaTime;
+	if (bAware) LegsOutUntil = HostTime + LegsOutHold;
+	bLegsOut = bAware || HostTime < LegsOutUntil;
+	USkeletalMeshComponent* Body = Creature->GetMesh();
+	const bool bHostFloat = !bLegsOut && !TraversalClip && RevealTimeRemaining <= 0.f && RevealAnimation;
+	Body->SetRelativeLocation(KeeperMeshOffset + FVector(0.f, 0.f, bHostFloat ? HostBobHeight * FMath::Sin(HostTime * 1.6f) : 0.f));
+	if (bHostFloat)
+	{
+		// Unaware host: legs held tucked on Reveal's first frame, drifting with a slow bob
+		UAnimSingleNodeInstance* Instance = Body->GetSingleNodeInstance();
+		if (ActiveClip != RevealAnimation || !Instance || Instance->IsPlaying())
+		{
+			if (RevealAnimation->GetSkeleton() != Body->GetSkeletalMeshAsset()->GetSkeleton()) return;
+			Body->PlayAnimation(RevealAnimation, false);
+			ActiveClip = RevealAnimation;
+			if ((Instance = Body->GetSingleNodeInstance()))
+			{
+				Instance->SetPosition(0.f, false);
+				Instance->SetPlaying(false);
+			}
+		}
+		return;
+	}
 	if (TraversalClip)
 	{
 		PlayClip(TraversalClip, bTraversalLoop, TraversalRate);
@@ -121,6 +159,8 @@ void UTallowCreatureAnimationComponent::TickComponent(float DeltaTime, ELevelTic
 	if (RevealTimeRemaining > 0.f)
 	{
 		RevealTimeRemaining = FMath::Max(0.f, RevealTimeRemaining - DeltaTime);
+		// Stand still until the legs are fully out, then the chase starts
+		if (UCharacterMovementComponent* Movement = Creature->GetCharacterMovement()) { Movement->MaxWalkSpeed = 0.f; Movement->StopMovementImmediately(); }
 		PlayClip(RevealAnimation, false, 1.f);
 		return;
 	}
@@ -149,10 +189,12 @@ void UTallowCreatureAnimationComponent::TickComponent(float DeltaTime, ELevelTic
 		const bool bChase = Creature->CurrentState == ETallowCreatureState::Chasing;
 		UAnimSequence* Clip = bChase && ChaseAnimation ? ChaseAnimation.Get() : WalkAnimation.Get();
 		// The authored sneak is a very slow crawl: use it only near its supported stride speed.
-		if (!bChase && Creature->CurrentState == ETallowCreatureState::Investigating && SneakAnimation && Speed <= SneakReferenceSpeed * 3.f) Clip = SneakAnimation;
+		// Heard something: always the legs-out sneak
+		if (!bChase && SneakAnimation) Clip = SneakAnimation;
 		const float ReferenceSpeed = bChase && ChaseAnimation ? ChaseReferenceSpeed : WalkReferenceSpeed;
 		const float ClipReferenceSpeed = Clip == SneakAnimation && SneakAnimation ? SneakReferenceSpeed : ReferenceSpeed;
-		PlayClip(Clip ? Clip : IdleAnimation.Get(), true, Clip ? FMath::Clamp(Speed / FMath::Max(ClipReferenceSpeed, 1.f), .1f, 3.f) : 1.f);
+		const float Rate = Clip == SneakAnimation ? FMath::Clamp(Speed / 120.f, .6f, 1.5f) : FMath::Clamp(Speed / FMath::Max(ClipReferenceSpeed, 1.f), .1f, 3.f);
+		PlayClip(Clip ? Clip : IdleAnimation.Get(), true, Clip ? Rate : 1.f);
 	}
 	else
 	{
