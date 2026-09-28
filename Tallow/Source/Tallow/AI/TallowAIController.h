@@ -44,6 +44,9 @@ public:
 
 	void NotifyPlayerTouched(AActor* TouchedActor);
 
+	/** Event tag the StateTree uses for 'player spotted' (also sent by the Keeper's close-range sense) */
+	FGameplayTag GetPlayerSpottedTag() const { return PlayerSpottedTag; }
+
 	/** Stores Player Actor */ 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player")
 	TObjectPtr<AActor> TargetActor;

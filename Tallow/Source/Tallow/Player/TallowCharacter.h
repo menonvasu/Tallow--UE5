@@ -11,6 +11,7 @@ class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
 class UTallowCandleComponent;
+class UTallowCandleFlameComponent;
 class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
 class ATallowChairEscape;
@@ -41,6 +42,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UTallowCandleComponent> CandleComponent;
+
+	/** Flame flicker and guttering on the candle's light */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Candle", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTallowCandleFlameComponent> CandleFlame;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Candle|Light")
 	TObjectPtr<UPointLightComponent> CandleLightComponent;

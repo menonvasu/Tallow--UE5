@@ -1,5 +1,5 @@
 {
-  "reimport_animations": false,
+  "reimport_animations": true,
   "mesh_location_cm": [
     0,
     0,
@@ -15,8 +15,5 @@
     1,
     1
   ],
-  "reimport_animation_names": [
-    "WallCrawl",
-    "CeilingCrawl"
-  ]
+  "import_uniform_scale": 70.0
 }

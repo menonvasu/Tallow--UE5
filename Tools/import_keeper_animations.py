@@ -46,10 +46,12 @@ def options(animation=False, skeleton=None):
         o.set_editor_property('skeleton', skeleton)
     m = o.get_editor_property('skeletal_mesh_import_data')
     m.set_editor_property('import_morph_targets', True)
+    m.set_editor_property('import_uniform_scale', settings.get('import_uniform_scale', 1.0))   # UE ignores Blender's FBX export scale
     m.set_editor_property('update_skeleton_reference_pose', False)
     m.set_editor_property('use_t0_as_ref_pose', False)
     a = o.get_editor_property('anim_sequence_import_data')
     a.set_editor_property('animation_length', u.FBXAnimationLengthImportType.FBXALIT_EXPORTED_TIME)
+    a.set_editor_property('import_uniform_scale', settings.get('import_uniform_scale', 1.0))
     a.set_editor_property('use_default_sample_rate', False)
     a.set_editor_property('custom_sample_rate', 0)
     a.set_editor_property('import_bone_tracks', True)

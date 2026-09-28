@@ -73,9 +73,9 @@ def tick(dt):
    check('all clips share mesh skeleton', all(a and a.get_editor_property('skeleton')==skeleton for a in clips.values()))
    allbones=[str(mesh.get_bone_name(i)) for i in range(mesh.get_num_bones())]
    report['bone_names']=allbones
-   fingers=[b for b in allbones if any(k in b.lower() for k in ['finger','index','thumb'])]
-   bones=list(dict.fromkeys([n for n in ['head','root','hand.L','hand.R'] if n in allbones]+fingers[:4]))
-   check('head and articulated finger bones imported','head' in bones and bool(fingers), sampled_bones=bones)
+   legs=[b for b in allbones if b.lower().startswith('leg_')]
+   bones=list(dict.fromkeys([n for n in ['head','root','body'] if n in allbones]+legs[:6]))
+   check('head and articulated leg bones imported','head' in bones and len(legs)>=12, sampled_bones=bones)
    origin,extent=creature.get_actor_bounds(False)
    check('mesh local up agrees with standing actor',mesh.get_up_vector().z>.95, mesh_up=vec(mesh.get_up_vector()), relative_rotation=str(mesh.get_editor_property('relative_rotation')))
    report['initial_bounds']={'origin':vec(origin),'extent':vec(extent),'mesh_relative_location':vec(mesh.get_editor_property('relative_location')),'mesh_relative_scale':vec(mesh.get_editor_property('relative_scale3d')),'mesh_relative_rotation':str(mesh.get_editor_property('relative_rotation')),'mesh_up':vec(mesh.get_up_vector()),'mesh_forward':vec(mesh.get_forward_vector())}
@@ -114,8 +114,8 @@ def tick(dt):
    for curve in CURVES:
     values=[s['curves'][curve] for s in samples]
     check(curve+' evaluated varying curve',max(values)-min(values)>.01,minimum=min(values),maximum=max(values))
-   fingerbones=[b for b in bones if b!='head' and any(k in b.lower() for k in ['finger','index','thumb'])]
-   check('fingers animate across authored clips',any(len({s['rotations'][b] for s in samples})>3 for b in fingerbones))
+   legbones=[b for b in bones if b.lower().startswith('leg_')]
+   check('legs animate across authored clips',any(len({s['rotations'][b] for s in samples})>3 for b in legbones))
    finish()
  except Exception:
   report['errors'].append(traceback.format_exc()); u.log_error(report['errors'][-1]); finish()

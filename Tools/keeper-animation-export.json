@@ -1,7 +1,7 @@
 {
-  "source": "/home/tyron/Projects/the-keeper/the-keeper-hybrid-work.blend",
-  "mesh_vertices": 118513,
-  "bones": 64,
+  "source": "the-keeper-v6-game.blend (procedural v6 rig)",
+  "mesh_vertices": 105909,
+  "bones": 21,
   "morphs": [
     "Basis",
     "FULL_HORROR",
@@ -9,112 +9,111 @@
     "Blink_L",
     "Blink_R"
   ],
-  "export_scale": 0.4896857534347332,
-  "height_source_units": 4.696889758110046,
+  "export_scale": 70.0,
   "clips": [
-    {
-      "name": "Reveal",
-      "frames": 73,
-      "fps": 24,
-      "seconds": 3.0,
-      "source_action": "KEEPER_Reveal",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "Walk",
-      "frames": 49,
-      "fps": 24,
-      "seconds": 2.0,
-      "source_action": "KEEPER_Walk",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "Sneak",
-      "frames": 97,
-      "fps": 24,
-      "seconds": 4.0,
-      "source_action": "KEEPER_Sneak",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "Chase",
-      "frames": 21,
-      "fps": 24,
-      "seconds": 0.8333333333333334,
-      "source_action": "KEEPER_Chase",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "RunChase",
-      "frames": 73,
-      "fps": 24,
-      "seconds": 3.0,
-      "source_action": "KEEPER_RunChase",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "WallCrawl",
-      "frames": 97,
-      "fps": 24,
-      "seconds": 4.0,
-      "source_action": "KEEPER_WallCrawl",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "CeilingCrawl",
-      "frames": 97,
-      "fps": 24,
-      "seconds": 4.0,
-      "source_action": "KEEPER_CeilingCrawl",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "SearchUnder",
-      "frames": 121,
-      "fps": 24,
-      "seconds": 5.0,
-      "source_action": "KEEPER_SearchUnder",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "SearchOver",
-      "frames": 121,
-      "fps": 24,
-      "seconds": 5.0,
-      "source_action": "KEEPER_SearchOver",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
-    {
-      "name": "JumpscareDeath",
-      "frames": 73,
-      "fps": 24,
-      "seconds": 3.0,
-      "source_action": "KEEPER_JumpscareDeath",
-      "root_motion": "removed; gameplay movement controls placement"
-    },
     {
       "name": "Idle",
       "frames": 97,
       "fps": 24,
       "seconds": 4.0,
-      "source_action": "KEEPER_Sneak",
-      "root_motion": "removed; gameplay movement controls placement"
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
     },
     {
       "name": "HostWalk",
       "frames": 49,
       "fps": 24,
       "seconds": 2.0,
-      "source_action": "KEEPER_Walk",
-      "root_motion": "removed; gameplay movement controls placement"
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
     },
     {
-      "name": "Squeeze",
+      "name": "Walk",
+      "frames": 49,
+      "fps": 24,
+      "seconds": 2.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "Sneak",
       "frames": 97,
       "fps": 24,
       "seconds": 4.0,
-      "source_action": "KEEPER_Sneak",
-      "root_motion": "removed; gameplay movement controls placement"
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "Chase",
+      "frames": 25,
+      "fps": 24,
+      "seconds": 1.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "RunChase",
+      "frames": 17,
+      "fps": 24,
+      "seconds": 0.6666666666666666,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "WallCrawl",
+      "frames": 49,
+      "fps": 24,
+      "seconds": 2.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "CeilingCrawl",
+      "frames": 49,
+      "fps": 24,
+      "seconds": 2.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "SearchUnder",
+      "frames": 73,
+      "fps": 24,
+      "seconds": 3.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "SearchOver",
+      "frames": 73,
+      "fps": 24,
+      "seconds": 3.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "Reveal",
+      "frames": 73,
+      "fps": 24,
+      "seconds": 3.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "JumpscareDeath",
+      "frames": 73,
+      "fps": 24,
+      "seconds": 3.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
+    },
+    {
+      "name": "Squeeze",
+      "frames": 49,
+      "fps": 24,
+      "seconds": 2.0,
+      "source_action": "procedural v6",
+      "root_motion": "none; gameplay movement controls placement"
     }
   ]
 }
