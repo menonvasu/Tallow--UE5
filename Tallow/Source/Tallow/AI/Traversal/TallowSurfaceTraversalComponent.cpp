@@ -9,6 +9,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UTallowSurfaceTraversalComponent::UTallowSurfaceTraversalComponent()
 {
@@ -59,7 +60,7 @@ bool UTallowSurfaceTraversalComponent::PoseClear(const FVector& Position, const 
  }
  return !bBlocked;
 }
-bool UTallowSurfaceTraversalComponent::BeginTraversal(TArray<FWaypoint>&& Points, bool bIsSqueeze)
+bool UTallowSurfaceTraversalComponent::BeginTraversal(TArray<FWaypoint>&& Points, bool bIsSqueeze, bool bKeepBrain)
 {
  if (bCaptureFrozen || bActive || !Character.IsValid() || Points.IsEmpty()) return false;
  for (const FWaypoint& Point : Points) if (!PoseClear(Point.Position, Point.Rotation))
@@ -74,15 +75,17 @@ bool UTallowSurfaceTraversalComponent::BeginTraversal(TArray<FWaypoint>&& Points
  auto* Movement = Character->GetCharacterMovement();
  SavedGravity = Movement->GravityScale; bSavedOrient = Movement->bOrientRotationToMovement;
  bSavedControllerYaw = Character->bUseControllerRotationYaw; bSavedControllerDesired = Movement->bUseControllerDesiredRotation;
- if (AAIController* AI = Cast<AAIController>(Character->GetController()))
+ if (!bKeepBrain) if (AAIController* AI = Cast<AAIController>(Character->GetController()))
  {
   AI->StopMovement();
   if (UBrainComponent* Brain = AI->GetBrainComponent()) { Brain->PauseLogic(TEXT("Keeper surface traversal")); bPausedBrain = true; }
  }
  Movement->StopMovementImmediately(); Movement->GravityScale = 0.f;
  Movement->bOrientRotationToMovement = false; Movement->bUseControllerDesiredRotation = false; Character->bUseControllerRotationYaw = false;
- Movement->SetMovementMode(MOVE_Flying);
- Waypoints = MoveTemp(Points); WaypointIndex = 0; bActive = true; bSqueeze = bIsSqueeze; bReturning = false;
+ // A chase climb keeps the brain (sight, hearing, chase target) live. MOVE_None stops its path following from
+ // pushing the capsule around while this component places it.
+ Movement->SetMovementMode(bKeepBrain ? MOVE_None : MOVE_Flying);
+ Waypoints = MoveTemp(Points); WaypointIndex = 0; bActive = true; bSqueeze = bIsSqueeze; bReturning = false; bChaseRoute = bKeepBrain;
  SafeHistory.Reset(); SafeHistory.Add({Character->GetActorLocation(), Character->GetActorQuat(), FVector::UpVector});
  return true;
 }
@@ -128,12 +131,14 @@ bool UTallowSurfaceTraversalComponent::StartSqueeze(AActor* Entry, AActor* Exit)
 bool UTallowSurfaceTraversalComponent::SweepStep(const FWaypoint& Target, float DeltaTime)
 {
  const FVector Before = Character->GetActorLocation(); const FQuat BeforeRotation = Character->GetActorQuat();
- const float Speed=bSqueeze?SqueezeSpeed:(Target.Normal.Z < -.5f ? CeilingSpeed : CrawlSpeed);
+ const bool bCeiling=Target.Normal.Z < -.5f;
+ const float Speed=bSqueeze?SqueezeSpeed:(bChaseRoute?(bCeiling?ChaseCeilingSpeed:ChaseCrawlSpeed):(bCeiling?CeilingSpeed:CrawlSpeed));
+ const float TurnRate=bChaseRoute?ChaseTurnRate:1.6f;
  const float Distance=FVector::Dist(Before,Target.Position);
  const float Angle=BeforeRotation.AngularDistance(Target.Rotation);
  // Translation and rotation share one progress parameter. Otherwise short corner segments
  // arrive while still upside down and the unchanged full capsule strikes the ceiling.
- const float Alpha=FMath::Min(1.f,FMath::Min(Distance>SMALL_NUMBER?Speed*DeltaTime/Distance:1.f,Angle>SMALL_NUMBER?1.6f*DeltaTime/Angle:1.f));
+ const float Alpha=FMath::Min(1.f,FMath::Min(Distance>SMALL_NUMBER?Speed*DeltaTime/Distance:1.f,Angle>SMALL_NUMBER?TurnRate*DeltaTime/Angle:1.f));
  const FVector Position=FMath::Lerp(Before,Target.Position,Alpha);
  const FQuat Rotation=FQuat::Slerp(BeforeRotation,Target.Rotation,Alpha).GetNormalized();
  // UE's translation sweep does not sweep rotational volume. Test intermediate rotations too.
@@ -162,8 +167,9 @@ void UTallowSurfaceTraversalComponent::FinishTraversal()
  Movement->SetMovementMode(MOVE_Falling);
  if (bPausedBrain) if (AAIController* AI=Cast<AAIController>(Character->GetController()))
   if (UBrainComponent* Brain=AI->GetBrainComponent()) Brain->ResumeLogic(TEXT("Keeper returned to ground"));
- bPausedBrain=false; bActive=false; bSqueeze=false; ActualSpeed=0; SurfaceNormal=FVector::UpVector;
- CooldownUntil=GetWorld()->GetTimeSeconds()+RouteCooldown;
+ if (bChaseRoute) NextChaseRouteTime=GetWorld()->GetTimeSeconds()+FMath::FRandRange(ChaseRouteIntervalMin,ChaseRouteIntervalMax);
+ else CooldownUntil=GetWorld()->GetTimeSeconds()+RouteCooldown;
+ bPausedBrain=false; bActive=false; bSqueeze=false; bChaseRoute=false; ActualSpeed=0; SurfaceNormal=FVector::UpVector;
 }
 void UTallowSurfaceTraversalComponent::ResetTraversal()
 {
@@ -175,7 +181,7 @@ void UTallowSurfaceTraversalComponent::TryAutomaticTraversal()
 {
  ATallowCreature* Creature=Cast<ATallowCreature>(Character.Get());
  if (!Creature) return;
- if (Creature->CurrentState==ETallowCreatureState::Patrol && GetWorld()->GetTimeSeconds()>CooldownUntil)
+ if (bAutomaticSurfaceRoute && Creature->CurrentState==ETallowCreatureState::Patrol && GetWorld()->GetTimeSeconds()>CooldownUntil)
  {
   if (StartSurfaceRoute()) return;
   CooldownUntil=GetWorld()->GetTimeSeconds()+2.f;
@@ -202,9 +208,13 @@ void UTallowSurfaceTraversalComponent::TickComponent(float DeltaTime,ELevelTick 
  Super::TickComponent(DeltaTime,TickType,ThisTickFunction);
  if (!Character.IsValid() || bCaptureFrozen) return;
  SqueezeAlpha=FMath::FInterpTo(SqueezeAlpha,IsSqueezing()?1.f:0.f,DeltaTime,5.f);
- if (!bActive) { if(bAutomaticTraversal && GetWorld()->GetTimeSeconds()>NextProbeTime) { NextProbeTime=GetWorld()->GetTimeSeconds()+.15f; TryAutomaticTraversal(); } return; }
+ if (!bActive)
+ {
+  if (bAutomaticTraversal && GetWorld()->GetTimeSeconds()>NextProbeTime) { NextProbeTime=GetWorld()->GetTimeSeconds()+.15f; TryAutomaticTraversal(); if (!bActive) TryChaseSurfaceRoute(); }
+  return;
+ }
  if (const ATallowCreature* Creature=Cast<ATallowCreature>(Character.Get()))
-  if(Creature->CurrentState!=ETallowCreatureState::Patrol && !bSqueeze) RequestGroundExit();
+  if(Creature->CurrentState!=ETallowCreatureState::Patrol && !bSqueeze && !bChaseRoute) RequestGroundExit();
  Character->GetCharacterMovement()->StopMovementImmediately();
  if (!Waypoints.IsValidIndex(WaypointIndex)) { FinishTraversal(); return; }
  const FWaypoint& Target=Waypoints[WaypointIndex];
@@ -212,4 +222,81 @@ void UTallowSurfaceTraversalComponent::TickComponent(float DeltaTime,ELevelTick 
  if (!bReturning && (SafeHistory.IsEmpty() || FVector::Dist(SafeHistory.Last().Position,Character->GetActorLocation())>10.f))
   SafeHistory.Add({Character->GetActorLocation(),Character->GetActorQuat(),SurfaceNormal});
  if (FVector::Dist(Character->GetActorLocation(),Target.Position)<1.f && Character->GetActorQuat().AngularDistance(Target.Rotation)<.02f) ++WaypointIndex;
+}
+
+bool UTallowSurfaceTraversalComponent::Trace(const FVector& From, const FVector& To, FHitResult& Hit) const
+{
+ FCollisionQueryParams Params(SCENE_QUERY_STAT(KeeperChaseRoute),false,Character.Get());
+ if (APawn* Player=UGameplayStatics::GetPlayerPawn(this,0)) Params.AddIgnoredActor(Player);
+ Params.AddIgnoredActors(Character->GetCapsuleComponent()->GetMoveIgnoreActors());
+ return GetWorld()->LineTraceSingleByChannel(Hit,From,To,ECC_WorldStatic,Params);
+}
+void UTallowSurfaceTraversalComponent::TryChaseSurfaceRoute()
+{
+ const ATallowCreature* Creature=Cast<ATallowCreature>(Character.Get());
+ const float Now=GetWorld()->GetTimeSeconds();
+ const bool bChasing=Creature && Creature->CurrentState==ETallowCreatureState::Chasing;
+ if (bChasing && !bWasChasing) { ChaseStartedAt=Now; NextChaseRouteTime=Now+ChaseRouteDelay; }
+ bWasChasing=bChasing;
+ if (!bChaseSurfaceRoutes || !bChasing || Now<NextChaseRouteTime) return;
+ const APawn* Player=UGameplayStatics::GetPlayerPawn(this,0);
+ if (!Player || !Character->GetCharacterMovement()->IsMovingOnGround()) { NextChaseRouteTime=Now+.5f; return; }
+ if (!StartChaseSurfaceRoute(Player->GetActorLocation())) NextChaseRouteTime=Now+1.f;   // no wall/ceiling fits here, try again soon
+}
+bool UTallowSurfaceTraversalComponent::StartChaseSurfaceRoute(const FVector& TargetLocation)
+{
+ if (!Character.IsValid() || bActive) return false;
+ const UCapsuleComponent* Capsule=Character->GetCapsuleComponent();
+ const float HalfHeight=Capsule->GetScaledCapsuleHalfHeight(), Radius=Capsule->GetScaledCapsuleRadius(), Offset=HalfHeight+10.f;
+ const FVector Start=Character->GetActorLocation();
+ FVector ToTarget=TargetLocation-Start; const float TargetDZ=ToTarget.Z; ToTarget.Z=0.f;
+ const float Dist2D=ToTarget.Size();
+ // Same floor, and far enough that going over the top is worth it
+ if (Dist2D<250.f || Dist2D>1400.f || FMath::Abs(TargetDZ)>200.f) return false;
+ const FVector Dir=ToTarget/Dist2D, Side=FVector::CrossProduct(FVector::UpVector,Dir);
+ FHitResult CeilHit;
+ if (!Trace(Start,Start+FVector(0,0,700),CeilHit)) return false;
+ const float FloorZ=Start.Z-HalfHeight, CeilZ=CeilHit.ImpactPoint.Z;
+ if (CeilZ-FloorZ<2.f*Offset+30.f) return false;                               // too low to hang from
+ // Nearest usable wall to either side (or diagonally ahead)
+ FHitResult Wall; bool bWall=false; float Best=TNumericLimits<float>::Max();
+ for (const FVector& Probe : {Side,-Side,(Side+Dir).GetSafeNormal(),(-Side+Dir).GetSafeNormal()})
+ {
+  FHitResult Hit;
+  if (Trace(Start,Start+Probe*350.f,Hit) && FMath::Abs(Hit.ImpactNormal.Z)<.3f && Hit.Distance>Radius && Hit.Distance<Best) { Best=Hit.Distance; Wall=Hit; bWall=true; }
+ }
+ if (!bWall) return false;
+ const FVector N=FVector(Wall.ImpactNormal.X,Wall.ImpactNormal.Y,0).GetSafeNormal();
+ FVector Along=Dir-FVector::DotProduct(Dir,N)*N; Along=Along.IsNearlyZero()?FVector::UpVector:Along.GetSafeNormal();
+ TArray<FWaypoint> Points;
+ const FVector WallBase=FVector(Wall.ImpactPoint.X,Wall.ImpactPoint.Y,Start.Z);
+ // 1. onto the wall, 2. up it toward the player (walls can end: re-trace)
+ Points.Add({WallBase+N*Offset,FRotationMatrix::MakeFromXZ((Along+FVector::UpVector).GetSafeNormal(),N).ToQuat(),N});
+ const float TopZ=CeilZ-Radius-20.f;
+ const FVector UpCandidate=FVector(WallBase.X,WallBase.Y,TopZ)+(Along.Z>.5f?FVector::ZeroVector:Along*140.f);
+ FHitResult WallHigh;
+ if (!Trace(UpCandidate+N*40.f,UpCandidate-N*60.f,WallHigh) || FMath::Abs(WallHigh.ImpactNormal.Z)>.3f) return false;
+ const FVector WallTop=FVector(WallHigh.ImpactPoint.X,WallHigh.ImpactPoint.Y,TopZ);
+ Points.Add({WallTop+N*Offset,FRotationMatrix::MakeFromXZ(Along.Z>.5f?FVector::UpVector:Along,N).ToQuat(),N});
+ // 3. across the ceiling toward the player, stopping short of them
+ const FVector CeilStart2D=WallTop+N*(Offset+Radius+40.f);
+ FVector Across=FVector(TargetLocation.X,TargetLocation.Y,0)-FVector(CeilStart2D.X,CeilStart2D.Y,0);
+ const float AcrossLen=Across.Size(); Across=Across.GetSafeNormal();
+ if (Across.IsNearlyZero()) return false;
+ const float Travel=FMath::Clamp(AcrossLen-130.f,0.f,600.f);
+ const FQuat Hang=FRotationMatrix::MakeFromXZ(Across,-FVector::UpVector).ToQuat();
+ for (const float T : {0.f,Travel})
+ {
+  const FVector XY=CeilStart2D+Across*T;
+  FHitResult Up;
+  if (!Trace(FVector(XY.X,XY.Y,CeilZ-80.f),FVector(XY.X,XY.Y,CeilZ+60.f),Up) || Up.ImpactNormal.Z>-.7f) return false;
+  Points.Add({FVector(XY.X,XY.Y,Up.ImpactPoint.Z-Offset),Hang,-FVector::UpVector});
+ }
+ // 4. drop to the floor facing the player
+ const FVector DropXY=Points.Last().Position;
+ FHitResult Floor;
+ if (!Trace(DropXY,DropXY-FVector(0,0,CeilZ-FloorZ+100.f),Floor) || Floor.ImpactNormal.Z<.7f) return false;
+ FVector Face=TargetLocation-DropXY; Face.Z=0; Face=Face.IsNearlyZero()?Across:Face.GetSafeNormal();
+ Points.Add({Floor.ImpactPoint+FVector(0,0,HalfHeight+3.f),FRotationMatrix::MakeFromXZ(Face,FVector::UpVector).ToQuat(),FVector::UpVector});
+ return BeginTraversal(MoveTemp(Points),false,true);   // validates every pose before committing
 }

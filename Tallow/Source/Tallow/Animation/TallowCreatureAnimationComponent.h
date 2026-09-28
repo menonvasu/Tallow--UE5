@@ -65,15 +65,33 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="1"))
 	float SneakReferenceSpeed = 7.5f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float PatrolSpeed = 65.f;
+	float PatrolSpeed = 90.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float InvestigateSpeed = 45.f;
+	float InvestigateSpeed = 180.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float ChaseSpeed = 260.f;
+	float ChaseSpeed = 400.f;   // faster than the player's walk (250), slower than their sprint (450)
+	/** Turn rates in degrees per second. The host turns slowly; the chase turns faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
+	float PatrolTurnRate = 140.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
+	float ChaseTurnRate = 320.f;
+	/** Mesh placement on the capsule. The v6 export arrives at true size (feet at the origin, facing -Y). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	FVector KeeperMeshOffset = FVector(0.f, 0.f, -96.f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float KeeperMeshYaw = -90.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.01"))
+	float KeeperMeshScale = 43.f;   // original Keeper (imported at 5.6 cm) to about 2.4 m
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))
 	float SqueezeWidthScale = .60f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))
 	float SqueezeHeightScale = .92f;
+	/** Vertical drift (cm) while the unaware host floats with its legs tucked. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float HostBobHeight = 6.f;
+	/** Seconds the legs stay out after he stops hunting, before tucking back into the floating host. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0"))
+	float LegsOutHold = 10.f;
 
 	/** Overrides locomotion until cleared. Used by wall, ceiling, squeeze and emergence controllers. */
 	UFUNCTION(BlueprintCallable, Category="Keeper|Animation")
@@ -96,6 +114,9 @@ private:
 	bool bTraversalLoop = true;
 	float TraversalRate = 1.f;
 	bool bWasChasing = false;
+	bool bLegsOut = false;
+	float HostTime = 0.f;
+	float LegsOutUntil = -1.f;
 	bool bWasTraversing = false;
 	float RevealTimeRemaining = 0.f;
 	bool bWasStationarySearch = false;

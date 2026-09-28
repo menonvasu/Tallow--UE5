@@ -8,6 +8,7 @@ class ATallowPatrolPoint;
 class USphereComponent;
 class UTallowCreatureAnimationComponent;
 class UTallowSurfaceTraversalComponent;
+class UTallowKeeperVoiceComponent;
 
 /** The creature's two forms. Phase two is the spider form (#25) */
 UENUM(BlueprintType)
@@ -43,6 +44,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Keeper")
 	TObjectPtr<UTallowSurfaceTraversalComponent> SurfaceTraversal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Keeper")
+	TObjectPtr<UTallowKeeperVoiceComponent> Voice;
 
 	/** Pawn BeginPlay implementation */
 	virtual void BeginPlay() override;

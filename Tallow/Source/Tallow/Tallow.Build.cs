@@ -20,6 +20,7 @@ public class Tallow : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
+			"SlateCore",
             "GameplayTags",
         });
 

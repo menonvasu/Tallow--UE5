@@ -1,6 +1,7 @@
 #include "AI/TallowCreature.h"
 #include "Animation/TallowCreatureAnimationComponent.h"
 #include "AI/Traversal/TallowSurfaceTraversalComponent.h"
+#include "Audio/TallowKeeperVoiceComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -11,12 +12,19 @@ ATallowCreature::ATallowCreature()
 {
 	KeeperAnimation = CreateDefaultSubobject<UTallowCreatureAnimationComponent>(TEXT("KeeperAnimation"));
 	SurfaceTraversal = CreateDefaultSubobject<UTallowSurfaceTraversalComponent>(TEXT("SurfaceTraversal"));
+	Voice = CreateDefaultSubobject<UTallowKeeperVoiceComponent>(TEXT("Voice"));
 
 	// Sets tick to false
 	PrimaryActorTick.bCanEverTick = false;
 
 	// Set size for collision capsule (Default)
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
+
+	// Turn the body toward where the controller is looking at a limited rate, rather than snapping to it
+	bUseControllerRotationYaw = false;
+	GetCharacterMovement()->bUseControllerDesiredRotation = true;
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 140.f, 0.f);
 
 	// Set AI controller class
 	AIControllerClass = ATallowAIController::StaticClass();

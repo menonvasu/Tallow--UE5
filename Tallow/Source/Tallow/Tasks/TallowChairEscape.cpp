@@ -8,6 +8,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/PlayerCameraManager.h"
+#include "UI/TallowChairEscapeWidget.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Noise/TallowNoiseTypes.h"
 
@@ -15,6 +16,7 @@
 ATallowChairEscape::ATallowChairEscape()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	ChairOverlayWidgetClass = UTallowChairEscapeWidget::StaticClass();
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Chair Root"));
 	RootComponent = SceneRoot;
@@ -145,8 +147,7 @@ void ATallowChairEscape::AttemptRock()
 	APlayerController* PC = TiedPlayerCharacter ? TiedPlayerCharacter->GetController<APlayerController>() : nullptr;
 
 	// initial impulse
-	const bool bIsAtRest = FMath::IsNearlyZero(AngularVelocity, 1.0f) && FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
-	if (bIsAtRest)
+	if (IsAtRest())
 	{
 		AngularVelocity += RockImpulse;
 	}
@@ -188,6 +189,13 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	if (!InPlayer) return;
 
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
+	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
+	{
+		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
+		if (UTallowChairEscapeWidget* Meter = Cast<UTallowChairEscapeWidget>(ActiveOverlayWidget)) Meter->Chair = this;
+		ActiveOverlayWidget->AddToViewport();
+	}
+
 	if (PC && PC->PlayerCameraManager)
 	{
 		APlayerCameraManager* CamManager = PC->PlayerCameraManager;
@@ -201,15 +209,32 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		const float ChairYaw = ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw;
 		const float TargetYawMin = ChairYaw - 40.0f;
 		const float TargetYawMax = ChairYaw + 40.0f;
-	
+
 		CamManager->ViewPitchMin = -60.0f;
 		CamManager->ViewPitchMax = 30.0f;
 		CamManager->ViewYawMin = FRotator::ClampAxis(TargetYawMin);
 		CamManager->ViewYawMax = FRotator::ClampAxis(TargetYawMax);
 
 		PC->SetControlRotation(FRotator(-60.0f, ChairYaw, 0.0f));
-		
+
 	}
+
+	// set properties back to defaults
+	TiedPlayerCharacter = InPlayer;
+	bIsTied = true;
+	CurrentRockCount = 0;
+	OnRockProgressChanged.Broadcast(0, RequiredRocks);
+	CurrentSwingAngle = 0.0f;
+	AngularVelocity = 0.0f;
+	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
+
+	// attach player to component, ignore pawn, disable movement, re-enable tick
+	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	InPlayer->GetCharacterMovement()->DisableMovement();
+	InPlayer->SetTiedChair(this);
+	InPlayer->bUseControllerRotationYaw = false;
+	SetActorTickEnabled(true);
 
 	// Reattach chair mesh if not already
 	if (ChairMesh)
@@ -222,23 +247,6 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		}
 	}
 
-	// set properties back to defaults
-	TiedPlayerCharacter = InPlayer;
-	bIsTied = true;
-	CurrentRockCount = 0;
-	OnRockProgressChanged.Broadcast(0, RequiredRocks);
-	CurrentSwingAngle = 0.0f;
-	AngularVelocity = 0.0f;
-	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
-	
-	// attach player to component, ignore pawn, disable movement, re-enable tick
-	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	InPlayer->GetCharacterMovement()->DisableMovement();
-	InPlayer->SetTiedChair(this);
-	InPlayer->bUseControllerRotationYaw = false;
-	SetActorTickEnabled(true);
-
 	// Set Widget
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
 	{
@@ -250,10 +258,15 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 // Helper: return correct window
 bool ATallowChairEscape::IsTimingWindowOpen() const
 {
-	const bool bIsNearApex = CurrentSwingAngle < -3.0f;
+	const bool bIsNearApex = CurrentSwingAngle < -WindowAngle;
 	const bool bIsMovingForward = AngularVelocity > 0.0f;
 
 	return bIsNearApex && bIsMovingForward;
+}
+
+bool ATallowChairEscape::IsAtRest() const
+{
+	return FMath::IsNearlyZero(AngularVelocity, 1.0f) && FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
 }
 
 // Helper for UI

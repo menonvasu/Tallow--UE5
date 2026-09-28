@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactable/IInteractable.h"
 #include "Candle/TallowCandleComponent.h"
+#include "Candle/TallowCandleFlameComponent.h"
 #include "Noise/TallowFootstepNoiseComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
@@ -29,7 +30,7 @@ ATallowCharacter::ATallowCharacter()
 	// Create spring arm
 	USpringArmComponent* CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetCapsuleComponent());
-	CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 20.0f));
+	CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 48.0f));
 	CameraBoom->TargetArmLength = 0.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 
@@ -67,6 +68,7 @@ ATallowCharacter::ATallowCharacter()
 
 	// Create candle and light component
 	CandleComponent = CreateDefaultSubobject<UTallowCandleComponent>(TEXT("Candle Component"));
+	CandleFlame = CreateDefaultSubobject<UTallowCandleFlameComponent>(TEXT("Candle Flame"));
 	FootstepNoiseComponent = CreateDefaultSubobject<UTallowFootstepNoiseComponent>(TEXT("Footstep Noise Component"));
 	CandleLightComponent = CreateDefaultSubobject<UPointLightComponent>(TEXT("CandleLight"));
 
@@ -319,10 +321,10 @@ void ATallowCharacter::DoCupEnd()
 
 void ATallowCharacter::DoRelight()
 {
-	if (CandleComponent)
-	{
-		CandleComponent->StartRelighting();
-	}
+	if (!CandleComponent || !CandleComponent->IsAcquired()) return;
+	// R toggles: blow the candle out to hide from the Keeper, or strike a match to relight it
+	if (CandleComponent->GetCandleState() == ECandleState::Out) CandleComponent->StartRelighting();
+	else CandleComponent->SetCandleState(ECandleState::Out);
 }
 
 void ATallowCharacter::DoStillnessStart()
