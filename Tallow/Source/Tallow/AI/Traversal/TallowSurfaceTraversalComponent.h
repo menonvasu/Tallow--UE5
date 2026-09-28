@@ -28,6 +28,8 @@ public:
  UFUNCTION(BlueprintPure, Category="Traversal") float GetTraversalSpeed() const { return ActualSpeed; }
  UFUNCTION(BlueprintPure, Category="Traversal") float GetSqueezeAlpha() const { return SqueezeAlpha; }
  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Traversal") bool bAutomaticTraversal = true;
+ /** Wander the wall/ceiling route on its own while patrolling. Off: the climb pauses the AI brain, so it went deaf mid-hunt. */
+ UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Traversal") bool bAutomaticSurfaceRoute = false;
  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Traversal", meta=(ClampMin="1")) float CrawlSpeed = 60.f;
  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Traversal", meta=(ClampMin="1")) float CeilingSpeed = 22.5f;
  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Traversal", meta=(ClampMin="1")) float SqueezeSpeed = 65.f;

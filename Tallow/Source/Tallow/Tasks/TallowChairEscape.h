@@ -35,6 +35,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Chair|UI")
 	float GetNormalizedSwing() const;
 
+	UFUNCTION(BlueprintPure, Category = "Chair|UI")
+	int32 GetRockCount() const { return CurrentRockCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Chair|UI")
+	int32 GetRequiredRocks() const { return RequiredRocks; }
+
+	/** Normalised swing below which the timing window can open (the back of the swing). */
+	UFUNCTION(BlueprintPure, Category = "Chair|UI")
+	float GetWindowThreshold() const { return MaxSwingAngle > 0.0f ? WindowAngle / MaxSwingAngle : 0.0f; }
+
+	UFUNCTION(BlueprintPure, Category = "Chair|UI")
+	bool IsAtRest() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -95,6 +108,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
 	float MaxSwingAngle = 25.0f;
+
+	/** How far back (degrees) the chair must be tipped for a rock to count */
+	UPROPERTY(EditDefaultsOnly, Category = "Chair|Tuning")
+	float WindowAngle = 3.0f;
 
 
 	/** Widget properties */

@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/TallowChairEscapeWidget.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Noise/TallowNoiseTypes.h"
 
@@ -14,6 +15,7 @@
 ATallowChairEscape::ATallowChairEscape()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	ChairOverlayWidgetClass = UTallowChairEscapeWidget::StaticClass();
 
 	ChairMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Chair Mesh"));
 	RootComponent = ChairMesh;
@@ -78,8 +80,7 @@ void ATallowChairEscape::AttemptRock()
 	if (!bIsTied) return;
 
 	// initial impulse
-	const bool bIsAtRest = FMath::IsNearlyZero(AngularVelocity, 1.0f) && FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
-	if (bIsAtRest)
+	if (IsAtRest())
 	{
 		AngularVelocity += RockImpulse;
 	}
@@ -143,6 +144,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
 	{
 		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
+		if (UTallowChairEscapeWidget* Meter = Cast<UTallowChairEscapeWidget>(ActiveOverlayWidget)) Meter->Chair = this;
 		ActiveOverlayWidget->AddToViewport();
 	}
 
@@ -167,10 +169,15 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 // Helper: return correct window
 bool ATallowChairEscape::IsTimingWindowOpen() const
 {
-	const bool bIsNearApex = CurrentSwingAngle < -3.0f; 
+	const bool bIsNearApex = CurrentSwingAngle < -WindowAngle;
 	const bool bIsMovingForward = AngularVelocity > 0.0f;
 
 	return bIsNearApex && bIsMovingForward;
+}
+
+bool ATallowChairEscape::IsAtRest() const
+{
+	return FMath::IsNearlyZero(AngularVelocity, 1.0f) && FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
 }
 
 // Helper for UI

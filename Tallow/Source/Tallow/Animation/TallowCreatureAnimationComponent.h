@@ -65,11 +65,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="1"))
 	float SneakReferenceSpeed = 7.5f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float PatrolSpeed = 65.f;
+	float PatrolSpeed = 90.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float InvestigateSpeed = 45.f;
+	float InvestigateSpeed = 180.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
-	float ChaseSpeed = 260.f;
+	float ChaseSpeed = 400.f;   // faster than the player's walk (250), slower than their sprint (450)
+	/** Turn rates in degrees per second. The host turns slowly; the chase turns faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
+	float PatrolTurnRate = 140.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Movement", meta=(ClampMin="1"))
+	float ChaseTurnRate = 320.f;
+	/** Mesh placement on the capsule. The v6 export arrives at true size (feet at the origin, facing -Y). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	FVector KeeperMeshOffset = FVector(0.f, 0.f, -96.f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float KeeperMeshYaw = -90.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.01"))
+	float KeeperMeshScale = 0.8f;   // about 2.4 m to the leg tips; fits the rooms and doors
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))
 	float SqueezeWidthScale = .60f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="0.1", ClampMax="1"))

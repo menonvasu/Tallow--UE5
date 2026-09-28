@@ -5,6 +5,7 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "UObject/ConstructorHelpers.h"
 #include "GameMode/TallowGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -12,6 +13,27 @@
 UTallowCreatureAnimationComponent::UTallowCreatureAnimationComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+
+	// Defaults so every Keeper gets the authored mesh and clips, not only the one placed in the M3 level
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mesh(TEXT("/Game/Characters/Keeper/Animated/SK_Keeper.SK_Keeper"));
+	KeeperMesh = Mesh.Object;
+	auto Clip = [](const TCHAR* Name) -> UAnimSequence*
+	{
+		ConstructorHelpers::FObjectFinder<UAnimSequence> Finder(*FString::Printf(TEXT("/Game/Characters/Keeper/Animated/AN_Keeper_%s.AN_Keeper_%s"), Name, Name));
+		return Finder.Object;
+	};
+	IdleAnimation = Clip(TEXT("Idle"));
+	WalkAnimation = Clip(TEXT("HostWalk"));
+	ChaseAnimation = Clip(TEXT("RunChase"));
+	InvestigateAnimation = Clip(TEXT("SearchUnder"));
+	CaptureAnimation = Clip(TEXT("JumpscareDeath"));
+	WallAnimation = Clip(TEXT("WallCrawl"));
+	CeilingAnimation = Clip(TEXT("CeilingCrawl"));
+	SqueezeAnimation = Clip(TEXT("Squeeze"));
+	RevealAnimation = Clip(TEXT("Reveal"));
+	SneakAnimation = Clip(TEXT("Sneak"));
+	SearchUnderAnimation = Clip(TEXT("SearchUnder"));
+	SearchOverAnimation = Clip(TEXT("SearchOver"));
 }
 
 void UTallowCreatureAnimationComponent::BeginPlay()
@@ -25,8 +47,10 @@ void UTallowCreatureAnimationComponent::BeginPlay()
 		return;
 	}
 	USkeletalMeshComponent* Mesh = Creature->GetMesh();
-	BaseMeshScale = Mesh->GetRelativeScale3D();
 	Mesh->SetSkeletalMesh(KeeperMesh);
+	Mesh->SetRelativeLocationAndRotation(KeeperMeshOffset, FRotator(0.f, KeeperMeshYaw, 0.f));
+	BaseMeshScale = FVector(KeeperMeshScale);
+	Mesh->SetRelativeScale3D(BaseMeshScale);
 	Mesh->SetVisibility(true, true);
 	Mesh->SetHiddenInGame(false, true);
 	Mesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -79,6 +103,7 @@ void UTallowCreatureAnimationComponent::TickComponent(float DeltaTime, ELevelTic
 	{
 		const bool bInvestigating = Creature->CurrentState == ETallowCreatureState::Investigating;
 		Movement->MaxWalkSpeed = bNowChasing ? ChaseSpeed : (bInvestigating ? InvestigateSpeed : PatrolSpeed);
+		Movement->RotationRate.Yaw = bNowChasing ? ChaseTurnRate : PatrolTurnRate;
 	}
 	if (SurfaceTraversal && SurfaceTraversal->IsTraversing()) RevealTimeRemaining = 0.f;
 	if (RevealAnimation && bNowChasing && !bWasChasing && !(SurfaceTraversal && SurfaceTraversal->IsTraversing()))

@@ -175,7 +175,7 @@ void UTallowSurfaceTraversalComponent::TryAutomaticTraversal()
 {
  ATallowCreature* Creature=Cast<ATallowCreature>(Character.Get());
  if (!Creature) return;
- if (Creature->CurrentState==ETallowCreatureState::Patrol && GetWorld()->GetTimeSeconds()>CooldownUntil)
+ if (bAutomaticSurfaceRoute && Creature->CurrentState==ETallowCreatureState::Patrol && GetWorld()->GetTimeSeconds()>CooldownUntil)
  {
   if (StartSurfaceRoute()) return;
   CooldownUntil=GetWorld()->GetTimeSeconds()+2.f;
