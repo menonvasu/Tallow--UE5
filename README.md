@@ -21,6 +21,8 @@ Approximately 2 to 4 minutes, walking through the design.
 
 **[ Watch the TALLOW Design Video ]** ( https://drive.google.com/file/d/1nauq0n2xJdngfQN-RJxJgxfaS6lw4g9e/view?usp=sharing )
 
+**[ Watch the Tallow Prototype Video ]** ( https://drive.google.com/file/d/1j_8SLlXs3CKcgyyvYG7_7HSj_uw0RM3v/view?usp=sharing )
+
 ---
 
 ## Game Description
@@ -204,6 +206,32 @@ Each is a distinct interaction and a distinct noise signature.
 | **M3, Prototype** | 28 Sep 2026 | All three AI states, noise system complete, three or more tasks, hiding, stillness, phase one creature, reflection |
 | **M4, Final Submission** | 27 Oct 2026 | Full art pass, both phases and the transformation, audio complete, release build and tag |
 
+
+## List of implemented features in prototype:
+- [x] Blocked out house at child scale 
+- [x] Player movement and interact
+- [x] Creature State Tree - Patrol, Investigate, Chase
+- [x] AI Stimulus perception - Sight, Hearing
+- [x] Noise Event System with Occlusion
+- [x] Candle State Machine - Lit, Cupped, Out
+- [x] Candle lighting, flickering and guttering VFX
+- [x] Chair Escape Opening Minigame
+- [x] Small gap traversal routes 
+- [x] Creature phase one: model, rig and animation
+- [x] Stillness feature
+- [] Crowbar and planks minigame
+- [] Fuze Box minigame
+- [] Lockpicking minigame with 2D overlay
+- [] Hiding spots
+- [] Metasounds
+
+## Controls
+WASD - Movement
+E - Interact
+Space - Jump/Trigger Chair Escape
+RMB - Cup flame
+R - Relight/Put out flame
+F - Hold Still
 ---
 
 ## Development Workflow
