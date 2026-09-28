@@ -113,6 +113,12 @@ void ATallowChairEscape::Tick(float DeltaTime)
 			ChairMesh->AddImpulse(GetActorForwardVector() * CrashForce);
 		}
 
+		if (ActiveOverlayWidget)
+		{
+			ActiveOverlayWidget->RemoveFromParent();
+			ActiveOverlayWidget = nullptr;
+		}
+
 		if (TiedPlayerCharacter)
 		{
 			TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
@@ -122,12 +128,6 @@ void ATallowChairEscape::Tick(float DeltaTime)
 			TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 			TiedPlayerCharacter->bUseControllerRotationYaw = true;
 			TiedPlayerCharacter = nullptr;
-		}
-
-		if (ActiveOverlayWidget)
-		{
-			ActiveOverlayWidget->RemoveFromParent();
-			ActiveOverlayWidget = nullptr;
 		}
 
 		SetActorTickEnabled(false);
@@ -187,14 +187,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 {
 	if (!InPlayer) return;
 
-	// Set Widget
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
-	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
-	{
-		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
-		ActiveOverlayWidget->AddToViewport();
-	}
-
 	if (PC && PC->PlayerCameraManager)
 	{
 		APlayerCameraManager* CamManager = PC->PlayerCameraManager;
@@ -245,6 +238,13 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	InPlayer->SetTiedChair(this);
 	InPlayer->bUseControllerRotationYaw = false;
 	SetActorTickEnabled(true);
+
+	// Set Widget
+	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
+	{
+		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
+		ActiveOverlayWidget->AddToViewport();
+	}
 }
 
 // Helper: return correct window
