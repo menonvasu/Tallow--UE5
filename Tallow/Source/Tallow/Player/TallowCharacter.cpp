@@ -16,6 +16,7 @@
 #include "Perception/AISense_Sight.h"
 #include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
+#include "Environment/TallowHideVolume.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -276,6 +277,13 @@ void ATallowCharacter::DoInteract()
 {
 	// if player is cupping, interact hand is occupied
 	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+
+	// if hidden, call exit
+	if (CurrentHideVolume)
+	{
+		IInteractable::Execute_OnInteract(CurrentHideVolume, this);
+		return;
+	}
 
 	FHitResult HitResult;
 	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();

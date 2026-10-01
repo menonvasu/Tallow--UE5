@@ -146,6 +146,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
 
+	// Pointer to hide volume
+	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
+	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
+
+	// Set and check hide volume
+	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
+	
+	bool IsHiddenInSpot() const {
+		return CurrentHideVolume != nullptr;
+	}
+
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
 	FOnStill OnStill;
 
