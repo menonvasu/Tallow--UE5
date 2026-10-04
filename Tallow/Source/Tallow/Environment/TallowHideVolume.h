@@ -10,6 +10,13 @@ class USceneComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHide, bool, bIsHidden);
 
+UENUM(BlueprintType)
+enum class ETallowHidingSpotType : uint8
+{
+	Wardrobe UMETA(DisplayName = "Wardrobe"),
+	UnderBed UMETA(DisplayName = "Under Bed")
+};
+
 UCLASS()
 class TALLOW_API ATallowHideVolume : public AActor, public IInteractable
 {
@@ -22,6 +29,12 @@ public:
 	// Hide Event
 	UPROPERTY(BlueprintAssignable, Category = "Hide|Events")
 	FOnHide OnHide;
+
+	UFUNCTION(BlueprintPure, Category = "Hide")
+	ETallowHidingSpotType GetHidingSpotType() const { return HidingSpotType; }
+
+	UFUNCTION(BlueprintPure, Category = "Hide")
+	USceneComponent* GetExitPoint() const { return ExitPoint; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Hide|Components")
@@ -43,6 +56,10 @@ protected:
 	float CachedPitchMax = 0.0f;
 	float CachedYawMin = 0.0f;
 	float CachedYawMax = 0.0f;
+
+	/** Type of hiding spot */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hide|Setup")
+	ETallowHidingSpotType HidingSpotType = ETallowHidingSpotType::Wardrobe;
 
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 

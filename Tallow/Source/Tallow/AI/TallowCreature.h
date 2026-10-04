@@ -26,6 +26,8 @@ enum class ETallowCreatureState : uint8
 	SuspiciousIdle,
 	SearchingCorner,
 	Chasing,
+	SearchHigh,
+	SearchLow
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCreatureStateChanged, ETallowCreatureState, NewState);

@@ -29,7 +29,7 @@ ATallowCharacter::ATallowCharacter()
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -PlayerHalfHeight));
 
 	// Create spring arm
-	USpringArmComponent* CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetCapsuleComponent());
 	CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 48.0f));
 	CameraBoom->TargetArmLength = 0.0f;

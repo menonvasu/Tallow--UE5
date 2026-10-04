@@ -3,7 +3,9 @@
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Player/TallowCharacter.h"
 
 ATallowHideVolume::ATallowHideVolume()
@@ -67,19 +69,11 @@ void ATallowHideVolume::EnterHiddenSpot(APlayerController* PC)
 		CamManager->ViewPitchMax = 30.0f;
 
 		// Set yaw clamps relative to new rotation
-		float TargetYawMin = FRotator::NormalizeAxis(TargetRotation.Yaw - 40.0f);
-		float TargetYawMax = FRotator::NormalizeAxis(TargetRotation.Yaw + 40.0f);
+		float TargetYawMin = FRotator::ClampAxis(TargetRotation.Yaw - 40.0f);
+		float TargetYawMax = FRotator::ClampAxis(TargetRotation.Yaw + 40.0f);
 
-		if (TargetYawMin > TargetYawMax)
-		{
-			CamManager->ViewYawMin = TargetYawMin;
-			CamManager->ViewYawMax = TargetYawMax + 360.0f;
-		}
-		else
-		{
-			CamManager->ViewYawMin = TargetYawMin;
-			CamManager->ViewYawMax = TargetYawMax;
-		}
+		CamManager->ViewYawMin = TargetYawMin;
+		CamManager->ViewYawMax = TargetYawMax + 360.0f;
 	}
 
 	ATallowCharacter* Player = Cast<ATallowCharacter>(PC->GetPawn());
@@ -88,7 +82,10 @@ void ATallowHideVolume::EnterHiddenSpot(APlayerController* PC)
 	Player->SetCurrentHideVolume(this);
 
 	// Set location and rotation to the viewpoint
-	Player->SetActorLocationAndRotation(TargetLocation, TargetRotation, false, nullptr, ETeleportType::TeleportPhysics);
+	const float CameraLocalZ = Player->GetFirstPersonCameraComponent()->GetRelativeLocation().Z + Player->GetCameraBoom()->GetRelativeLocation().Z;
+	FVector TargetCapsuleLocation = TargetLocation;
+	TargetCapsuleLocation.Z -= CameraLocalZ;
+	Player->SetActorLocationAndRotation(TargetCapsuleLocation, TargetRotation, false, nullptr, ETeleportType::TeleportPhysics);
 	PC->SetControlRotation(TargetRotation);
 
 	// Disable movement and collision
@@ -97,7 +94,7 @@ void ATallowHideVolume::EnterHiddenSpot(APlayerController* PC)
 		Player->GetCharacterMovement()->DisableMovement();
 		Player->GetCharacterMovement()->StopMovementImmediately();
 		Player->bUseControllerRotationYaw = false;
-		Player->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		Player->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 }
 
@@ -128,6 +125,7 @@ void ATallowHideVolume::ExitHiddenSpot(APlayerController* PC)
 		Player->SetActorLocation(TargetLocation, false, nullptr, ETeleportType::TeleportPhysics);
 		Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 		Player->bUseControllerRotationYaw = true;
+		Player->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Player->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	}
 }
