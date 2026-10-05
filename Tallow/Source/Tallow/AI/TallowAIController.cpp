@@ -12,7 +12,7 @@
 
 ATallowAIController::ATallowAIController()
 {
-	// Createa and set components
+	// Create a and set components
 	AIPerceptionComponent = this->CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
 	SetPerceptionComponent(*AIPerceptionComponent);
 
@@ -112,7 +112,7 @@ void ATallowAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 		const bool bIsTooSoon = (CurrentTime - LastNoiseProcessTime) < MinNoiseRepathDelay;
 		const bool bIsTooClose = DistanceFromLastNoise < NoiseRepathDistanceThreshold;
 
-		// supress event if too soon and close, reduce recalculation
+		// suppress event if too soon and close, reduce recalculation
 		if (bIsTooClose && bIsTooSoon) return;
 
 		// update boolean 
