@@ -73,12 +73,15 @@ protected:
 	/** Bool to check if player holding still */
 	bool bIsHoldingStill = false;
 
-	/** Must hold for atleast 0.6s to pay the cost */
+	/** Must hold for at least 0.6s to pay the cost */
 	double StillnessStartTime = 0.0;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player|Tuning")
 	float MinStillnessHoldDuration = 0.6f; 
 
+	/** Holds current fuse */
+	bool bHasFuse = false;
+	
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* JumpAction;
@@ -153,20 +156,36 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
 
-	// Pointer to hide volume
+	/** Pointer to hide volume */
 	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
 	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
 
-	// Set and check hide volume
+	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
 	
 	bool IsHiddenInSpot() const {
 		return CurrentHideVolume != nullptr;
 	}
-
+	
+	/** Gets & Sets Carried Fuses */
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool ConsumeFuse()
+	{
+		if (bHasFuse)
+		{
+			bHasFuse = false;
+			return true;
+		}
+		return false;
+	}
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Components")
+	void GiveFuse()  { bHasFuse = true;  }
+	
+	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
 	FOnStill OnStill;
-
+	
 	UPROPERTY(BlueprintCallable, Category = "Player|Event")
 	FOnTransformation OnTransformation;
 	
@@ -235,5 +254,4 @@ protected:
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-
 };
