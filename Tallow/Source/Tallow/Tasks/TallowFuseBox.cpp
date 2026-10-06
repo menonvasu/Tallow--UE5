@@ -37,13 +37,23 @@ void ATallowFuseBox::BeginPlay()
 	
 }
 
-void ATallowFuseBox::OnInteract_Implementation(AActor* Interactor)
+float ATallowFuseBox::GetInteractionDuration_Implementation() const
+{
+	// if already fully powered, ignore
+	if (CurrentFuses >= RequiredFuses) { return 0.0f; }
+	return InsertionHoldDuration;
+}
+
+void ATallowFuseBox::OnInteractStart_Implementation(AActor* Actor)
+{
+	OnFuseCurrentlyBeingInserted.Broadcast();
+}
+
+void ATallowFuseBox::OnInteractComplete_Implementation(AActor* Interactor)
 {
 	if (!Interactor) return;
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player) return;
-	
-	if (CurrentFuses >= RequiredFuses) { return; }
+	if (!Player || CurrentFuses >= RequiredFuses) return;
 	
 	// if holding fuse - consume
 	if (Player->ConsumeFuse())
@@ -78,11 +88,18 @@ void ATallowFuseBox::OnInteract_Implementation(AActor* Interactor)
 			OnPowerRestored.Broadcast();
 		}
 	}
-	else
-	{
-		// Play buzz when player tries to insert fuse without holding one
-		OnNothingInserted.Broadcast();	
-	}
 }
 
+void ATallowFuseBox::OnInteractCancel_Implementation(AActor* Interactor)
+{
+	// Play buzz when player tries to insert fuse without holding one
+	OnNothingInserted.Broadcast();	
+}
 
+void ATallowFuseBox::ResetVisual()
+{
+	CurrentFuses = 0;
+	FuseMesh1->SetVisibility(false);
+	FuseMesh2->SetVisibility(false);
+	FuseMesh3->SetVisibility(false);
+}

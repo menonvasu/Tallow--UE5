@@ -67,6 +67,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
 	TObjectPtr<UAIPerceptionStimuliSourceComponent> StimulusSourceComponent;
 
+	/** Interact Hold variables */
+	TWeakObjectPtr<AActor> CurrentInteractTarget = nullptr;
+	float CurrentHoldTime = 0.0f;
+	float TargetHoldDuration = 0.0f;
+	bool bIsHoldingInteract = false;
+	float TargetDistance = 200.0f;
+	FTimerHandle HoldTimerHandle;
+	// Update rate for hold validation
+	static constexpr float HoldUpdateInterval = 0.02f;
+	static constexpr float HoldLookThreshold = 0.8f;
+	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
 
@@ -179,6 +190,9 @@ public:
 		return false;
 	}
 	
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool HasFuse() const { return bHasFuse; }
+	
 	UFUNCTION(BlueprintCallable, Category = "Player|Components")
 	void GiveFuse()  { bHasFuse = true;  }
 	
@@ -228,11 +242,7 @@ protected:
 	/** Handles crouch end inputs */
 	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoCrouchEnd();
-
-	/** Handles interact */
-	UFUNCTION(BlueprintCallable, Category = "Input")
-	virtual void DoInteract();
-
+	
 	/** Handles cupping candle */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoCup();
@@ -252,6 +262,15 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoStillnessEnd();
 
+	/** Handles interact */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void StartInteract();
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void CancelInteract();
+	void UpdateHoldStep();
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void ResetHoldState();
+	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 };

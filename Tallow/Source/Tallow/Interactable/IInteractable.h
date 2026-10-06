@@ -10,9 +10,6 @@ class UInteractable : public UInterface
 	GENERATED_BODY()
 };
 
-/**
- * 
- */
 class TALLOW_API IInteractable
 {
 	GENERATED_BODY()
@@ -20,4 +17,19 @@ class TALLOW_API IInteractable
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	void OnInteract(AActor* Interactor);
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	float GetInteractionDuration() const;
+	virtual float GetInteractionDuration_Implementation() const { return 0.0f; }
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	void OnInteractStart(AActor* Interactor);
+	
+	// called if player completes duration
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	void OnInteractComplete(AActor* Interactor); 
+	
+	// called if player cancels action	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	void OnInteractCancel(AActor* Interactor);
 };

@@ -9,6 +9,8 @@ class ATallowCreature;
 class ATallowCandlePickup;
 class ATallowCharacter;
 class APlayerCameraManager;
+class ATallowFuseBox;
+class ATallowFusePickup;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCaught);
 
@@ -46,6 +48,12 @@ protected:
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
 	TObjectPtr<APlayerCameraManager> CameraManager;
+	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TObjectPtr<ATallowFuseBox> FuseBox;
+	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TArray<TObjectPtr<ATallowFusePickup>> FusePickups;
 
 	/** Screen fade timer */
 	FTimerHandle ResetTimerHandle;

@@ -111,13 +111,15 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
-
-		// Interact
+		
+		// Hold - Interact
 		if (InteractAction)
 		{
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::StartInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ATallowCharacter::CancelInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &ATallowCharacter::CancelInteract);
 		}
-
+		
 		// Cupping candle (actions come from the candle MR; skip if the BP has not wired them yet)
 		if (CupAction)
 		{
@@ -273,7 +275,7 @@ void ATallowCharacter::DoCrouchEnd()
 	UnCrouch();
 }
 
-void ATallowCharacter::DoInteract()
+void ATallowCharacter::StartInteract()
 {
 	// if player is cupping, interact hand is occupied
 	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
@@ -304,9 +306,101 @@ void ATallowCharacter::DoInteract()
 	// if hit, run interact
 	AActor* HitActor = HitResult.GetActor();
 	if (bHit && HitActor && HitActor->Implements<UInteractable>())
-	{
-		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
+	{	
+		const float Duration = IInteractable::Execute_GetInteractionDuration(HitActor); 
+		// if < 0.0s run tap interact
+		if (Duration <= 0.0f)
+		{
+			IInteractable::Execute_OnInteract(HitActor, this);	
+		}
+		// hold interact
+		else
+		{
+			IInteractable::Execute_OnInteractStart(HitActor, this);
+			
+			CurrentInteractTarget = HitActor;
+			TargetHoldDuration = Duration;
+			CurrentHoldTime = 0.0f;
+			bIsHoldingInteract = true;
+			
+			GetWorld()->GetTimerManager().SetTimer(HoldTimerHandle, this, &ATallowCharacter::UpdateHoldStep, HoldUpdateInterval, true);
+		}
 	}
+}
+void ATallowCharacter::UpdateHoldStep()
+{
+	// if not valid or distance too far, cancel
+	if (!CurrentInteractTarget.IsValid())
+	{
+		CancelInteract();
+		return;
+	}
+	
+	if (AActor* RawActor = CurrentInteractTarget.Get())
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (PC && PC->PlayerCameraManager)
+		{
+			FVector CameraLoc = PC->PlayerCameraManager->GetCameraLocation();
+			FVector CameraForward = PC->PlayerCameraManager->GetCameraRotation().Vector();
+
+			// Get normalized vector
+			FVector TargetLoc = RawActor->GetActorLocation();
+			FVector DirToTarget = (TargetLoc - CameraLoc).GetSafeNormal();
+
+			// Calculate Dot Product
+			float DotProduct = FVector::DotProduct(CameraForward, DirToTarget);
+
+			if (DotProduct <= HoldLookThreshold)
+			{
+				CancelInteract();
+				return;
+			}
+		}
+		if (GetDistanceTo(RawActor) > TargetDistance)
+		{
+			CancelInteract();
+			return;
+		}
+	}
+	
+	// Update hold time and perform check
+	CurrentHoldTime += HoldUpdateInterval;
+	if (CurrentHoldTime >= TargetHoldDuration)
+	{
+		AActor* CompletedTarget = CurrentInteractTarget.Get();
+		ResetHoldState(); 
+		if (CompletedTarget)
+		{
+			IInteractable::Execute_OnInteractComplete(CompletedTarget, this);
+		}
+	}
+}
+void ATallowCharacter::CancelInteract()
+{
+	if (bIsHoldingInteract)
+	{
+		AActor* CanceledTarget = CurrentInteractTarget.Get();
+		ResetHoldState();
+		
+		if (UAnimInstance* AnimInst = FirstPersonMesh->GetAnimInstance())
+		{
+			AnimInst->Montage_Stop(0.2f); 
+		}
+		if (CanceledTarget)
+		{
+			IInteractable::Execute_OnInteractCancel(CanceledTarget, this);
+		}
+	}
+}
+
+void ATallowCharacter::ResetHoldState()
+{
+	GetWorldTimerManager().ClearTimer(HoldTimerHandle);
+	CurrentHoldTime = 0.0f;
+	TargetHoldDuration = 0.0f;
+	bIsHoldingInteract = false;
+	CurrentInteractTarget = nullptr;
 }
 
 void ATallowCharacter::DoCup()

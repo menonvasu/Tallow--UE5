@@ -8,6 +8,7 @@
 class UStaticMeshComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFuseInserted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFuseCurrentlyBeingInserted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnNothingInserted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPowerRestored);
 
@@ -20,11 +21,21 @@ public:
 	/** Sets default values for this actor's properties */
 	ATallowFuseBox();
 	
-	virtual void OnInteract_Implementation(AActor* Interactor) override;
+	virtual float GetInteractionDuration_Implementation() const override;
+	
+	virtual void OnInteractStart_Implementation(AActor* Actor) override;
+
+	virtual void OnInteractComplete_Implementation(AActor* Interactor) override;
+
+	virtual void OnInteractCancel_Implementation(AActor* Interactor) override;
 	
 	/** Required fuses */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FuseBox|Tunables")
 	int32 RequiredFuses = 3;
+	
+	/** Hold duration */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FuseBox|Tunables")
+	float InsertionHoldDuration = 1.5f;
 	
 	/** Fuse Insert Loudness */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FuseBox|Tunables")
@@ -43,6 +54,12 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "FuseBox|Events")
 	FOnNothingInserted OnNothingInserted;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "FuseBox|Events")
+	FOnFuseCurrentlyBeingInserted OnFuseCurrentlyBeingInserted;
+	
+	UFUNCTION(BlueprintCallable, Category = "FuseBox|Reset")
+	void ResetVisual();
 	
 protected:
 	/** Called when the game starts */
