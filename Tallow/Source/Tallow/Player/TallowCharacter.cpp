@@ -16,6 +16,7 @@
 #include "Perception/AISense_Sight.h"
 #include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
+#include "Environment/TallowHideVolume.h"
 #include "Tallow.h"
 
 ATallowCharacter::ATallowCharacter()
@@ -28,7 +29,7 @@ ATallowCharacter::ATallowCharacter()
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -PlayerHalfHeight));
 
 	// Create spring arm
-	USpringArmComponent* CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetCapsuleComponent());
 	CameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 48.0f));
 	CameraBoom->TargetArmLength = 0.0f;
@@ -276,6 +277,13 @@ void ATallowCharacter::DoInteract()
 {
 	// if player is cupping, interact hand is occupied
 	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+
+	// if hidden, call exit
+	if (CurrentHideVolume)
+	{
+		IInteractable::Execute_OnInteract(CurrentHideVolume, this);
+		return;
+	}
 
 	FHitResult HitResult;
 	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();

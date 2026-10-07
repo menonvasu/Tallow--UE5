@@ -8,6 +8,7 @@
 class UInputComponent;
 class USkeletalMeshComponent;
 class UCameraComponent;
+class USpringArmComponent;
 class UInputAction;
 struct FInputActionValue;
 class UTallowCandleComponent;
@@ -35,6 +36,10 @@ protected:
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FirstPersonCameraComponent;
+
+	/** Camera boom */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USpringArmComponent> CameraBoom;
 	
 	/** First person mesh */
 	UPROPERTY(VisibleAnywhere, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
@@ -124,6 +129,8 @@ public:
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
+	USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+
 	/** Movement Speeds */
 	UPROPERTY(EditAnywhere, Category = "Params")
 	float RunSpeed = 450.0f;
@@ -145,6 +152,17 @@ public:
 	/** Get if player holding still*/
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
+
+	// Pointer to hide volume
+	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
+	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
+
+	// Set and check hide volume
+	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
+	
+	bool IsHiddenInSpot() const {
+		return CurrentHideVolume != nullptr;
+	}
 
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
 	FOnStill OnStill;

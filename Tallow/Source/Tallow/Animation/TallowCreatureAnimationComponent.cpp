@@ -198,17 +198,25 @@ void UTallowCreatureAnimationComponent::TickComponent(float DeltaTime, ELevelTic
 	}
 	else
 	{
-		const bool bInspect = Creature->CurrentState == ETallowCreatureState::Investigating ||
-			Creature->CurrentState == ETallowCreatureState::SuspiciousIdle ||
-			Creature->CurrentState == ETallowCreatureState::SearchingCorner;
-		if (bInspect && !bWasStationarySearch)
+		bWasStationarySearch = true;
+
+		if (Creature->CurrentState == ETallowCreatureState::SearchHigh)
 		{
-			StationarySearchClip = bNextSearchOver && SearchOverAnimation ? SearchOverAnimation.Get() : SearchUnderAnimation.Get();
-			if (!StationarySearchClip) StationarySearchClip = InvestigateAnimation;
-			bNextSearchOver = !bNextSearchOver;
+			PlayClip(SearchOverAnimation ? SearchOverAnimation.Get() : IdleAnimation.Get(), false, 1.f);
 		}
-		bWasStationarySearch = bInspect;
-		PlayClip(bInspect && StationarySearchClip ? StationarySearchClip.Get() : IdleAnimation.Get(), true, 1.f);
+		else if (Creature->CurrentState == ETallowCreatureState::SearchLow)
+		{
+			PlayClip(SearchUnderAnimation ? SearchUnderAnimation.Get() : IdleAnimation.Get(), false, 1.f);
+		}
+		else if (Creature->CurrentState == ETallowCreatureState::Investigating || Creature->CurrentState == ETallowCreatureState::SuspiciousIdle ||
+				Creature->CurrentState == ETallowCreatureState::SearchingCorner)
+		{
+			PlayClip(InvestigateAnimation ? InvestigateAnimation.Get() : IdleAnimation.Get(), false, 1.f);
+		}
+		else 
+		{
+			PlayClip(IdleAnimation.Get(), true, 1.f);
+		}	
 	}
 }
 
