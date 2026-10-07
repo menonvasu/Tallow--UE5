@@ -17,7 +17,9 @@
 #include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Environment/TallowHideVolume.h"
+#include "Interactable/TallowInteractionComponent.h"
 #include "Tallow.h"
+
 
 ATallowCharacter::ATallowCharacter()
 {
@@ -85,6 +87,9 @@ ATallowCharacter::ATallowCharacter()
 	{
 		StimulusSourceComponent->bAutoRegister = true;
 	}
+	
+	// Interaction component
+	InteractionComponent = CreateDefaultSubobject<UTallowInteractionComponent>(TEXT("Interaction Component"));
 
 }
 
@@ -115,9 +120,9 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// Hold - Interact
 		if (InteractAction)
 		{
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::StartInteract);
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ATallowCharacter::CancelInteract);
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &ATallowCharacter::CancelInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteractStart);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoInteractEnd);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoInteractEnd);
 		}
 		
 		// Cupping candle (actions come from the candle MR; skip if the BP has not wired them yet)
@@ -158,6 +163,7 @@ void ATallowCharacter::BeginPlay()
 		SetLightPerception(CandleComponent->GetCandleState());
 	}
 
+	// Hide head mesh clipping
 	if (FirstPersonMesh)
 	{
 		FirstPersonMesh->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
@@ -275,7 +281,7 @@ void ATallowCharacter::DoCrouchEnd()
 	UnCrouch();
 }
 
-void ATallowCharacter::StartInteract()
+void ATallowCharacter::DoInteractStart()
 {
 	// if player is cupping, interact hand is occupied
 	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
@@ -286,121 +292,24 @@ void ATallowCharacter::StartInteract()
 		IInteractable::Execute_OnInteract(CurrentHideVolume, this);
 		return;
 	}
-
-	FHitResult HitResult;
-	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();
-	FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 200.0f);
-
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this); // ignore self
-
-	// run raycast
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		StartLocation,
-		EndLocation,
-		ECollisionChannel::ECC_Visibility,
-		QueryParams
-	);
-
-	// if hit, run interact
-	AActor* HitActor = HitResult.GetActor();
-	if (bHit && HitActor && HitActor->Implements<UInteractable>())
-	{	
-		const float Duration = IInteractable::Execute_GetInteractionDuration(HitActor); 
-		// if < 0.0s run tap interact
-		if (Duration <= 0.0f)
-		{
-			IInteractable::Execute_OnInteract(HitActor, this);	
-		}
-		// hold interact
-		else
-		{
-			IInteractable::Execute_OnInteractStart(HitActor, this);
-			
-			CurrentInteractTarget = HitActor;
-			TargetHoldDuration = Duration;
-			CurrentHoldTime = 0.0f;
-			bIsHoldingInteract = true;
-			
-			GetWorld()->GetTimerManager().SetTimer(HoldTimerHandle, this, &ATallowCharacter::UpdateHoldStep, HoldUpdateInterval, true);
-		}
-	}
-}
-void ATallowCharacter::UpdateHoldStep()
-{
-	// if not valid or distance too far, cancel
-	if (!CurrentInteractTarget.IsValid())
-	{
-		CancelInteract();
-		return;
-	}
 	
-	if (AActor* RawActor = CurrentInteractTarget.Get())
+	// if free run interaction
+	if (InteractionComponent)
 	{
-		APlayerController* PC = Cast<APlayerController>(GetController());
-		if (PC && PC->PlayerCameraManager)
-		{
-			FVector CameraLoc = PC->PlayerCameraManager->GetCameraLocation();
-			FVector CameraForward = PC->PlayerCameraManager->GetCameraRotation().Vector();
-
-			// Get normalized vector
-			FVector TargetLoc = RawActor->GetActorLocation();
-			FVector DirToTarget = (TargetLoc - CameraLoc).GetSafeNormal();
-
-			// Calculate Dot Product
-			float DotProduct = FVector::DotProduct(CameraForward, DirToTarget);
-
-			if (DotProduct <= HoldLookThreshold)
-			{
-				CancelInteract();
-				return;
-			}
-		}
-		if (GetDistanceTo(RawActor) > TargetDistance)
-		{
-			CancelInteract();
-			return;
-		}
-	}
-	
-	// Update hold time and perform check
-	CurrentHoldTime += HoldUpdateInterval;
-	if (CurrentHoldTime >= TargetHoldDuration)
-	{
-		AActor* CompletedTarget = CurrentInteractTarget.Get();
-		ResetHoldState(); 
-		if (CompletedTarget)
-		{
-			IInteractable::Execute_OnInteractComplete(CompletedTarget, this);
-		}
-	}
-}
-void ATallowCharacter::CancelInteract()
-{
-	if (bIsHoldingInteract)
-	{
-		AActor* CanceledTarget = CurrentInteractTarget.Get();
-		ResetHoldState();
-		
-		if (UAnimInstance* AnimInst = FirstPersonMesh->GetAnimInstance())
-		{
-			AnimInst->Montage_Stop(0.2f); 
-		}
-		if (CanceledTarget)
-		{
-			IInteractable::Execute_OnInteractCancel(CanceledTarget, this);
-		}
+		InteractionComponent->StartInteract();	
 	}
 }
 
-void ATallowCharacter::ResetHoldState()
+void ATallowCharacter::DoInteractEnd()
 {
-	GetWorldTimerManager().ClearTimer(HoldTimerHandle);
-	CurrentHoldTime = 0.0f;
-	TargetHoldDuration = 0.0f;
-	bIsHoldingInteract = false;
-	CurrentInteractTarget = nullptr;
+	if (UAnimInstance* AnimInst = FirstPersonMesh->GetAnimInstance())
+	{
+		AnimInst->Montage_Stop(0.2f); 
+	}
+	if (InteractionComponent)
+	{
+		InteractionComponent->CancelInteract();
+	}
 }
 
 void ATallowCharacter::DoCup()

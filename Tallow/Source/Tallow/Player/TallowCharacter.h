@@ -17,7 +17,7 @@ class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
 class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
-
+class UTallowInteractionComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -66,17 +66,10 @@ protected:
 	/** Stimulus component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
 	TObjectPtr<UAIPerceptionStimuliSourceComponent> StimulusSourceComponent;
-
-	/** Interact Hold variables */
-	TWeakObjectPtr<AActor> CurrentInteractTarget = nullptr;
-	float CurrentHoldTime = 0.0f;
-	float TargetHoldDuration = 0.0f;
-	bool bIsHoldingInteract = false;
-	float TargetDistance = 200.0f;
-	FTimerHandle HoldTimerHandle;
-	// Update rate for hold validation
-	static constexpr float HoldUpdateInterval = 0.02f;
-	static constexpr float HoldLookThreshold = 0.8f;
+	
+	/** Interaction component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UTallowInteractionComponent> InteractionComponent;
 	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
@@ -264,12 +257,10 @@ protected:
 
 	/** Handles interact */
 	UFUNCTION(BlueprintCallable, Category = "Input")
-	virtual void StartInteract();
+	virtual void DoInteractStart();
+	
 	UFUNCTION(BlueprintCallable, Category = "Input")
-	virtual void CancelInteract();
-	void UpdateHoldStep();
-	UFUNCTION(BlueprintCallable, Category = "Input")
-	virtual void ResetHoldState();
+	virtual void DoInteractEnd();
 	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
