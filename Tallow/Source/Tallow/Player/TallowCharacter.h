@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Candle/TallowCandleComponent.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "TallowCharacter.generated.h"
@@ -17,7 +18,7 @@ class UTallowFootstepNoiseComponent;
 class UPointLightComponent;
 class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
-
+class UTallowInteractionComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -66,19 +67,26 @@ protected:
 	/** Stimulus component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Perception")
 	TObjectPtr<UAIPerceptionStimuliSourceComponent> StimulusSourceComponent;
-
+	
+	/** Interaction component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UTallowInteractionComponent> InteractionComponent;
+	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
 
 	/** Bool to check if player holding still */
 	bool bIsHoldingStill = false;
 
-	/** Must hold for atleast 0.6s to pay the cost */
+	/** Must hold for at least 0.6s to pay the cost */
 	double StillnessStartTime = 0.0;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player|Tuning")
 	float MinStillnessHoldDuration = 0.6f; 
 
+	/** Holds current fuse */
+	bool bHasFuse = false;
+	
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* JumpAction;
@@ -149,24 +157,50 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Components")
 	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
 
+	/** Gets if player cupping flame */
+	UFUNCTION(BlueprintCallable, Category = "Player|State")
+	bool IsHandOccupied() const;
+	
 	/** Get if player holding still*/
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
 
-	// Pointer to hide volume
+	/** Pointer to hide volume */
 	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
 	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
 
-	// Set and check hide volume
+	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
+	
+	/** Get current hide volume */
+	ATallowHideVolume* GetCurrentHideVolume() const { return CurrentHideVolume; }
 	
 	bool IsHiddenInSpot() const {
 		return CurrentHideVolume != nullptr;
 	}
-
+	
+	/** Gets & Sets Carried Fuses */
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool ConsumeFuse()
+	{
+		if (bHasFuse)
+		{
+			bHasFuse = false;
+			return true;
+		}
+		return false;
+	}
+	
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool HasFuse() const { return bHasFuse; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Components")
+	void GiveFuse()  { bHasFuse = true;  }
+	
+	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
 	FOnStill OnStill;
-
+	
 	UPROPERTY(BlueprintCallable, Category = "Player|Event")
 	FOnTransformation OnTransformation;
 	
@@ -209,11 +243,7 @@ protected:
 	/** Handles crouch end inputs */
 	UFUNCTION(BlueprintCallable, Category= "Input")
 	virtual void DoCrouchEnd();
-
-	/** Handles interact */
-	UFUNCTION(BlueprintCallable, Category = "Input")
-	virtual void DoInteract();
-
+	
 	/** Handles cupping candle */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoCup();
@@ -233,7 +263,13 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoStillnessEnd();
 
+	/** Handles interact */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoInteractStart();
+	
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoInteractEnd();
+	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-
 };

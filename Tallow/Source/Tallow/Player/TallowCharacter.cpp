@@ -17,7 +17,9 @@
 #include "Perception/AIPerceptionSystem.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Environment/TallowHideVolume.h"
+#include "Interactable/TallowInteractionComponent.h"
 #include "Tallow.h"
+
 
 ATallowCharacter::ATallowCharacter()
 {
@@ -85,6 +87,9 @@ ATallowCharacter::ATallowCharacter()
 	{
 		StimulusSourceComponent->bAutoRegister = true;
 	}
+	
+	// Interaction component
+	InteractionComponent = CreateDefaultSubobject<UTallowInteractionComponent>(TEXT("Interaction Component"));
 
 }
 
@@ -111,13 +116,15 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATallowCharacter::LookInput);
-
-		// Interact
+		
+		// Hold - Interact
 		if (InteractAction)
 		{
-			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteract);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATallowCharacter::DoInteractStart);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoInteractEnd);
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoInteractEnd);
 		}
-
+		
 		// Cupping candle (actions come from the candle MR; skip if the BP has not wired them yet)
 		if (CupAction)
 		{
@@ -156,6 +163,7 @@ void ATallowCharacter::BeginPlay()
 		SetLightPerception(CandleComponent->GetCandleState());
 	}
 
+	// Hide head mesh clipping
 	if (FirstPersonMesh)
 	{
 		FirstPersonMesh->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
@@ -273,10 +281,10 @@ void ATallowCharacter::DoCrouchEnd()
 	UnCrouch();
 }
 
-void ATallowCharacter::DoInteract()
+void ATallowCharacter::DoInteractStart()
 {
 	// if player is cupping, interact hand is occupied
-	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+	if (IsHandOccupied()) return;
 
 	// if hidden, call exit
 	if (CurrentHideVolume)
@@ -284,28 +292,23 @@ void ATallowCharacter::DoInteract()
 		IInteractable::Execute_OnInteract(CurrentHideVolume, this);
 		return;
 	}
-
-	FHitResult HitResult;
-	FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation();
-	FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 200.0f);
-
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this); // ignore self
-
-	// run raycast
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		StartLocation,
-		EndLocation,
-		ECollisionChannel::ECC_Visibility,
-		QueryParams
-	);
-
-	// if hit, run interact
-	AActor* HitActor = HitResult.GetActor();
-	if (bHit && HitActor && HitActor->Implements<UInteractable>())
+	
+	// if free run interaction
+	if (InteractionComponent)
 	{
-		IInteractable::Execute_OnInteract(HitResult.GetActor(), this);
+		InteractionComponent->StartInteract();	
+	}
+}
+
+void ATallowCharacter::DoInteractEnd()
+{
+	if (UAnimInstance* AnimInst = FirstPersonMesh->GetAnimInstance())
+	{
+		AnimInst->Montage_Stop(0.2f); 
+	}
+	if (InteractionComponent)
+	{
+		InteractionComponent->CancelInteract();
 	}
 }
 
@@ -397,4 +400,13 @@ void ATallowCharacter::DoStillnessEnd()
 	}
 
 	GetCharacterMovement()->AvoidanceWeight = 0.0f;
+}
+
+bool ATallowCharacter::IsHandOccupied() const
+{
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped)
+	{
+		return true;
+	}
+	return false;
 }

@@ -11,6 +11,8 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Tasks/TallowFusePickup.h"
+#include "Tasks/TallowFuseBox.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -20,10 +22,22 @@ void ATallowGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Cast to all pointers once for performance
 	Player = Cast<ATallowCharacter>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCharacter::StaticClass()));
 	Chair = Cast<ATallowChairEscape>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowChairEscape::StaticClass()));
 	Creature = Cast<ATallowCreature>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCreature::StaticClass()));
 	CandlePickup = Cast<ATallowCandlePickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCandlePickup::StaticClass()));
+	FuseBox = Cast<ATallowFuseBox>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFuseBox::StaticClass()));
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowFusePickup::StaticClass(), FoundActors);
+	for (AActor* Actor : FoundActors)
+	{
+		if (ATallowFusePickup* Pickup = Cast<ATallowFusePickup>(Actor))
+		{
+			FusePickups.Add(Pickup);
+		}
+	}
+	
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		CameraManager = PC->PlayerCameraManager;
@@ -82,7 +96,7 @@ void ATallowGameMode::HandlePlayerCaptured()
 }
 
 void ATallowGameMode::BeginCaptureFade()
-{
+{	
 	if (CameraManager)
 		CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
 }
@@ -112,5 +126,22 @@ void ATallowGameMode::ResetGame()
 	if (CameraManager)
 	{
 		CameraManager->StartCameraFade(1.0f, 0.0f, FadeInTimer, FColor::Black, false, false);
+	}
+	
+	if (FuseBox)
+	{
+		FuseBox->ResetVisual();
+	}
+	
+	for (ATallowFusePickup* Pickup : FusePickups)
+	{
+		if (Pickup)
+		{
+			Pickup->ResetPickup();
+		}
+	}
+	if (Player)
+	{
+		Player->ConsumeFuse();
 	}
 }

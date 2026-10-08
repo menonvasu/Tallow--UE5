@@ -27,6 +27,13 @@ void ATallowCandlePickup::OnInteract_Implementation(AActor* Interactor)
 	}
 }
 
+FText ATallowCandlePickup::GetInteractionPromptText_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) return FText::GetEmpty();
+	
+	return FText::FromString("PICKUP CANDLE");
+}
+
 void ATallowCandlePickup::ResetPickup(AActor* Interactor)
 {
 	if (!Interactor) return;
