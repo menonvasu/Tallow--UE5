@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Candle/TallowCandleComponent.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "TallowCharacter.generated.h"
@@ -156,6 +157,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Components")
 	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
 
+	/** Gets if player cupping flame */
+	UFUNCTION(BlueprintCallable, Category = "Player|State")
+	bool IsHandOccupied() const;
+	
 	/** Get if player holding still*/
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }

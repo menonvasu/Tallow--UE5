@@ -5,7 +5,7 @@
 #include "TallowInteractionComponent.generated.h"
 
 class UCameraComponent;
-class UTallowHoldProgressWidget;
+class UTallowInteractWidget;
 class AActor;
 class APlayerController;
 
@@ -23,7 +23,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Interact")
 	void CancelInteract();
-	
+
 protected:
 	virtual void BeginPlay() override;
 	
@@ -45,11 +45,15 @@ protected:
 	
 	bool bIsHoldingInteract = false;
 	
+	bool bCanInteract = false;
+	
+	bool bIsHoldType = false;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|UI")
-	TSubclassOf<UTallowHoldProgressWidget> HoldProgressWidgetClass;
+	TSubclassOf<UTallowInteractWidget> HoldProgressWidgetClass;
 	
 	UPROPERTY(Transient)
-	TObjectPtr<UTallowHoldProgressWidget> HoldProgressWidgetInstance;
+	TObjectPtr<UTallowInteractWidget> HoldProgressWidgetInstance;
 	
 	/** Pointer to cache Player Controller */
 	UPROPERTY()

@@ -29,6 +29,10 @@ public:
 
 	virtual void OnInteractCancel_Implementation(AActor* Interactor) override;
 	
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	
+	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
+	
 	/** Required fuses */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FuseBox|Tunables")
 	int32 RequiredFuses = 3;

@@ -1,8 +1,9 @@
 ﻿#include "TallowInteractionComponent.h"
-#include "UI/TallowHoldProgressWidget.h"
+#include "UI/TallowInteractWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
 #include "IInteractable.h"
+#include "Player/TallowCharacter.h"
 
 UTallowInteractionComponent::UTallowInteractionComponent()
 {
@@ -21,7 +22,7 @@ void UTallowInteractionComponent::BeginPlay()
 		PC = Cast<APlayerController>(Pawn->GetController());
 		if (PC.IsValid())
 		{
-			HoldProgressWidgetInstance = CreateWidget<UTallowHoldProgressWidget>(PC.Get(), HoldProgressWidgetClass);
+			HoldProgressWidgetInstance = CreateWidget<UTallowInteractWidget>(PC.Get(), HoldProgressWidgetClass);
 			if (HoldProgressWidgetInstance)
 			{
 				HoldProgressWidgetInstance->AddToViewport();
@@ -52,7 +53,7 @@ void UTallowInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReas
 	ResetHoldState();
 }
 
-// returns owning camera
+// Helper returns owning camera
 UCameraComponent* UTallowInteractionComponent::GetOwnerCamera() const
 {
 	return GetOwner() ? GetOwner()->FindComponentByClass<UCameraComponent>() : nullptr;
@@ -61,7 +62,7 @@ UCameraComponent* UTallowInteractionComponent::GetOwnerCamera() const
 // Helper to run a raycast on item
 AActor* UTallowInteractionComponent::RunRaycast() const
 {
-	UCameraComponent* Camera = GetOwnerCamera();
+	const UCameraComponent* Camera = GetOwnerCamera();
 	if (!Camera) return nullptr;
 	
 	const FVector StartLocation = Camera->GetComponentLocation();
@@ -96,18 +97,41 @@ void UTallowInteractionComponent::DoHoverCheck()
 	if (HitActor && HitActor->Implements<UInteractable>())
 	{
 		if (HitActor == CurrentHoverActor.Get()) return;
-		
 		CurrentHoverActor = HitActor;
-		float HoldDuration = IInteractable::Execute_GetInteractionDuration(HitActor);
-		//show prompt - need to code method on widgetclass
+		
+		bCanInteract = IInteractable::Execute_CanInteract(HitActor, GetOwner());
+		
+		const float HoldDuration = IInteractable::Execute_GetInteractionDuration(HitActor);
+		bIsHoldType = HoldDuration > 0.0f;
+		
+		FText Prompt = IInteractable::Execute_GetInteractionPromptText(HitActor, GetOwner());
+	
+		// force interact to false if player cupping flame
+		if (const ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner()))
+		{
+			if (Player->IsHandOccupied())
+			{
+				bCanInteract = false;
+				Prompt = FText::FromString(TEXT("HAND OCCUPIED"));	
+			}
+		}
+		
+		if (HoldProgressWidgetInstance)
+		{
+			HoldProgressWidgetInstance->ShowPrompt(Prompt, bIsHoldType, bCanInteract);
+		}
 	}
-	else 
+	else
 	{
 		// clear if nothing hit and actor valid
 		if (CurrentHoverActor.IsValid() && HoldProgressWidgetInstance)
 		{
-			HoldProgressWidgetInstance->SetPromptVisibility(false);
 			CurrentHoverActor = nullptr;
+		}
+		
+		if (HoldProgressWidgetInstance)
+		{
+			HoldProgressWidgetInstance ->HidePrompt();
 		}
 	}
 }
@@ -117,6 +141,8 @@ void UTallowInteractionComponent::StartInteract()
 	AActor* HitActor = RunRaycast();
 	if (HitActor && HitActor->Implements<UInteractable>())
 	{
+		if (!IInteractable::Execute_CanInteract(HitActor, GetOwner())) return;
+
 		const float Duration = IInteractable::Execute_GetInteractionDuration(HitActor);
 		// if < 0.0s run tap interact
 		if (Duration <= 0.0f)
@@ -190,7 +216,11 @@ void UTallowInteractionComponent::UpdateHoldStep()
 		ResetHoldState(); 
 		if (CompletedTarget)
 		{
-				IInteractable::Execute_OnInteractComplete(CompletedTarget, GetOwner());
+			IInteractable::Execute_OnInteractComplete(CompletedTarget, GetOwner());
+				
+			// force an immediate hover re-evaluation 
+			CurrentHoverActor = nullptr; // Invalidate the cache
+			DoHoverCheck();
 		}
 		return;
 	}

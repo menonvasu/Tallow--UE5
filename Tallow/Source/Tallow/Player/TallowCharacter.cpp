@@ -284,7 +284,7 @@ void ATallowCharacter::DoCrouchEnd()
 void ATallowCharacter::DoInteractStart()
 {
 	// if player is cupping, interact hand is occupied
-	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+	if (IsHandOccupied()) return;
 
 	// if hidden, call exit
 	if (CurrentHideVolume)
@@ -400,4 +400,13 @@ void ATallowCharacter::DoStillnessEnd()
 	}
 
 	GetCharacterMovement()->AvoidanceWeight = 0.0f;
+}
+
+bool ATallowCharacter::IsHandOccupied() const
+{
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped)
+	{
+		return true;
+	}
+	return false;
 }

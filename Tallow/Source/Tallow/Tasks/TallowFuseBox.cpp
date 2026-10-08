@@ -96,6 +96,46 @@ void ATallowFuseBox::OnInteractCancel_Implementation(AActor* Interactor)
 	OnNothingInserted.Broadcast();	
 }
 
+bool ATallowFuseBox::CanInteract_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) return true;
+	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
+	if (!Player || CurrentFuses >= RequiredFuses) return true;
+	
+	// if already powered, cannot interact
+	if (CurrentFuses >= RequiredFuses)
+	{
+		return false;
+	}
+	// if missing fuse
+	if (!Player->HasFuse())
+	{
+		return false;
+	}
+	// else, can interact
+	return true;
+}
+
+FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) return FText::GetEmpty();
+	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
+	if (!Player || CurrentFuses >= RequiredFuses) return FText::GetEmpty();
+	
+	// if already powered
+	if (CurrentFuses >= RequiredFuses)
+	{
+		return FText::FromString(TEXT("POWER RESTORED"));
+	}
+	// if missing fuse
+	if (!Player->HasFuse())
+	{
+		return FText::FromString(TEXT("REQUIRES FUSE"));
+	}
+	// else
+	return FText::FromString(TEXT("INSERT FUSE"));
+}
+
 void ATallowFuseBox::ResetVisual()
 {
 	CurrentFuses = 0;

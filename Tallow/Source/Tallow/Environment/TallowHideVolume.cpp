@@ -44,6 +44,17 @@ void ATallowHideVolume::OnInteract_Implementation(AActor* Interactor)
 	}
 }
 
+FText ATallowHideVolume::GetInteractionPromptText_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) return FText::GetEmpty();
+	
+	if (!bIsHidden)
+	{
+		return FText::FromString("ENTER");
+	}
+	return FText::FromString("EXIT");
+}
+
 void ATallowHideVolume::EnterHiddenSpot(APlayerController* PC)
 {
 	if (!PC) return; 

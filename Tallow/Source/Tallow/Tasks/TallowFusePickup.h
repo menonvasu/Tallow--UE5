@@ -19,6 +19,10 @@ public:
 	
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 	
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	
+	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
+	
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "FuseBox|Events")
 	FOnFusePickedUp OnFusePickedUp;
 	

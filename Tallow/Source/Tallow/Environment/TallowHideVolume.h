@@ -62,6 +62,10 @@ protected:
 	ETallowHidingSpotType HidingSpotType = ETallowHidingSpotType::Wardrobe;
 
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
+	
+	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
+	
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 
 	/** Runs on entering */
 	void EnterHiddenSpot(APlayerController* PC);

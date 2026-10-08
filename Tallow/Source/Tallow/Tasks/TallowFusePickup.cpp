@@ -29,6 +29,34 @@ void ATallowFusePickup::OnInteract_Implementation(AActor* Interactor)
 	SetActorEnableCollision(false);
 }	
 
+bool ATallowFusePickup::CanInteract_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) { return true; }
+	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
+	if (!Player) { return true; }
+	
+	// if player has fuse - return cannot interact
+	if (Player->HasFuse())
+	{
+		return false;
+	}
+	return true;
+}
+
+FText ATallowFusePickup::GetInteractionPromptText_Implementation(AActor* Interactor) const
+{
+	if (!Interactor) { return FText::GetEmpty(); }
+	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
+	if (!Player) { return FText::GetEmpty(); }
+	
+	if (Player->HasFuse())
+	{
+		return FText::FromString(TEXT("CARRYING FUSE"));
+	}
+	return FText::FromString(TEXT("TAKE FUSE"));
+	
+}
+
 void ATallowFusePickup::ResetPickup()
 {
 	SetActorHiddenInGame(false);

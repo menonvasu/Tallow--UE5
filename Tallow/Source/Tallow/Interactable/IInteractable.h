@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "StateTreeNodeDescriptionHelpers.h"
 #include "UObject/Interface.h"
 #include "IInteractable.generated.h"
 
@@ -36,4 +37,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	void OnInteractCancel(AActor* Interactor);
 	virtual void OnInteractCancel_Implementation(AActor* Interactor) {}
+	
+	// returns if player is able to interact
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	bool CanInteract(AActor* Interactor) const;
+	virtual bool CanInteract_Implementation(AActor* Interactor) const { return true; }
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	FText GetInteractionPromptText(AActor* Interactor) const;
+	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const { return FText::GetEmpty(); }
 };

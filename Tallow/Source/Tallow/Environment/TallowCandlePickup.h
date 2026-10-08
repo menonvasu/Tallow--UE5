@@ -19,6 +19,8 @@ public:
 
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 
+	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
+	
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void ResetPickup(AActor* Interactor);
 
