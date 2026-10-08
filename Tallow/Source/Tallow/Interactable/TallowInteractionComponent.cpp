@@ -4,6 +4,7 @@
 #include "Camera/CameraComponent.h"
 #include "IInteractable.h"
 #include "Player/TallowCharacter.h"
+#include "Environment/TallowHideVolume.h"
 
 UTallowInteractionComponent::UTallowInteractionComponent()
 {
@@ -93,6 +94,23 @@ AActor* UTallowInteractionComponent::RunRaycast() const
 // called to check if player hovers on item
 void UTallowInteractionComponent::DoHoverCheck()
 {
+	// if hidden - call hidden prompt without raycast
+	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
+	if (Player && Player->IsHiddenInSpot())
+	{
+		if (ATallowHideVolume* HideVolume = Player->GetCurrentHideVolume())
+		{
+			if (HideVolume == CurrentHoverActor.Get()) return;
+			CurrentHoverActor = HideVolume;
+			FText Prompt = IInteractable::Execute_GetInteractionPromptText(HideVolume, GetOwner());
+			if (HoldProgressWidgetInstance)
+			{
+				HoldProgressWidgetInstance->ShowPrompt(Prompt, false, true);	
+			}
+			return;
+		}
+	}
+	
 	AActor* HitActor = RunRaycast();
 	if (HitActor && HitActor->Implements<UInteractable>())
 	{
@@ -107,11 +125,12 @@ void UTallowInteractionComponent::DoHoverCheck()
 		FText Prompt = IInteractable::Execute_GetInteractionPromptText(HitActor, GetOwner());
 	
 		// force interact to false if player cupping flame
-		if (const ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner()))
+		if (Player)
 		{
 			if (Player->IsHandOccupied())
 			{
 				bCanInteract = false;
+				bIsHoldType = false;
 				Prompt = FText::FromString(TEXT("HAND OCCUPIED"));	
 			}
 		}
@@ -124,14 +143,14 @@ void UTallowInteractionComponent::DoHoverCheck()
 	else
 	{
 		// clear if nothing hit and actor valid
-		if (CurrentHoverActor.IsValid() && HoldProgressWidgetInstance)
+		if (CurrentHoverActor.IsValid())
 		{
 			CurrentHoverActor = nullptr;
 		}
 		
 		if (HoldProgressWidgetInstance)
 		{
-			HoldProgressWidgetInstance ->HidePrompt();
+			HoldProgressWidgetInstance->HidePrompt();
 		}
 	}
 }

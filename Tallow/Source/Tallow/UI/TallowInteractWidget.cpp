@@ -50,6 +50,16 @@ void UTallowInteractWidget::ShowPrompt(const FText& ActionText, const bool bIsHo
 			HoldProgressBar->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
 	}
+	
+	// if player can interact, show input badge
+	if (bCanInteract)
+	{
+		KeyPromptBadge->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		KeyPromptBadge->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void UTallowInteractWidget::HidePrompt()

@@ -172,6 +172,9 @@ public:
 	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
 	
+	/** Get current hide volume */
+	ATallowHideVolume* GetCurrentHideVolume() const { return CurrentHideVolume; }
+	
 	bool IsHiddenInSpot() const {
 		return CurrentHideVolume != nullptr;
 	}

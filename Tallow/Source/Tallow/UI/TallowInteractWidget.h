@@ -35,6 +35,10 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> HoldProgressBar;
 	
+	/** Input key badge */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> KeyPromptBadge;
+	
 	// Configurable colors in Defaults / Blueprint
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Colors")
 	FLinearColor NormalColor = FLinearColor(0.85f, 0.85f, 0.85f, 1.0f);
