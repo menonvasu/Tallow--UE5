@@ -46,4 +46,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	FText GetInteractionPromptText(AActor* Interactor) const;
 	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const { return FText::GetEmpty(); }
+	
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
+	void OnInteractTick(AActor* Interactor, float DeltaTime, float Progress);
+	virtual void OnInteractTick_Implementation(AActor* Interactor, float DeltaTime, float Progress);
 };

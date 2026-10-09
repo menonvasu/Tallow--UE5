@@ -24,6 +24,15 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStill, bool, bIsStill);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTransformation, int32, NewLevel);
+
+UENUM(BlueprintType)
+enum class ECarriedItemType : uint8 
+{
+	None,
+	Fuse,
+	Crowbar
+};
+
 /**
  *  A first person character
  */
@@ -84,8 +93,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Player|Tuning")
 	float MinStillnessHoldDuration = 0.6f; 
 
-	/** Holds current fuse */
-	bool bHasFuse = false;
+	/** Carried Item */
+	ECarriedItemType CarriedItem = ECarriedItemType::None;
 	
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -183,19 +192,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Components")
 	bool ConsumeFuse()
 	{
-		if (bHasFuse)
+		if (CarriedItem == ECarriedItemType::Fuse)
 		{
-			bHasFuse = false;
+			CarriedItem = ECarriedItemType::None;
 			return true;
 		}
 		return false;
 	}
 	
 	UFUNCTION(BlueprintPure, Category = "Player|Components")
-	bool HasFuse() const { return bHasFuse; }
+	ECarriedItemType GetCarriedItem() const {  return CarriedItem; }
+	
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool HasCarriedItem(const ECarriedItemType ItemType) const { return CarriedItem == ItemType; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Player|Components")
-	void GiveFuse()  { bHasFuse = true;  }
+	void SetCarriedItem(const ECarriedItemType NewCarriedItem) { CarriedItem = NewCarriedItem; }
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Components")
+	void ClearCarriedItem() { CarriedItem = ECarriedItemType::None; }
 	
 	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
