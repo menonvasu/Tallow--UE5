@@ -81,6 +81,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTallowInteractionComponent> InteractionComponent;
 	
+	/** Pointer to hide volume */
+	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
+	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
+	
+	/** Spawnable pickups */
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Spawns") 
+	TSubclassOf<class ATallowFusePickup> FusePickupClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Spawns") 
+	TSubclassOf<class ATallowCrowbarPickup> CrowbarPickupClass;
+	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
 
@@ -95,6 +106,9 @@ protected:
 
 	/** Carried Item */
 	ECarriedItemType CarriedItem = ECarriedItemType::None;
+	
+	/** Drop item raycast distance threshold */
+	const float DropRayCastDistance = 220.0f;
 	
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -133,6 +147,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* StillnessAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* DropAction;
 
 public:
 	ATallowCharacter();
@@ -173,10 +190,6 @@ public:
 	/** Get if player holding still*/
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
-
-	/** Pointer to hide volume */
-	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
-	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
 
 	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
@@ -284,6 +297,13 @@ protected:
 	
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoInteractEnd();
+	
+	/** Handles drop */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoDropItem();
+	
+	/** Helper to instantiate an item pickup cleanly on the floor */
+	AActor* SpawnItem(const TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation);
 	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;

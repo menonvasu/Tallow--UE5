@@ -49,5 +49,5 @@ public:
 	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	void OnInteractTick(AActor* Interactor, float DeltaTime, float Progress);
-	virtual void OnInteractTick_Implementation(AActor* Interactor, float DeltaTime, float Progress);
+	virtual void OnInteractTick_Implementation(AActor* Interactor, float DeltaTime, float Progress) {}
 };
