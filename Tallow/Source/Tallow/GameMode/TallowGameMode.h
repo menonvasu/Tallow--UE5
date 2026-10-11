@@ -11,6 +11,7 @@ class ATallowCharacter;
 class APlayerCameraManager;
 class ATallowFuseBox;
 class ATallowFusePickup;
+class ATallowCrowbarPickup;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCaught);
 
@@ -54,6 +55,9 @@ protected:
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
 	TArray<TObjectPtr<ATallowFusePickup>> FusePickups;
+	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TObjectPtr<ATallowCrowbarPickup> CrowbarPickup;
 
 	/** Screen fade timer */
 	FTimerHandle ResetTimerHandle;

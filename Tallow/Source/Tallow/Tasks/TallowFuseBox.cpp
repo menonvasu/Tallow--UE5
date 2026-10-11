@@ -120,7 +120,7 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 {
 	if (!Interactor) return FText::GetEmpty();
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player || CurrentFuses >= RequiredFuses) return FText::GetEmpty();
+	if (!Player) return FText::GetEmpty();
 	
 	// if already powered
 	if (CurrentFuses >= RequiredFuses)

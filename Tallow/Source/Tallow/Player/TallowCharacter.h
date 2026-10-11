@@ -19,6 +19,7 @@ class UPointLightComponent;
 class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
 class UTallowInteractionComponent;
+class UTallowItemDefinition;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -91,6 +92,14 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Spawns") 
 	TSubclassOf<class ATallowCrowbarPickup> CrowbarPickupClass;
+	
+	/** Meshes assigned in BP class */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory|Visuals")
+	TObjectPtr<UStaticMeshComponent> HeldItemMesh;
+	
+	/** Registry of items */
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Registry")
+	TMap<ECarriedItemType, TObjectPtr<UTallowItemDefinition>> ItemRegistry;
 	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
@@ -207,7 +216,7 @@ public:
 	{
 		if (CarriedItem == ECarriedItemType::Fuse)
 		{
-			CarriedItem = ECarriedItemType::None;
+			ClearCarriedItem();
 			return true;
 		}
 		return false;
@@ -220,10 +229,13 @@ public:
 	bool HasCarriedItem(const ECarriedItemType ItemType) const { return CarriedItem == ItemType; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Player|Components")
-	void SetCarriedItem(const ECarriedItemType NewCarriedItem) { CarriedItem = NewCarriedItem; }
+	void SetCarriedItem(const ECarriedItemType NewCarriedItem) { CarriedItem = NewCarriedItem; UpdateHeldItemVisual(); }
 	
 	UFUNCTION(BlueprintCallable, Category = "Player|Components")
-	void ClearCarriedItem() { CarriedItem = ECarriedItemType::None; }
+	void ClearCarriedItem() { CarriedItem = ECarriedItemType::None; UpdateHeldItemVisual();	}
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Visuals	")
+	void UpdateHeldItemVisual();
 	
 	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
@@ -303,7 +315,7 @@ protected:
 	virtual void DoDropItem();
 	
 	/** Helper to instantiate an item pickup cleanly on the floor */
-	AActor* SpawnItem(const TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation);
+	AActor* SpawnItem(TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation);
 	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;

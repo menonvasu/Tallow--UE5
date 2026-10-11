@@ -20,6 +20,7 @@
 #include "Interactable/TallowInteractionComponent.h"
 #include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowFusePickup.h"
+#include "Items/TallowItemDefinition.h"	
 #include "Tallow.h"
 
 
@@ -92,6 +93,13 @@ ATallowCharacter::ATallowCharacter()
 	
 	// Interaction component
 	InteractionComponent = CreateDefaultSubobject<UTallowInteractionComponent>(TEXT("Interaction Component"));
+	
+	// Held Item Mesh
+	HeldItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeldItemMesh"));
+	HeldItemMesh->SetupAttachment(FirstPersonCameraComponent);
+	HeldItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HeldItemMesh->SetVisibility(false);
+	HeldItemMesh->SetRelativeLocation(FVector(45.0f, 25.0f, -25.0f));
 
 }
 
@@ -421,7 +429,12 @@ void ATallowCharacter::DoStillnessEnd()
 void ATallowCharacter::DoDropItem()
 {
 	bool bFoundValidLocation = false;
-	if  (CarriedItem == ECarriedItemType::None || !FirstPersonCameraComponent) { return; }
+	if (CarriedItem == ECarriedItemType::None || !FirstPersonCameraComponent) { return; }
+	UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem);
+	if (!ItemDef || !ItemDef->PickupClass)
+	{
+		return;
+	}
 	
 	const FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation() + (GetActorForwardVector() * 40.0f);
 	const FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 220.0f);
@@ -473,14 +486,13 @@ void ATallowCharacter::DoDropItem()
 	// return if no valid surface found 
 	if (!bFoundValidLocation) { return; }
 	// check item - spawn and clear 
-	TSubclassOf<AActor> ClassToSpawn = (CarriedItem == ECarriedItemType::Crowbar) ? CrowbarPickupClass : FusePickupClass;
-	if (ClassToSpawn && SpawnItem(ClassToSpawn, SpawnLocation, SpawnRotation))
+	if (SpawnItem(ItemDef->PickupClass, SpawnLocation, SpawnRotation))
 	{
 		ClearCarriedItem();
 	}
 }
 
-AActor* ATallowCharacter::SpawnItem(const TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation)
+AActor* ATallowCharacter::SpawnItem(TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation)
 {
 	if (!ItemPickupClass) { return nullptr; }
 	
@@ -491,4 +503,37 @@ AActor* ATallowCharacter::SpawnItem(const TSubclassOf<AActor> ItemPickupClass, c
 
 	AActor* SpawnedItem = GetWorld()->SpawnActor<AActor>(ItemPickupClass, SpawnLocation, SpawnRotation, SpawnParams);
 	return SpawnedItem;
+}
+
+void ATallowCharacter::UpdateHeldItemVisual()
+{
+	if (!HeldItemMesh) { return; }
+	if (CarriedItem == ECarriedItemType::None)
+	{
+		HeldItemMesh->SetStaticMesh(nullptr);
+		HeldItemMesh->SetVisibility(false);
+		return;
+	}
+	
+	// Checks the carried item and if it has a mesh, set it with correct transform  
+	if (const UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("--> HELD VISUAL: Carried=[%d] | Def=[%s] | Mesh=[%s] | Loc=[%s]"),
+		(int32)CarriedItem,
+		*GetNameSafe(ItemDef),
+		ItemDef ? *GetNameSafe(ItemDef->HeldMesh.Get()) : TEXT("None"),
+		ItemDef ? *ItemDef->HeldRelativeTransform.GetLocation().ToString() : TEXT("N/A"));
+		
+		if (ItemDef && ItemDef->HeldMesh)
+		{
+			HeldItemMesh->SetStaticMesh(ItemDef->HeldMesh);
+			HeldItemMesh->SetRelativeTransform(ItemDef->HeldRelativeTransform);
+			HeldItemMesh->SetVisibility(true);
+		}
+		else
+		{
+			HeldItemMesh->SetStaticMesh(nullptr);
+			HeldItemMesh->SetVisibility(false);
+		}
+	}
 }

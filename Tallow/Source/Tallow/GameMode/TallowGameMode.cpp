@@ -11,8 +11,10 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
+#include "Tasks/TallowCrowbarPickup.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -28,15 +30,16 @@ void ATallowGameMode::BeginPlay()
 	Creature = Cast<ATallowCreature>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCreature::StaticClass()));
 	CandlePickup = Cast<ATallowCandlePickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCandlePickup::StaticClass()));
 	FuseBox = Cast<ATallowFuseBox>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFuseBox::StaticClass()));
-	TArray<AActor*> FoundActors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowFusePickup::StaticClass(), FoundActors);
-	for (AActor* Actor : FoundActors)
+	TArray<AActor*> FoundFuseActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowFusePickup::StaticClass(), FoundFuseActors);
+	for (AActor* Actor : FoundFuseActors)
 	{
 		if (ATallowFusePickup* Pickup = Cast<ATallowFusePickup>(Actor))
 		{
 			FusePickups.Add(Pickup);
 		}
 	}
+	CrowbarPickup = Cast<ATallowCrowbarPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCrowbarPickup::StaticClass()));
 	
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
@@ -140,8 +143,15 @@ void ATallowGameMode::ResetGame()
 			Pickup->ResetPickup();
 		}
 	}
+	
+	if (CrowbarPickup)
+	{
+		CrowbarPickup->ResetPickup();
+	}
+	
 	if (Player)
 	{
 		Player->ConsumeFuse();
+		Player->UpdateHeldItemVisual();
 	}
 }
