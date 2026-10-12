@@ -19,6 +19,7 @@ class UPointLightComponent;
 class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
 class UTallowInteractionComponent;
+class UCharacterMovementComponent;
 class UTallowItemDefinition;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -191,7 +192,7 @@ public:
 	/** Gets candle component */
 	UFUNCTION(BlueprintCallable, Category = "Components")
 	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
-
+	
 	/** Gets if player cupping flame */
 	UFUNCTION(BlueprintCallable, Category = "Player|State")
 	bool IsHandOccupied() const;
