@@ -29,6 +29,12 @@ void ATallowDoor::BeginPlay()
 	Super::BeginPlay();
 	
 	InitialPlanks = BarricadePlanks;
+	
+	if (DoorTimeline && DoorTimelineCurve)
+	{
+		TimelineProgress.BindDynamic(this, &ATallowDoor::UpdateDoorRotation);
+		DoorTimeline->AddInterpFloat(DoorTimelineCurve, TimelineProgress);	
+	}
 }
 
 bool ATallowDoor::CanInteract_Implementation(AActor* Interactor) const
@@ -60,29 +66,37 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	if (!Player) { return; }
 	
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
-	if (!NoiseSubsystem) { return; }
-	
+	 
 	// if door closed
 	if (!bIsOpen)
 	{
 		if (Player->GetVelocity().Size() > Player->Walkspeed)
 		{
 			// slam door!
-			NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorSlam, GetActorLocation(), Player, DoorSlamLoudness, true);
+			if (NoiseSubsystem)
+			{
+				NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorSlam, GetActorLocation(), Player, DoorSlamLoudness, true);
+			}
 		}
 		else
 		{
 			// open door
-			NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorOpen, GetActorLocation(), Player, DoorOpenLoudness, false);
+			if (NoiseSubsystem)
+			{
+				NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorOpen, GetActorLocation(), Player, DoorOpenLoudness, false);
+			}
 		}
 	}
 	// if open - close
 	else
 	{
-		NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorClose, GetActorLocation(), Player, DoorCloseLoudness, true);
+		if (NoiseSubsystem)
+		{
+			NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorClose, GetActorLocation(), Player, DoorCloseLoudness, true);	
+		}
 	}
 	
-	ToggleDoor();
+	ToggleDoor(Player);
 }
 
 void ATallowDoor::UpdateDoorRotation(float OutputValue) 
@@ -92,16 +106,24 @@ void ATallowDoor::UpdateDoorRotation(float OutputValue)
 	HingePivot->SetRelativeRotation(FRotator(0.0f, CurrentYaw, 0.0f));
 }
 
-void ATallowDoor::ToggleDoor()
+void ATallowDoor::ToggleDoor(ATallowCharacter* Player)
 {
-	if (bIsOpen)
+	if (!Player || !DoorTimeline) return;
+	
+	if (!bIsOpen)
 	{
-		DoorTimeline->Reverse();
+		// Opening 
+		const bool bIsSlamming = Player->GetVelocity().Size() > Player->Walkspeed;
+		DoorTimeline->SetPlayRate(bIsSlamming ? DoorSlamPlayRate : DoorOpenPlayRate);
+		DoorTimeline->Play();
 	}
 	else
 	{
-		DoorTimeline->Play();
+		// Closing
+		DoorTimeline->SetPlayRate(DoorClosePlayRate);
+		DoorTimeline->Reverse();
 	}
+	
 	bIsOpen = !bIsOpen;
 }
 

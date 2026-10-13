@@ -18,8 +18,7 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Environment/TallowHideVolume.h"
 #include "Interactable/TallowInteractionComponent.h"
-#include "Tasks/TallowCrowbarPickup.h"
-#include "Tasks/TallowFusePickup.h"
+#include "GameMode/TallowGameMode.h"
 #include "Items/TallowItemDefinition.h"	
 #include "Tallow.h"
 
@@ -500,10 +499,16 @@ AActor* ATallowCharacter::SpawnItem(TSubclassOf<AActor> ItemPickupClass, const F
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = GetInstigator();
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
+	
 	AActor* SpawnedItem = GetWorld()->SpawnActor<AActor>(ItemPickupClass, SpawnLocation, SpawnRotation, SpawnParams);
+	
+	if (ATallowGameMode* Gm = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		Gm->RegisterDroppedItem(SpawnedItem);
+	}
+	
 	return SpawnedItem;
-}
+}	
 
 void ATallowCharacter::UpdateHeldItemVisual()
 {

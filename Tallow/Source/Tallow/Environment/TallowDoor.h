@@ -1,11 +1,13 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Components/TimelineComponent.h"
 #include "GameFramework/Actor.h"
 #include "Interactable/IInteractable.h"
 #include "TallowDoor.generated.h"
 
-class UTimelineComponent;
+class ATallowPlank;
+class ATallowCharacter;
 class UCurveFloat;
 
 UCLASS()
@@ -30,7 +32,7 @@ public:
 	void UpdateDoorRotation(float OutputValue);
 	
 	/** Called on interaction */
-	void ToggleDoor();
+	void ToggleDoor(ATallowCharacter* Player);
 	
 	void ResetDoor();
 	
@@ -46,6 +48,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float OpenAngle = 90.0f;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
+	float DoorSlamPlayRate = 3.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
+	float DoorOpenPlayRate = 1.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
+	float DoorClosePlayRate = 1.2f;
+	
+	FOnTimelineFloat TimelineProgress;
+	
 protected:
 	virtual void BeginPlay() override;
 	
@@ -59,9 +72,9 @@ protected:
 	TObjectPtr<UStaticMeshComponent> DoorMesh;
 
 	UPROPERTY(EditInstanceOnly, Category = "Door|Barricade")
-	TArray<TObjectPtr<class ATallowPlank>> BarricadePlanks;
+	TArray<TObjectPtr<ATallowPlank>> BarricadePlanks;
 	
-	TArray<TObjectPtr<class ATallowPlank>> InitialPlanks;
+	TArray<TObjectPtr<ATallowPlank>> InitialPlanks;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door|Timeline")
 	TObjectPtr<UTimelineComponent> DoorTimeline;

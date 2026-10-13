@@ -3,7 +3,6 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Player/TallowCharacter.h"
 #include "AI/TallowCreature.h"
-#include "AI/TallowAIController.h"
 #include "Environment/TallowCandlePickup.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -14,7 +13,7 @@
 #include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
-#include "Tasks/TallowCrowbarPickup.h"
+#include "Environment/TallowDoor.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -45,6 +44,16 @@ void ATallowGameMode::BeginPlay()
 	{
 		CameraManager = PC->PlayerCameraManager;
 	}
+	TArray<AActor*> FoundDoors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowDoor::StaticClass(), FoundDoors);
+	for (AActor* Actor : FoundDoors)
+	{
+		if (ATallowDoor* Door = Cast<ATallowDoor>(Actor))
+		{
+			CachedDoors.Add(Door);
+		}
+	}
+	
 }
 
 void ATallowGameMode::HandlePlayerCaptured()
@@ -104,6 +113,13 @@ void ATallowGameMode::BeginCaptureFade()
 		CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
 }
 
+void ATallowGameMode::RegisterDroppedItem(AActor* DroppedItem)
+{
+	// just adds dropped item to the array
+	if (!DroppedItem) { return; }
+	RuntimeDroppedItems.Add(DroppedItem);
+}
+
 void ATallowGameMode::ResetGame()
 {
 	bCaptureInProgress = false;
@@ -151,7 +167,24 @@ void ATallowGameMode::ResetGame()
 	
 	if (Player)
 	{
-		Player->ConsumeFuse();
+		Player->ClearCarriedItem();
 		Player->UpdateHeldItemVisual();
+	}
+	
+	for (TWeakObjectPtr<AActor> DroppedItem : RuntimeDroppedItems)
+	{
+		if (DroppedItem.IsValid())
+		{
+			DroppedItem->Destroy();
+		}
+	}
+	RuntimeDroppedItems.Empty();
+	
+	for (ATallowDoor* Door : CachedDoors)
+	{
+		if (Door)
+		{
+			Door->ResetDoor();
+		}
 	}
 }

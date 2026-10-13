@@ -4,15 +4,6 @@
 #include "GameFramework/GameModeBase.h"
 #include "TallowGameMode.generated.h"
 
-class ATallowChairEscape;
-class ATallowCreature;
-class ATallowCandlePickup;
-class ATallowCharacter;
-class APlayerCameraManager;
-class ATallowFuseBox;
-class ATallowFusePickup;
-class ATallowCrowbarPickup;
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCaught);
 
 UCLASS(abstract)
@@ -32,33 +23,43 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Tallow|Events")
 	FOnCaught OnCaught;
 
+	/** Registers an item dropped on the floor at runtime*/
+	void RegisterDroppedItem(AActor* DroppedItem);
+
 protected:
 
 	/** References to track */
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowCharacter> Player;
+	TObjectPtr<class ATallowCharacter> Player;
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowChairEscape> Chair;
+	TObjectPtr<class ATallowChairEscape> Chair;
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowCreature> Creature;
+	TObjectPtr<class ATallowCreature> Creature;
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowCandlePickup> CandlePickup;
+	TObjectPtr<class ATallowCandlePickup> CandlePickup;
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<APlayerCameraManager> CameraManager;
+	TObjectPtr<class APlayerCameraManager> CameraManager;
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowFuseBox> FuseBox;
+	TObjectPtr<class ATallowFuseBox> FuseBox;
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TArray<TObjectPtr<ATallowFusePickup>> FusePickups;
+	TArray<TObjectPtr<class ATallowFusePickup>> FusePickups;
 	
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
-	TObjectPtr<ATallowCrowbarPickup> CrowbarPickup;
-
+	TObjectPtr<class ATallowCrowbarPickup> CrowbarPickup;
+	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TArray<TObjectPtr<class ATallowDoor>> CachedDoors;
+	
+	/** Registry of runtime drops */
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> RuntimeDroppedItems;
+	
 	/** Screen fade timer */
 	FTimerHandle ResetTimerHandle;
 	FTimerHandle CaptureFadeTimerHandle;
