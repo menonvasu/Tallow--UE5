@@ -36,6 +36,10 @@ public:
 	
 	void ResetDoor();
 	
+	/** Overlap function */
+	UFUNCTION()
+	void OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult );
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float DoorSlamLoudness = 1.0f;
 	
@@ -75,6 +79,9 @@ protected:
 	TArray<TObjectPtr<ATallowPlank>> BarricadePlanks;
 	
 	TArray<TObjectPtr<ATallowPlank>> InitialPlanks;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
+	TObjectPtr<class UBoxComponent> AIProximityBox;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door|Timeline")
 	TObjectPtr<UTimelineComponent> DoorTimeline;

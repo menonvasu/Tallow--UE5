@@ -1,10 +1,13 @@
 ﻿#include "TallowDoor.h"
+
+#include "AI/TallowCreature.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Player/TallowCharacter.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Tasks/TallowPlank.h"
+#include "Components/BoxComponent.h"
 
 // Sets default values
 ATallowDoor::ATallowDoor()
@@ -19,6 +22,14 @@ ATallowDoor::ATallowDoor()
 	
 	DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
 	DoorMesh->SetupAttachment(HingePivot);
+	DoorMesh->SetCanEverAffectNavigation(false);
+	
+	AIProximityBox = CreateDefaultSubobject<UBoxComponent>(TEXT("AIProximityBox"));
+	AIProximityBox->SetupAttachment(RootComponent);
+	AIProximityBox->SetBoxExtent(FVector(80.0f, 70.0f, 120.0f));
+	AIProximityBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	AIProximityBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap); // only wake up for pawn
+	AIProximityBox->SetCanEverAffectNavigation(false);
 	
 	DoorTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DoorTimeline"));
 }
@@ -34,6 +45,11 @@ void ATallowDoor::BeginPlay()
 	{
 		TimelineProgress.BindDynamic(this, &ATallowDoor::UpdateDoorRotation);
 		DoorTimeline->AddInterpFloat(DoorTimelineCurve, TimelineProgress);	
+	}
+	
+	if (AIProximityBox)
+	{
+		AIProximityBox->OnComponentBeginOverlap.AddDynamic(this, &ATallowDoor::OnAIProximityBeginOverlap);
 	}
 }
 
@@ -144,6 +160,39 @@ void ATallowDoor::ResetDoor()
 	}
 }
 
+void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	ATallowCreature* Creature = Cast<ATallowCreature>(OtherActor);
+	if (!Creature || !DoorTimeline) { return; }
+	
+	if (IsBarricaded()) { return; } // only works with un-barricaded
+	
+	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
+	
+	if (!bIsOpen)
+	{
+		
+		if (const bool bIsChasing = (Creature->CurrentState == ETallowCreatureState::Chasing))
+		{
+			DoorTimeline->SetPlayRate(DoorSlamPlayRate);
+			if (NoiseSubsystem)
+			{
+				NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorSlam, GetActorLocation(), Creature, DoorSlamLoudness, false);
+			}
+		}
+		else
+		{
+			DoorTimeline->SetPlayRate(DoorOpenPlayRate);
+			if (NoiseSubsystem)
+			{
+				NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorOpen, GetActorLocation(), Creature, DoorOpenLoudness, false);	
+			}
+		}
+		
+		DoorTimeline->Play();
+		bIsOpen = true;
+	}
+}
 
 
 
