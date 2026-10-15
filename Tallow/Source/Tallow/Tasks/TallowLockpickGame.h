@@ -6,7 +6,9 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTensionReleased);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLockpickSet);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBinding);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSnap);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFalseSet);
 
 /** Per state for a pin */
 UENUM(BlueprintType)
@@ -15,7 +17,7 @@ enum class EPinState : uint8
 	Free,
 	Binding, 
 	Set,
-	FalseGate,
+	FalseSet,
 	Overset
 };
 
@@ -26,6 +28,9 @@ struct FPinChamber
 	GENERATED_BODY()
 	
 public:
+	bool bHasFalseGate = false;
+	bool bFalseGateCleared = false;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PinChamber")
 	float TargetHeight = 0.6f;
 	
@@ -38,6 +43,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PinChamber")
 	float FalseGateHeight = 0.5f;
 };
+
+class UTallowLockpickWidget;
 
 /** Cylinder/lock mechanism as a whole */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -75,6 +82,12 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
 	FOnSnap OnSnap;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
+	FOnFalseSet OnFalseSet;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
+	FOnBinding OnBinding;
 
 protected:
 	virtual void BeginPlay() override;
@@ -97,6 +110,11 @@ protected:
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|Tunables")
 	float PinTargetHeightMin = 0.25f;
+	
+	/** Drop-speed of pin on release */
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float PinSpringDropSpeed = 25.0f; 
+
 	
 	/** Current binding unlock level */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
@@ -127,6 +145,19 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
 	float PickLift = 0.0f;
 	
+	/** Variables for pick movement*/
+	float TargetPickDepth = 0.0f;
+	float TargetPickLift = 0.0f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float PickMoveSpeed; 
+	
 	/** Weak pointer to target actor */
 	TWeakObjectPtr<AActor> TargetLockable = nullptr;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|UI")
+	TSubclassOf<UTallowLockpickWidget> LockpickWidgetClass;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UTallowLockpickWidget> ActiveWidgetInstance;
 };

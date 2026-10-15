@@ -8,6 +8,7 @@
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Tasks/TallowPlank.h"
 #include "Components/BoxComponent.h"
+#include "Tasks/TallowLockpickGame.h"
 
 // Sets default values
 ATallowDoor::ATallowDoor()
@@ -81,6 +82,15 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
 	
+	if (bIsLocked)
+	{
+		if (UTallowLockpickGame* Lockpick = Player->GetLockpickComponent())
+		{
+			Lockpick->StartLockpickSession(this, 3);
+		}
+		return;
+	}
+	
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
 	 
 	// if door closed
@@ -113,6 +123,16 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	}
 	
 	ToggleDoor(Player);
+}
+
+void ATallowDoor::OnInteractComplete_Implementation(AActor* Interactor)
+{
+	if (!Interactor) { return; }
+	
+	bIsLocked = false;
+	OnDoorUnlocked.Broadcast();
+	
+	OnInteract_Implementation(Interactor);
 }
 
 void ATallowDoor::UpdateDoorRotation(float OutputValue) 

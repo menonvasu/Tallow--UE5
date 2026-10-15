@@ -1,8 +1,10 @@
 ﻿#include "TallowLockpickGame.h"
 
 #include "Player/TallowCharacter.h"
-	#include "Algo/RandomShuffle.h" 
+#include "Algo/RandomShuffle.h" 
+#include "Interactable/IInteractable.h"
 #include "Noise/TallowNoiseSubsystem.h"
+#include "UI/TallowLockpickWidget.h"
 
 
 UTallowLockpickGame::UTallowLockpickGame()
@@ -39,9 +41,13 @@ void UTallowLockpickGame::GenerateLock(int32 PinCount)
 	// randomize tolerance
 	CurrentTolerance = FMath::RandRange(0.03f, 0.06f);
 	
+	// randomize a pin to false gate
+	PinChambers[FMath::RandRange(0, PinCount - 1)].bHasFalseGate = true;
+	
 	// set first pin to binding
 	const int32 FirstPinIndex = BindingSequence[0];
 	PinChambers[FirstPinIndex].PinState = EPinState::Binding;
+	
 }
 
 void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 PinCount)
@@ -58,8 +64,17 @@ void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 P
 		PC->SetIgnoreLookInput(true);
 	}
 	
+	if (PC && LockpickWidgetClass)
+	{
+		ActiveWidgetInstance = CreateWidget<UTallowLockpickWidget>(this, LockpickWidgetClass);
+		ActiveWidgetInstance->AddToViewport();
+		ActiveWidgetInstance->InitializeLockpickWidget(this);
+	}
+	
 	PickDepth = 0.0f; 
 	PickLift = 0.0f; 
+	TargetPickDepth = 0.0f;
+	TargetPickLift = 0.0f;
 	CurrentTorque = 0.0f;
 
 	SetComponentTickEnabled(true); 
@@ -67,28 +82,32 @@ void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 P
 
 void UTallowLockpickGame::UpdatePickPosition(float DeltaDepth, float DeltaLift)
 {
-	PickDepth = FMath::Clamp(PickDepth + DeltaDepth , 0.0f, static_cast<float>(PinChambers.Num() - 1));
-	PickLift = FMath::Clamp(PickLift + DeltaLift, 0.0f, 1.0f);
-	
-	ActivePinIndex = FMath::RoundToInt(PickDepth);
-	// aligned under chamber!
-	if (FMath::Abs(PickDepth - ActivePinIndex) <= 0.2f)
+	// pick trapped in chamber
+	if (TargetPickLift <= 0.15f)
 	{
-		PinChambers[ActivePinIndex].CurrentHeight = PickLift;
+		TargetPickDepth = FMath::Clamp(TargetPickDepth + DeltaDepth, 0.0f, static_cast<float>(PinChambers.Num() - 1)); 
 	}
+	
+	// pick hitting ceiling
+	const int32 TargetPinIndex = FMath::RoundToInt(TargetPickDepth);
+	const bool bIsUnderPin = FMath::Abs(TargetPickDepth - TargetPinIndex) < 0.15f;
+	
+	float MaxAllowedLift = bIsUnderPin ? 1.0f : 0.05f;
+	TargetPickLift = FMath::Clamp(TargetPickLift + DeltaLift, 0.0f, MaxAllowedLift);
 }
 
 void UTallowLockpickGame::SetTensionTorque(float InTorque)
 {
-	CurrentTorque = FMath::Clamp(InTorque, 0.0f, 1.0f);
+	if (BindingSequence.IsEmpty()) return;
 	
+	CurrentTorque = FMath::Clamp(InTorque, 0.0f, 1.0f);
+		
 	// tension dropped
 	if (CurrentTorque <= 0.05f)
 	{
 		for (int32 i = 0; i < PinChambers.Num(); i++)
 		{
 			// reset pins
-			PinChambers[i].CurrentHeight = (i == ActivePinIndex) ? PickLift : 0.0f;
 			PinChambers[i].PinState = EPinState::Free;
 		}
 		
@@ -100,18 +119,16 @@ void UTallowLockpickGame::SetTensionTorque(float InTorque)
 
 void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 {
-	if (!PinChambers.IsValidIndex(ActivePinIndex)) { return;} 
+	PickDepth = FMath::FInterpTo(PickDepth, TargetPickDepth, DeltaTime, PickMoveSpeed);
+	PickLift = FMath::FInterpTo(PickLift, TargetPickLift, DeltaTime, PickMoveSpeed);
 	
-	if(FMath::Abs(PickDepth - ActivePinIndex) <= 0.2f)
-	{
-		PinChambers[ActivePinIndex].CurrentHeight = PickLift;
-	}
+	ActivePinIndex = FMath::RoundToInt(PickDepth);
 	for (int32 i = 0; i < PinChambers.Num(); i++)
 	{
 		// drop if not active pin and free
-		if (PinChambers[i].PinState == EPinState::Free && ActivePinIndex != i)
+		if ((PinChambers[i].PinState == EPinState::Free || PinChambers[i].PinState == EPinState::Binding) && ActivePinIndex != i)
 		{
-			PinChambers[i].CurrentHeight = 0.0f;	
+			PinChambers[i].CurrentHeight = FMath::FInterpTo(PinChambers[i].CurrentHeight, 0.0, DeltaTime, PinSpringDropSpeed);
 		}
 	}
 	
@@ -123,16 +140,30 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 		// if index matches pin to bind
 		if (BindingPinIndex == ActivePinIndex)
 		{
+			// if false gate 
+			FPinChamber& Pin = PinChambers[ActivePinIndex];
+			const bool bNearFalseGate = Pin.bHasFalseGate && !Pin.bFalseGateCleared && FMath::Abs(Pin.CurrentHeight - Pin.FalseGateHeight) <= CurrentTolerance;
+			if (bNearFalseGate && CurrentTorque >= 0.4)
+			{
+				Pin.PinState = EPinState::FalseSet;
+				OnFalseSet.Broadcast();
+			}
+			else if (bNearFalseGate)
+			{
+				Pin.bFalseGateCleared = true;
+			}
+			
 			// if struck pin right!
-			if (FMath::Abs(PinChambers[ActivePinIndex].CurrentHeight - PinChambers[ActivePinIndex].TargetHeight) <= CurrentTolerance)
+			else if (FMath::Abs(PinChambers[ActivePinIndex].CurrentHeight - PinChambers[ActivePinIndex].TargetHeight) <= CurrentTolerance)
 			{
 				PinChambers[ActivePinIndex].PinState = EPinState::Set;
-				OnLockpickSet.Broadcast();
+				
 				CurrentBindingStep++;
 			
 				// if finished
 				if (CurrentBindingStep >= BindingSequence.Num())
 				{
+					OnLockpickSet.Broadcast();
 					EndLockpickSession(true);
 				}
 				else
@@ -180,8 +211,7 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 			// lock collapse
 			for (FPinChamber& Pin : PinChambers)
 			{
-				Pin.CurrentHeight = 0.0f;
-				Pin.PinState = EPinState::Free;	
+				Pin.PinState = EPinState::Free;
 			}
 			CurrentBindingStep = 0;
 			PinChambers[BindingSequence[0]].PinState = EPinState::Binding;
@@ -195,5 +225,38 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 	}
 }
 
-void UTallowLockpickGame::EndLockpickSession(bool bSuccess) {}
+void UTallowLockpickGame::EndLockpickSession(bool bSuccess)
+{
+	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
+	APlayerController* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
+	
+	// restore input
+	if (PC)
+	{
+		PC->SetIgnoreMoveInput(false);
+		PC->SetIgnoreLookInput(false);	
+	}
+	
+	SetComponentTickEnabled(false);
+	
+	// remove widget 
+	if (ActiveWidgetInstance)
+	{
+		ActiveWidgetInstance->RemoveFromParent();
+		ActiveWidgetInstance = nullptr;
+	}
+	
+	if (TargetLockable.IsValid())
+	{
+		if (bSuccess)
+		{
+			IInteractable::Execute_OnInteractComplete(TargetLockable.Get(), GetOwner());
+		}
+		else
+		{
+			IInteractable::Execute_OnInteractCancel(TargetLockable.Get(), GetOwner());
+		}
+	}
+	TargetLockable = nullptr;
+}
 
