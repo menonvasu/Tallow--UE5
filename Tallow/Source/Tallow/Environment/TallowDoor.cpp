@@ -86,7 +86,7 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	{
 		if (UTallowLockpickGame* Lockpick = Player->GetLockpickComponent())
 		{
-			Lockpick->StartLockpickSession(this, 3);
+			Lockpick->StartLockpickSession(this, 4);
 		}
 		return;
 	}

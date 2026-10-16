@@ -5,6 +5,7 @@
 #include "TallowLockpickGame.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTensionReleased);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPinSet);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLockpickSet);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBinding);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSnap);
@@ -55,6 +56,8 @@ class TALLOW_API UTallowLockpickGame : public UActorComponent
 public:
 	UTallowLockpickGame();
 	
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	
 	/** Start a session */
 	void StartLockpickSession(AActor* InTargetLockable, int32 PinCount = 4);
 	
@@ -67,11 +70,16 @@ public:
 	/** Update pick */
 	void UpdatePickPosition(float DeltaDepth, float DeltaLift);
 	
-	/** Evaluate state of pin */
+	/** Evaluate state of pin per tick */
 	void EvaluateLockState(float DeltaTime);
 	
 	/** Generate a new lock */
 	void GenerateLock(int32 PinCount);
+	
+	float GetPickDepth() const { return PickDepth; }
+	float GetPickLift() const { return PickLift; }
+	float GetCurrentTorque() const { return CurrentTorque; }
+	TArray<FPinChamber> GetPinChambers() const { return PinChambers; }
 	
 	/** Lock picking events */
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
@@ -88,6 +96,9 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
 	FOnBinding OnBinding;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
+	FOnPinSet OnPinSet;
 
 protected:
 	virtual void BeginPlay() override;
@@ -145,9 +156,14 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
 	float PickLift = 0.0f;
 	
-	/** Variables for pick movement*/
+	/** Variables for player input pick movement */
 	float TargetPickDepth = 0.0f;
 	float TargetPickLift = 0.0f;
+	
+	/** Variables for player input torque */
+	float TargetTorque = 0.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float TorqueInterpSpeed = 8.0f; // snappy 
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float PickMoveSpeed; 
@@ -160,4 +176,17 @@ protected:
 	
 	UPROPERTY(Transient)
 	TObjectPtr<UTallowLockpickWidget> ActiveWidgetInstance;
+
+private:
+	/** Smoothes raw player inputs towards physical positions */
+	void UpdateSmoothing(float DeltaTime);
+	
+	/** Resolves spring return on unsupported pins and handles tension drop collapse */
+	void SimulatePinGravity(float DeltaTime);
+	
+	/** Evaluates shear line alignment, false gates, and oversets in active chamber */
+	void EvaluateActiveChamber();
+	
+	/** Accumulates stress on jammed pins and executes the pick snap */
+	void EvaluatePickStress(float DeltaTime);
 };

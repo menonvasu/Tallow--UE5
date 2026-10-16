@@ -66,7 +66,7 @@ void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 P
 	
 	if (PC && LockpickWidgetClass)
 	{
-		ActiveWidgetInstance = CreateWidget<UTallowLockpickWidget>(this, LockpickWidgetClass);
+		ActiveWidgetInstance = CreateWidget<UTallowLockpickWidget>(PC, LockpickWidgetClass);
 		ActiveWidgetInstance->AddToViewport();
 		ActiveWidgetInstance->InitializeLockpickWidget(this);
 	}
@@ -100,90 +100,109 @@ void UTallowLockpickGame::SetTensionTorque(float InTorque)
 {
 	if (BindingSequence.IsEmpty()) return;
 	
-	CurrentTorque = FMath::Clamp(InTorque, 0.0f, 1.0f);
-		
+	TargetTorque = FMath::Clamp(InTorque, 0.0f, 1.0f);
+}
+
+void UTallowLockpickGame::UpdateSmoothing(float DeltaTime)
+{
+	CurrentTorque = FMath::FInterpTo(CurrentTorque, TargetTorque, DeltaTime, TorqueInterpSpeed);
+	PickDepth = FMath::FInterpTo(PickDepth, TargetPickDepth, DeltaTime, PickMoveSpeed);
+	PickLift = FMath::FInterpTo(PickLift, TargetPickLift, DeltaTime, PickMoveSpeed);
+	ActivePinIndex = FMath::RoundToInt(PickDepth);
+	
+	// couple pin height w pick
+	if (FMath::Abs(PickDepth - ActivePinIndex) <= 0.2f)
+	{
+		PinChambers[ActivePinIndex].CurrentHeight = PickLift;
+	}
+}
+
+void UTallowLockpickGame::SimulatePinGravity(float DeltaTime)
+{
 	// tension dropped
-	if (CurrentTorque <= 0.05f)
+	const bool bTensionDropped = (CurrentTorque <= 0.05f && TargetTorque <= 0.05f);
+	const bool bHasProgressToReset = (CurrentBindingStep > 0);
+	if (bTensionDropped && bHasProgressToReset)
 	{
 		for (int32 i = 0; i < PinChambers.Num(); i++)
 		{
 			// reset pins
 			PinChambers[i].PinState = EPinState::Free;
 		}
-		
 		CurrentBindingStep = 0;
 		PinChambers[BindingSequence[0]].PinState = EPinState::Binding;
 		OnTensionReleased.Broadcast();
 	}
-}
-
-void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
-{
-	PickDepth = FMath::FInterpTo(PickDepth, TargetPickDepth, DeltaTime, PickMoveSpeed);
-	PickLift = FMath::FInterpTo(PickLift, TargetPickLift, DeltaTime, PickMoveSpeed);
 	
-	ActivePinIndex = FMath::RoundToInt(PickDepth);
+	// drop if not active pin and free
 	for (int32 i = 0; i < PinChambers.Num(); i++)
 	{
-		// drop if not active pin and free
 		if ((PinChambers[i].PinState == EPinState::Free || PinChambers[i].PinState == EPinState::Binding) && ActivePinIndex != i)
 		{
 			PinChambers[i].CurrentHeight = FMath::FInterpTo(PinChambers[i].CurrentHeight, 0.0, DeltaTime, PinSpringDropSpeed);
 		}
 	}
+}
+
+void UTallowLockpickGame::EvaluateActiveChamber()
+{
+	// run if only applying torque
+	if (!(CurrentTorque >= 0.15f && BindingSequence.IsValidIndex(CurrentBindingStep))) return;
 	
-	// actively applying torque
-	if (CurrentTorque >= 0.15f)
+	const int32 BindingPinIndex = BindingSequence[CurrentBindingStep];
+	if (ActivePinIndex != BindingPinIndex) return; // exit if not poking active 
+	
+	FPinChamber& Pin = PinChambers[ActivePinIndex]; // active pin 
+	
+	const bool bInsideFalseGate = Pin.bHasFalseGate && FMath::Abs(Pin.CurrentHeight - Pin.FalseGateHeight) <= CurrentTolerance;
+	// if false gate
+	if (bInsideFalseGate)
 	{
-		const int32 BindingPinIndex = BindingSequence[CurrentBindingStep];
-		
-		// if index matches pin to bind
-		if (BindingPinIndex == ActivePinIndex)
+		// if player using heavy tension
+		if (CurrentTorque >= 0.4)
 		{
-			// if false gate 
-			FPinChamber& Pin = PinChambers[ActivePinIndex];
-			const bool bNearFalseGate = Pin.bHasFalseGate && !Pin.bFalseGateCleared && FMath::Abs(Pin.CurrentHeight - Pin.FalseGateHeight) <= CurrentTolerance;
-			if (bNearFalseGate && CurrentTorque >= 0.4)
-			{
-				Pin.PinState = EPinState::FalseSet;
-				OnFalseSet.Broadcast();
-			}
-			else if (bNearFalseGate)
-			{
-				Pin.bFalseGateCleared = true;
-			}
-			
-			// if struck pin right!
-			else if (FMath::Abs(PinChambers[ActivePinIndex].CurrentHeight - PinChambers[ActivePinIndex].TargetHeight) <= CurrentTolerance)
-			{
-				PinChambers[ActivePinIndex].PinState = EPinState::Set;
-				
-				CurrentBindingStep++;
-			
-				// if finished
-				if (CurrentBindingStep >= BindingSequence.Num())
-				{
-					OnLockpickSet.Broadcast();
-					EndLockpickSession(true);
-				}
-				else
-				{
-					// arm next pin in sequence
-					const int32 NextPinIndex = BindingSequence[CurrentBindingStep];
-					PinChambers[NextPinIndex].PinState = EPinState::Binding;
-				}
-			}
-			else
-			{
-				// overset - pushed too high
-				if (PinChambers[ActivePinIndex].CurrentHeight > (PinChambers[ActivePinIndex].TargetHeight + CurrentTolerance))
-				{
-					PinChambers[ActivePinIndex].PinState = EPinState::Overset;
-				}
-			}
+			Pin.PinState = EPinState::FalseSet;
+			OnFalseSet.Broadcast();
+			TargetPickLift = FMath::Min(TargetPickLift, Pin.FalseGateHeight); // cannot lift pin
+		}
+		else
+		{	
+			Pin.PinState = EPinState::Binding; // light tension
 		}
 	}
-	
+	// if struck pin right!
+	else if (FMath::Abs(Pin.CurrentHeight - Pin.TargetHeight) <= CurrentTolerance)
+	{
+		Pin.PinState = EPinState::Set;
+		CurrentBindingStep++;
+		OnPinSet.Broadcast();
+				
+		// if finished
+		if (CurrentBindingStep >= BindingSequence.Num())
+		{
+			OnLockpickSet.Broadcast();
+			EndLockpickSession(true);
+		}
+		else
+		{
+			// arm next pin in sequence
+			const int32 NextPinIndex = BindingSequence[CurrentBindingStep];
+			PinChambers[NextPinIndex].PinState = EPinState::Binding;
+		}
+	}
+	else
+	{
+		// overset - pushed too high
+		if (Pin.CurrentHeight > (Pin.TargetHeight + CurrentTolerance))
+		{
+			Pin.PinState = EPinState::Overset;
+		}
+	}
+}
+
+void UTallowLockpickGame::EvaluatePickStress(float DeltaTime)
+{
+	// scans overset pins
 	bool bHasOversetPin = false;
 	for (const FPinChamber& Pin : PinChambers)
 	{
@@ -202,7 +221,6 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 		{
 			// fire audio and animation
 			OnSnap.Broadcast();
-			
 			if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
 			{
 				NoiseSubsystem->EmitNoise(ETallowNoiseType::LockSnap, GetOwner()->GetActorLocation(), GetOwner(), LockpickSnapLoudness, true);	
@@ -222,10 +240,20 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 	{
 		// tension released or no overset pins
 		OversetStressTimer = 0.0f;
-	}
+	}	
 }
 
-void UTallowLockpickGame::EndLockpickSession(bool bSuccess)
+void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
+{
+	if (PinChambers.IsEmpty()) return;
+	
+	UpdateSmoothing(DeltaTime);
+	SimulatePinGravity(DeltaTime);
+	EvaluateActiveChamber();
+	EvaluatePickStress(DeltaTime);
+}
+
+void UTallowLockpickGame::EndLockpickSession(bool bWasSuccessful)
 {
 	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
 	APlayerController* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
@@ -248,7 +276,7 @@ void UTallowLockpickGame::EndLockpickSession(bool bSuccess)
 	
 	if (TargetLockable.IsValid())
 	{
-		if (bSuccess)
+		if (bWasSuccessful)
 		{
 			IInteractable::Execute_OnInteractComplete(TargetLockable.Get(), GetOwner());
 		}
@@ -260,3 +288,8 @@ void UTallowLockpickGame::EndLockpickSession(bool bSuccess)
 	TargetLockable = nullptr;
 }
 
+void UTallowLockpickGame::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	EvaluateLockState(DeltaTime);
+} 

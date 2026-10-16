@@ -4,6 +4,11 @@
 #include "Blueprint/UserWidget.h"
 #include "TallowLockpickWidget.generated.h"
 
+class UTallowLockpickGame;
+class UCanvasPanel;
+class UBorder;
+class UProgressBar;
+
 UCLASS()
 class TALLOW_API UTallowLockpickWidget : public UUserWidget
 {
@@ -11,16 +16,45 @@ class TALLOW_API UTallowLockpickWidget : public UUserWidget
 	
 public:
 	/** connects UI to the game simulation */
-	void InitializeLockpickWidget(class UTallowLockpickGame* InGameComponent);
-	
+	void InitializeLockpickWidget(UTallowLockpickGame* InGameComponent);
+
 protected:
-	virtual void NativeConstruct();
+	virtual void NativeTick(const FGeometry& Geometry, float InDeltaTime) override;
 	
-	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+	/** background grid */
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCanvasPanel> LockCanvas;
 	
-	/** Reference to the model */
-	TObjectPtr<UTallowLockpickGame> LockpickComponent;	
+	/** player lockpick */
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UBorder> PickImage;
 	
-private:
-	FSlateColorBrush Solid = FSlateColorBrush(FLinearColor::White);	
+	/** tension bar */
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UProgressBar> TensionBar;
+	
+	TWeakObjectPtr<UTallowLockpickGame> LockpickGame;
+	
+	/** Tracked boxes*/
+	UPROPERTY(meta = (BindWidget)) 
+	TObjectPtr<UBorder> Pin0;
+	
+	UPROPERTY(meta = (BindWidget)) 
+	TObjectPtr<UBorder> Pin1;
+	
+	UPROPERTY(meta = (BindWidget)) 
+	TObjectPtr<UBorder> Pin2;
+	
+	UPROPERTY(meta = (BindWidget)) 
+	TObjectPtr<UBorder> Pin3;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UBorder>> PinWidgets;
+	
+	/** Tunables for layout */
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Layout")
+	float PinSpacing = 60.0f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Layout")
+	float MaxLiftPixels = 50.0f;
 };
