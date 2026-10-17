@@ -337,7 +337,7 @@ void ATallowCharacter::DoInteractStart()
 	}
 	
 	// if in lock pick minigame, call exit
-	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
+	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled() && LockpickComponent->GetIsCompleting() != true)
 	{
 		LockpickComponent->EndLockpickSession(false);
 		return;
@@ -522,7 +522,7 @@ void ATallowCharacter::DoTensionStart()
 {
 	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
 	{
-		LockpickComponent->SetTensionTorque(1.0f);
+		LockpickComponent->SetTensionHeld(true);
 	}
 }
 
@@ -530,7 +530,7 @@ void ATallowCharacter::DoTensionEnd()
 {
 	if (LockpickComponent)
 	{
-		LockpickComponent->SetTensionTorque(0.0f);
+		LockpickComponent->SetTensionHeld(false);
 	}
 }
 

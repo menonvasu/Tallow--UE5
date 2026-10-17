@@ -8,6 +8,7 @@ class UTallowLockpickGame;
 class UCanvasPanel;
 class UBorder;
 class UProgressBar;
+class UTextBlock;
 
 UCLASS()
 class TALLOW_API UTallowLockpickWidget : public UUserWidget
@@ -17,9 +18,26 @@ class TALLOW_API UTallowLockpickWidget : public UUserWidget
 public:
 	/** connects UI to the game simulation */
 	void InitializeLockpickWidget(UTallowLockpickGame* InGameComponent);
-
+	
 protected:
 	virtual void NativeTick(const FGeometry& Geometry, float InDeltaTime) override;
+	
+	virtual void NativeDestruct() override;
+	
+	/** Shows dynamic feedback */
+	void ShowStatus(const FText& Message);
+	
+	/** Handlers for feedback */
+	UFUNCTION()
+	void HandleOnFalseSet();
+	UFUNCTION()
+	void HandleOnOverSet();
+	UFUNCTION()
+	void HandleOnTensionReleasedOrOnSnap();
+	UFUNCTION()
+	void HandleOnPinSet();
+	UFUNCTION()
+	void HandleOnLockpickSet();
 	
 	/** background grid */
 	UPROPERTY(meta = (BindWidget))
@@ -51,10 +69,24 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UBorder>> PinWidgets;
 	
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* EventFeedbackText;
+	
+	float StatusTimeRemaining = 0.0f;
+	
 	/** Tunables for layout */
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Layout")
 	float PinSpacing = 60.0f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Layout")
 	float MaxLiftPixels = 50.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Lockpick|Layout")
+	float MaxShakePixels = 2.5f;
+	
+	float ShakeAlpha = 0.0f;
+	float ShakeTime = 0.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Lockpick|Layout") 
+	float ShakeFadeSpeed = 12.0f;
 };

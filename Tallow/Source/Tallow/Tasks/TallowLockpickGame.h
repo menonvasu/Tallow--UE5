@@ -10,6 +10,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLockpickSet);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBinding);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSnap);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFalseSet);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOverset);
 
 /** Per state for a pin */
 UENUM(BlueprintType)
@@ -30,7 +31,6 @@ struct FPinChamber
 	
 public:
 	bool bHasFalseGate = false;
-	bool bFalseGateCleared = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PinChamber")
 	float TargetHeight = 0.6f;
@@ -65,7 +65,7 @@ public:
 	void EndLockpickSession(bool bWasSuccessful);
 	
 	/** Set torque */
-	void SetTensionTorque(float InTorque);
+	void SetTensionHeld(bool bHeld) { bTensionHeld = bHeld; }
 	
 	/** Update pick */
 	void UpdatePickPosition(float DeltaDepth, float DeltaLift);
@@ -76,10 +76,28 @@ public:
 	/** Generate a new lock */
 	void GenerateLock(int32 PinCount);
 	
+	/** Methods exposed for widget */
 	float GetPickDepth() const { return PickDepth; }
+	
 	float GetPickLift() const { return PickLift; }
+	
+	float GetTargetPickLift() const { return TargetPickLift; }
+	
 	float GetCurrentTorque() const { return CurrentTorque; }
+	
 	TArray<FPinChamber> GetPinChambers() const { return PinChambers; }
+	
+	bool GetIsCompleting() const { return bCompleting; }
+	
+	float GetSetDwellProgress() const
+	{
+		return SetDwellDuration > 0.0f ? FMath::Clamp(SetDwellTimer / SetDwellDuration, 0.0f, 1.0f) : 0.0f;
+	}
+	
+	int32 GetCurrentBindingPinIndex() const
+	{
+		return BindingSequence.IsValidIndex(CurrentBindingStep) ? BindingSequence[CurrentBindingStep] : INDEX_NONE;	
+	}
 	
 	/** Lock picking events */
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
@@ -99,6 +117,9 @@ public:
 	
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
 	FOnPinSet OnPinSet;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
+	FOnOverset OnOverset;
 
 protected:
 	virtual void BeginPlay() override;
@@ -117,10 +138,10 @@ protected:
 	
 	/** Pin Height Ranges */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|Tunables")
-	float PinTargetHeightMax = 0.85f;
+	float PinTargetHeightMax = 0.95f;
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|Tunables")
-	float PinTargetHeightMin = 0.25f;
+	float PinTargetHeightMin = 0.20f;
 	
 	/** Drop-speed of pin on release */
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
@@ -137,9 +158,11 @@ protected:
 	
 	/** Stress variables */
 	float OversetStressTimer = 0.0f;
+	
+	UPROPERTY(EditAnywhere, Category="Lockpick|Tuning") float OversetMargin = 0.03f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float MaxStressDuration = 0.35f;
+	float MaxStressDuration = 0.45f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float LockpickSnapLoudness = 1.0f;
@@ -163,13 +186,39 @@ protected:
 	/** Variables for player input torque */
 	float TargetTorque = 0.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float TorqueInterpSpeed = 8.0f; // snappy 
+	float TorqueRiseRate = 0.7f;
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float TorqueFallRate = 1.0f;
+	bool bTensionHeld = false;
+	bool bTensionResetDone = true;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float PickMoveSpeed; 
+	float PickMoveSpeed = 5.0f;
+	
+	/** Binding Resistance */
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float BindingResistanceMin = 0.25f;
+	
+	/** Binding Resistance */
+	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
+	float FalseGateChance = 0.3f;
+	
+	/** Dwell timers */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lockpick|Tunables")
+	float SetDwellDuration = 0.15f;
+
+	float SetDwellTimer = 0.0f;
 	
 	/** Weak pointer to target actor */
 	TWeakObjectPtr<AActor> TargetLockable = nullptr;
+	
+	/** Completion */
+	UPROPERTY(EditAnywhere, Category = "Lockpick|Tunables")
+	float UnlockDelay = 0.6f;
+	bool bCompleting = false;
+	FTimerHandle CompleteTimerHandle;
+	UFUNCTION()
+	void FinishSuccess() { EndLockpickSession(true); }
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|UI")
 	TSubclassOf<UTallowLockpickWidget> LockpickWidgetClass;
@@ -185,7 +234,7 @@ private:
 	void SimulatePinGravity(float DeltaTime);
 	
 	/** Evaluates shear line alignment, false gates, and oversets in active chamber */
-	void EvaluateActiveChamber();
+	void EvaluateActiveChamber(float DeltaTime);
 	
 	/** Accumulates stress on jammed pins and executes the pick snap */
 	void EvaluatePickStress(float DeltaTime);
