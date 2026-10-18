@@ -23,6 +23,7 @@ enum class ETallowNoiseType : uint8
 	Projector,
 	DoorOpen,
 	DoorSlam,
+	DoorClose,
 	PropFall,
 	Custom
 };

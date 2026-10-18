@@ -108,7 +108,7 @@ bool ATallowFuseBox::CanInteract_Implementation(AActor* Interactor) const
 		return false;
 	}
 	// if missing fuse
-	if (!Player->HasFuse())
+	if (!Player->HasCarriedItem(ECarriedItemType::Fuse))
 	{
 		return false;
 	}
@@ -120,7 +120,7 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 {
 	if (!Interactor) return FText::GetEmpty();
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player || CurrentFuses >= RequiredFuses) return FText::GetEmpty();
+	if (!Player) return FText::GetEmpty();
 	
 	// if already powered
 	if (CurrentFuses >= RequiredFuses)
@@ -128,7 +128,7 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 		return FText::FromString(TEXT("POWER RESTORED"));
 	}
 	// if missing fuse
-	if (!Player->HasFuse())
+	if (!Player->HasCarriedItem(ECarriedItemType::Fuse))
 	{
 		return FText::FromString(TEXT("REQUIRES FUSE"));
 	}

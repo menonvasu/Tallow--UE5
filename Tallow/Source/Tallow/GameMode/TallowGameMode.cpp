@@ -3,7 +3,6 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Player/TallowCharacter.h"
 #include "AI/TallowCreature.h"
-#include "AI/TallowAIController.h"
 #include "Environment/TallowCandlePickup.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -11,8 +10,10 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
+#include "Environment/TallowDoor.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -28,20 +29,31 @@ void ATallowGameMode::BeginPlay()
 	Creature = Cast<ATallowCreature>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCreature::StaticClass()));
 	CandlePickup = Cast<ATallowCandlePickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCandlePickup::StaticClass()));
 	FuseBox = Cast<ATallowFuseBox>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFuseBox::StaticClass()));
-	TArray<AActor*> FoundActors;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowFusePickup::StaticClass(), FoundActors);
-	for (AActor* Actor : FoundActors)
+	TArray<AActor*> FoundFuseActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowFusePickup::StaticClass(), FoundFuseActors);
+	for (AActor* Actor : FoundFuseActors)
 	{
 		if (ATallowFusePickup* Pickup = Cast<ATallowFusePickup>(Actor))
 		{
 			FusePickups.Add(Pickup);
 		}
 	}
+	CrowbarPickup = Cast<ATallowCrowbarPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowCrowbarPickup::StaticClass()));
 	
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		CameraManager = PC->PlayerCameraManager;
 	}
+	TArray<AActor*> FoundDoors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowDoor::StaticClass(), FoundDoors);
+	for (AActor* Actor : FoundDoors)
+	{
+		if (ATallowDoor* Door = Cast<ATallowDoor>(Actor))
+		{
+			CachedDoors.Add(Door);
+		}
+	}
+	
 }
 
 void ATallowGameMode::HandlePlayerCaptured()
@@ -101,6 +113,13 @@ void ATallowGameMode::BeginCaptureFade()
 		CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
 }
 
+void ATallowGameMode::RegisterDroppedItem(AActor* DroppedItem)
+{
+	// just adds dropped item to the array
+	if (!DroppedItem) { return; }
+	RuntimeDroppedItems.Add(DroppedItem);
+}
+
 void ATallowGameMode::ResetGame()
 {
 	bCaptureInProgress = false;
@@ -140,8 +159,32 @@ void ATallowGameMode::ResetGame()
 			Pickup->ResetPickup();
 		}
 	}
+	
+	if (CrowbarPickup)
+	{
+		CrowbarPickup->ResetPickup();
+	}
+	
 	if (Player)
 	{
-		Player->ConsumeFuse();
+		Player->ClearCarriedItem();
+		Player->UpdateHeldItemVisual();
+	}
+	
+	for (TWeakObjectPtr<AActor> DroppedItem : RuntimeDroppedItems)
+	{
+		if (DroppedItem.IsValid())
+		{
+			DroppedItem->Destroy();
+		}
+	}
+	RuntimeDroppedItems.Empty();
+	
+	for (ATallowDoor* Door : CachedDoors)
+	{
+		if (Door)
+		{
+			Door->ResetDoor();
+		}
 	}
 }

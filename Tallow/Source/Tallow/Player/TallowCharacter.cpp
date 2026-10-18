@@ -18,6 +18,8 @@
 #include "Tasks/TallowChairEscape.h"
 #include "Environment/TallowHideVolume.h"
 #include "Interactable/TallowInteractionComponent.h"
+#include "GameMode/TallowGameMode.h"
+#include "Items/TallowItemDefinition.h"	
 #include "Tallow.h"
 
 
@@ -90,6 +92,13 @@ ATallowCharacter::ATallowCharacter()
 	
 	// Interaction component
 	InteractionComponent = CreateDefaultSubobject<UTallowInteractionComponent>(TEXT("Interaction Component"));
+	
+	// Held Item Mesh
+	HeldItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeldItemMesh"));
+	HeldItemMesh->SetupAttachment(FirstPersonCameraComponent);
+	HeldItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HeldItemMesh->SetVisibility(false);
+	HeldItemMesh->SetRelativeLocation(FVector(45.0f, 25.0f, -25.0f));
 
 }
 
@@ -145,6 +154,11 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoStillnessEnd);
 			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoStillnessEnd);
 		}
+		
+		if (DropAction)
+		{
+			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &ATallowCharacter::DoDropItem);
+		}
 	}
 	else
 	{
@@ -186,6 +200,15 @@ void ATallowCharacter::SetLightPerception(ECandleState NewState)
 	{
 		PerceptionSystem->RegisterSourceForSenseClass(UAISense_Sight::StaticClass(), *this);
 	}
+}
+
+bool ATallowCharacter::IsHandOccupied() const
+{
+	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped)
+	{
+		return true;
+	}
+	return false;
 }
 
 void ATallowCharacter::MoveInput(const FInputActionValue& Value)
@@ -402,11 +425,120 @@ void ATallowCharacter::DoStillnessEnd()
 	GetCharacterMovement()->AvoidanceWeight = 0.0f;
 }
 
-bool ATallowCharacter::IsHandOccupied() const
+void ATallowCharacter::DoDropItem()
 {
-	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped)
+	bool bFoundValidLocation = false;
+	if (CarriedItem == ECarriedItemType::None || !FirstPersonCameraComponent) { return; }
+	UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem);
+	if (!ItemDef || !ItemDef->PickupClass)
 	{
-		return true;
+		return;
 	}
-	return false;
+	
+	const FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation() + (GetActorForwardVector() * 40.0f);
+	const FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 220.0f);
+	const FVector DowncastEndLocation = StartLocation - FVector(0.0f, 0.0f, 150.0f);
+	
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+	
+	FVector SpawnLocation = FVector::ZeroVector;
+	FRotator SpawnRotation = FRotator::ZeroRotator;
+	
+	// run initial raycast
+	bool bHitSurface = GetWorld()->LineTraceSingleByChannel(
+		HitResult,
+		StartLocation,
+		EndLocation,
+		ECollisionChannel::ECC_Visibility,
+		QueryParams
+	);
+	
+	// if surface valid (surface angle < 45), save location
+	if (bHitSurface && HitResult.ImpactNormal.Z >= 0.7f)
+	{
+		bFoundValidLocation = true;
+		SpawnLocation = HitResult.Location + (HitResult.ImpactNormal * 2.0f);
+		SpawnRotation = FRotator(0.0f, GetActorRotation().Yaw, 0.0f );
+	}
+	else
+	{
+		// run downward raycast
+		bool bHitFloor = GetWorld()->LineTraceSingleByChannel(
+			HitResult,
+			StartLocation,
+			DowncastEndLocation,
+			ECollisionChannel::ECC_Visibility,
+			QueryParams
+		);	
+		
+		// if hit floor, save location
+		if (bHitFloor && HitResult.ImpactNormal.Z >= 0.7f)
+		{
+			bFoundValidLocation = true;
+			SpawnLocation = HitResult.Location + (HitResult.ImpactNormal * 2.0f);
+			SpawnRotation = FRotator(0.0f, GetActorRotation().Yaw, 0.0f );
+		}
+	}
+	
+	// return if no valid surface found 
+	if (!bFoundValidLocation) { return; }
+	// check item - spawn and clear 
+	if (SpawnItem(ItemDef->PickupClass, SpawnLocation, SpawnRotation))
+	{
+		ClearCarriedItem();
+	}
+}
+
+AActor* ATallowCharacter::SpawnItem(TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation)
+{
+	if (!ItemPickupClass) { return nullptr; }
+	
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = GetInstigator();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	
+	AActor* SpawnedItem = GetWorld()->SpawnActor<AActor>(ItemPickupClass, SpawnLocation, SpawnRotation, SpawnParams);
+	
+	if (ATallowGameMode* Gm = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		Gm->RegisterDroppedItem(SpawnedItem);
+	}
+	
+	return SpawnedItem;
+}	
+
+void ATallowCharacter::UpdateHeldItemVisual()
+{
+	if (!HeldItemMesh) { return; }
+	if (CarriedItem == ECarriedItemType::None)
+	{
+		HeldItemMesh->SetStaticMesh(nullptr);
+		HeldItemMesh->SetVisibility(false);
+		return;
+	}
+	
+	// Checks the carried item and if it has a mesh, set it with correct transform  
+	if (const UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("--> HELD VISUAL: Carried=[%d] | Def=[%s] | Mesh=[%s] | Loc=[%s]"),
+		(int32)CarriedItem,
+		*GetNameSafe(ItemDef),
+		ItemDef ? *GetNameSafe(ItemDef->HeldMesh.Get()) : TEXT("None"),
+		ItemDef ? *ItemDef->HeldRelativeTransform.GetLocation().ToString() : TEXT("N/A"));
+		
+		if (ItemDef && ItemDef->HeldMesh)
+		{
+			HeldItemMesh->SetStaticMesh(ItemDef->HeldMesh);
+			HeldItemMesh->SetRelativeTransform(ItemDef->HeldRelativeTransform);
+			HeldItemMesh->SetVisibility(true);
+		}
+		else
+		{
+			HeldItemMesh->SetStaticMesh(nullptr);
+			HeldItemMesh->SetVisibility(false);
+		}
+	}
 }

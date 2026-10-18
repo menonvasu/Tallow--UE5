@@ -18,10 +18,11 @@ void ATallowFusePickup::OnInteract_Implementation(AActor* Interactor)
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
 	
-	if (Player->HasFuse()) return;
+	// if carrying item, ignore
+	if (Player->GetCarriedItem() != ECarriedItemType::None) { return; }
 	
 	// give fuse and broadcast sound/change
-	Player->GiveFuse();
+	Player->SetCarriedItem(ECarriedItemType::Fuse);
 	OnFusePickedUp.Broadcast();
 	
 	// Deactivate it
@@ -31,27 +32,27 @@ void ATallowFusePickup::OnInteract_Implementation(AActor* Interactor)
 
 bool ATallowFusePickup::CanInteract_Implementation(AActor* Interactor) const
 {
-	if (!Interactor) { return true; }
+	if (!Interactor) { return false; }
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player) { return true; }
+	if (!Player) { return false; }
 	
-	// if player has fuse - return cannot interact
-	if (Player->HasFuse())
+	// if player is holding item - return cannot interact
+	if (Player->GetCarriedItem() != ECarriedItemType::None) 
 	{
 		return false;
 	}
 	return true;
 }
-
+	
 FText ATallowFusePickup::GetInteractionPromptText_Implementation(AActor* Interactor) const
 {
 	if (!Interactor) { return FText::GetEmpty(); }
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return FText::GetEmpty(); }
 	
-	if (Player->HasFuse())
+	if (Player->GetCarriedItem() != ECarriedItemType::None)
 	{
-		return FText::FromString(TEXT("CARRYING FUSE"));
+		return FText::FromString(TEXT("HANDS FULL"));
 	}
 	return FText::FromString(TEXT("TAKE FUSE"));
 	

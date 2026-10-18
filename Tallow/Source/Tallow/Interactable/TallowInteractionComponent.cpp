@@ -227,6 +227,9 @@ void UTallowInteractionComponent::UpdateHoldStep()
 		HoldProgressWidgetInstance->SetHoldProgress(Alpha);
 	}
 	
+	// notify target actor of elapsed time
+	IInteractable::Execute_OnInteractTick(CurrentInteractTarget.Get(), GetOwner(), HoldTickInterval, CurrentHoldTime / TargetHoldDuration);
+	
 	// Update hold time and perform check
 	CurrentHoldTime += HoldTickInterval;
 	if (CurrentHoldTime >= TargetHoldDuration)

@@ -19,11 +19,22 @@ class UPointLightComponent;
 class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
 class UTallowInteractionComponent;
+class UCharacterMovementComponent;
+class UTallowItemDefinition;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStill, bool, bIsStill);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTransformation, int32, NewLevel);
+
+UENUM(BlueprintType)
+enum class ECarriedItemType : uint8 
+{
+	None,
+	Fuse,
+	Crowbar
+};
+
 /**
  *  A first person character
  */
@@ -72,6 +83,25 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UTallowInteractionComponent> InteractionComponent;
 	
+	/** Pointer to hide volume */
+	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
+	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
+	
+	/** Spawnable pickups */
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Spawns") 
+	TSubclassOf<class ATallowFusePickup> FusePickupClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Spawns") 
+	TSubclassOf<class ATallowCrowbarPickup> CrowbarPickupClass;
+	
+	/** Meshes assigned in BP class */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory|Visuals")
+	TObjectPtr<UStaticMeshComponent> HeldItemMesh;
+	
+	/** Registry of items */
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Registry")
+	TMap<ECarriedItemType, TObjectPtr<UTallowItemDefinition>> ItemRegistry;
+	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
 
@@ -84,8 +114,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Player|Tuning")
 	float MinStillnessHoldDuration = 0.6f; 
 
-	/** Holds current fuse */
-	bool bHasFuse = false;
+	/** Carried Item */
+	ECarriedItemType CarriedItem = ECarriedItemType::None;
+	
+	/** Drop item raycast distance threshold */
+	const float DropRayCastDistance = 220.0f;
 	
 	/** Jump Input Action */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -124,6 +157,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* StillnessAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* DropAction;
 
 public:
 	ATallowCharacter();
@@ -156,7 +192,7 @@ public:
 	/** Gets candle component */
 	UFUNCTION(BlueprintCallable, Category = "Components")
 	UTallowCandleComponent* GetCandleComponent() const { return CandleComponent; }
-
+	
 	/** Gets if player cupping flame */
 	UFUNCTION(BlueprintCallable, Category = "Player|State")
 	bool IsHandOccupied() const;
@@ -164,10 +200,6 @@ public:
 	/** Get if player holding still*/
 	UFUNCTION(BlueprintPure, Category = "Player|State")
 	bool IsHoldingStill() const { return bIsHoldingStill; }
-
-	/** Pointer to hide volume */
-	UPROPERTY(VisibleInstanceOnly, Category = "Hide")
-	TObjectPtr<class ATallowHideVolume> CurrentHideVolume = nullptr;
 
 	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }
@@ -183,19 +215,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Components")
 	bool ConsumeFuse()
 	{
-		if (bHasFuse)
+		if (CarriedItem == ECarriedItemType::Fuse)
 		{
-			bHasFuse = false;
+			ClearCarriedItem();
 			return true;
 		}
 		return false;
 	}
 	
 	UFUNCTION(BlueprintPure, Category = "Player|Components")
-	bool HasFuse() const { return bHasFuse; }
+	ECarriedItemType GetCarriedItem() const {  return CarriedItem; }
+	
+	UFUNCTION(BlueprintPure, Category = "Player|Components")
+	bool HasCarriedItem(const ECarriedItemType ItemType) const { return CarriedItem == ItemType; }
 	
 	UFUNCTION(BlueprintCallable, Category = "Player|Components")
-	void GiveFuse()  { bHasFuse = true;  }
+	void SetCarriedItem(const ECarriedItemType NewCarriedItem) { CarriedItem = NewCarriedItem; UpdateHeldItemVisual(); }
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Components")
+	void ClearCarriedItem() { CarriedItem = ECarriedItemType::None; UpdateHeldItemVisual();	}
+	
+	UFUNCTION(BlueprintCallable, Category = "Player|Visuals	")
+	void UpdateHeldItemVisual();
 	
 	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
@@ -269,6 +310,13 @@ protected:
 	
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoInteractEnd();
+	
+	/** Handles drop */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoDropItem();
+	
+	/** Helper to instantiate an item pickup cleanly on the floor */
+	AActor* SpawnItem(TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation);
 	
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;

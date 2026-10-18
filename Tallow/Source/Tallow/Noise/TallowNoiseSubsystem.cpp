@@ -52,6 +52,7 @@ void UTallowNoiseSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	NoiseProfiles.Add(ETallowNoiseType::DoorOpen, FTallowNoiseProfile(0.3f, 800.0f));
 	NoiseProfiles.Add(ETallowNoiseType::DoorSlam, FTallowNoiseProfile(0.9f, 2200.0f));
 	NoiseProfiles.Add(ETallowNoiseType::PropFall, FTallowNoiseProfile(0.8f, 2000.0f));
+	NoiseProfiles.Add(ETallowNoiseType::DoorClose, FTallowNoiseProfile(0.3f, 800.0f));
 	NoiseProfiles.Add(ETallowNoiseType::Custom, FTallowNoiseProfile(0.5f, 1000.0f));
 }
 

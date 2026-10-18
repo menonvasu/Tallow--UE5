@@ -198,7 +198,21 @@ void ATallowChairEscape::AttemptRock()
 void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 {
 	if (!InPlayer) return;
+	
+	// Reattach chair mesh if not already
+	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
+	if (ChairMesh)
+	{
+		ChairMesh->SetSimulatePhysics(false);
+		if (RockingPivot && ChairMesh->GetAttachParent() != RockingPivot)
+		{
+			ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		}
+		ChairMesh->SetRelativeTransform(InitialChairRelativeTransform);
+	}
 
+	const float ChairYaw = ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw;
+	
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
 	{
@@ -207,6 +221,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		ActiveOverlayWidget->AddToViewport();
 	}
 
+	
 	if (PC && PC->PlayerCameraManager)
 	{
 		APlayerCameraManager* CamManager = PC->PlayerCameraManager;
@@ -217,7 +232,6 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		CachedYawMax = CamManager->ViewYawMax;
 
 		// Calculate clamps
-		const float ChairYaw = ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw;
 		const float TargetYawMin = ChairYaw - 40.0f;
 		const float TargetYawMax = ChairYaw + 40.0f;
 
@@ -238,17 +252,6 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	CurrentSwingAngle = 0.0f;
 	AngularVelocity = 0.0f;
 	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
-
-	// Reattach chair mesh if not already
-	if (ChairMesh)
-	{
-		ChairMesh->SetSimulatePhysics(false);
-		if (RockingPivot && ChairMesh->GetAttachParent() != RockingPivot)
-		{
-			ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-			ChairMesh->SetRelativeTransform(InitialChairRelativeTransform);
-		}
-	}
 
 	// attach player to component, ignore pawn, disable movement, re-enable tick
 	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
