@@ -173,6 +173,13 @@ for floor,z in [('Ground',0),('Upper',390)]:
         board = fit(asset(ASSETS+'SM_HouseV01_SplinteredBoard','/Engine/BasicShapes/Cube'),'BayBoarded_%s_Board%d'%(floor,i),[1160,-14,z+h-9],[1440,-8,z+h+9],roll)
         board.static_mesh_component.set_material(0,timber)
 fit(asset(ASSETS+'SM_HouseV01_GateDoor_Wide'),'FrontDoor_Leaf',[700,-6,0],[860,6,240])
+# Ty's playtest: the basement stairs start 48 cm behind the hall wall, so you could barely get onto them. Open the wall in
+# front of the flight and its side steps (x 1170-1470) so the stairs start straight off the hall; rebuild the rest around it.
+for a in A.get_all_level_actors():
+    if a.get_actor_label().startswith('HI_SM_HouseV01_Basement_Wall_x6p50'):
+        wall_material = a.static_mesh_component.get_material(0); a.set_actor_hidden_in_game(True); a.set_actor_enable_collision(False)
+        for i,(x0,x1,z0,z1) in enumerate([(952,1170,-330,-30),(1470,1582,-330,-30),(1170,1470,-95,-30)]):
+            fit(asset('/Engine/BasicShapes/Cube'),'StairHallWall_%d'%i,[x0,-672,z0],[x1,-627,z1]).static_mesh_component.set_material(0,wall_material)
 
 box = existing['BP_TallowFuseBox_C_1']
 # Mount the authored switchboard on the east utility wall, facing into the room.
