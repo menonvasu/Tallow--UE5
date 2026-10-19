@@ -27,6 +27,9 @@ Plugins/**/Intermediate/
 # OS cruft
 .DS_Store
 Thumbs.db
+__pycache__/
+*.py[cod]
+*.blend[1-9]
 
 # Local env
 .env
