@@ -156,6 +156,9 @@ void UTallowCandleComponent::StartRelighting()
 
 void UTallowCandleComponent::FinishRelighting()
 {
+    // A reset can invalidate this attempt before its timer callback runs.
+    if (!bIsAcquired) return;
+
     // remove a match and set candle to lit
 	MatchCount -= 1;
 	SetCandleState(ECandleState::Lit);
@@ -248,6 +251,7 @@ void UTallowCandleComponent::HandleDraftExtinguishTimerExpired()
 
 void UTallowCandleComponent::ResetCandle()
 {
+    GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
     bIsAcquired = false;
     SetCandleState(ECandleState::Out);
     ResetMatchCount();

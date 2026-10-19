@@ -10,8 +10,7 @@ class UAnimSequence;
 class USkeletalMesh;
 
 /** Optional playback bridge for the Keeper's authored clips. Character movement owns translation.
- *  This prototype uses single-node playback, so transitions cut between poses; an AnimBP can replace it.
- */
+ *  The presentation rig blends authored poses; legacy rigs retain single-node playback. */
 UCLASS(ClassGroup=(Tallow), meta=(BlueprintSpawnableComponent))
 class TALLOW_API UTallowCreatureAnimationComponent : public UActorComponent
 {
@@ -24,6 +23,26 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
 	bool bEnableAuthoredPlayback = true;
+	/** Opt-in for the new rig in the integrated map. Legacy maps keep their original playback. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	bool bUsePresentationRig = false;
+	/** V07 locomotion and transition clips. Legacy playback ignores these. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> HostWalkAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> InvestigationWalkAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> AwareIdleAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> ResetAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> WallEnterAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> WallExitAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> CeilingEnterAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation") TObjectPtr<UAnimSequence> CeilingExitAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation", meta=(ClampMin="1")) float HostReferenceSpeed = 65.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation", meta=(ClampMin="1")) float InvestigationReferenceSpeed = 36.666667f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation", meta=(ClampMin="1")) float SqueezeReferenceSpeed = 5.555556f;
+	/** Upper cadence for planted modern locomotion; movement is limited to its matching stride speed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Presentation", meta=(ClampMin="0.1", ClampMax="4")) float PresentationMaxLocomotionRate = 2.f;
+	/** Optional stationary transition hook. Does not pause or move the traversal controller.
+	 * Call only during an owner-controlled hold; movement cancels the visual transition. */
+	UFUNCTION(BlueprintCallable, Category="Keeper|Presentation") bool PlaySurfaceTransition(bool bCeiling, bool bEntering);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
 	TObjectPtr<USkeletalMesh> KeeperMesh;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
@@ -36,6 +55,18 @@ public:
 	TObjectPtr<UAnimSequence> InvestigateAnimation;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
 	TObjectPtr<UAnimSequence> CaptureAnimation;
+	/** Jumpscare variants: dropping from above when caught on the ceiling, hands-first when the player is hiding. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	TObjectPtr<UAnimSequence> CeilingCaptureAnimation;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	TObjectPtr<UAnimSequence> GrabCaptureAnimation;
+	/** Seconds into each jumpscare where it strikes the lens; sound, light and camera hit on it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float CaptureStrikeTime = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float CeilingCaptureStrikeTime = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
+	float GrabCaptureStrikeTime = 0.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
 	TObjectPtr<UAnimSequence> WallAnimation;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation")
@@ -52,6 +83,8 @@ public:
 	TObjectPtr<UAnimSequence> SearchOverAnimation;
 	UFUNCTION(BlueprintPure, Category="Keeper|Animation")
 	float GetCaptureDuration() const;
+	UFUNCTION(BlueprintPure, Category="Keeper|Animation")
+	float GetCaptureStrikeTime() const;
 
 	/** Speeds represented by the in-place cycles, in cm/s. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Keeper|Animation", meta=(ClampMin="1"))
@@ -102,9 +135,17 @@ public:
 	void ResetPlayback();
 	UFUNCTION(BlueprintCallable, Category="Keeper|Animation")
 	void PlayCaptureAnimation();
+	/** The game mode asks for the duration before it broadcasts the capture, so the variant is chosen there once. */
+	UAnimSequence* ChooseCaptureAnimation() const;
+	mutable UAnimSequence* ChosenCapture = nullptr;
+	mutable UAnimSequence* LastCapture = nullptr;
 
 private:
 	void PlayClip(UAnimSequence* Animation, bool bLoop, float PlayRate);
+	void TickPresentation(float DeltaTime);
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> PresentationTransition;
+	float PresentationTransitionRemaining = 0.f;
+	bool bPresentationFolded = true;
 	UPROPERTY(Transient) TObjectPtr<ATallowCreature> Creature;
 	UPROPERTY(Transient) TObjectPtr<ATallowGameMode> GameMode;
 	UPROPERTY(Transient) TObjectPtr<UAnimSequence> ActiveClip;
