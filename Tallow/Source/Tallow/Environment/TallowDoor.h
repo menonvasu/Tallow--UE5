@@ -90,6 +90,8 @@ protected:
 	
 	TArray<TObjectPtr<ATallowPlank>> InitialPlanks;
 	
+	bool bInitiallyLocked = false;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
 	TObjectPtr<class UBoxComponent> AIProximityBox;
 	

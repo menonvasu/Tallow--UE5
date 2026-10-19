@@ -41,6 +41,7 @@ void ATallowDoor::BeginPlay()
 	Super::BeginPlay();
 	
 	InitialPlanks = BarricadePlanks;
+	bInitiallyLocked = bIsLocked;
 	
 	if (DoorTimeline && DoorTimelineCurve)
 	{
@@ -65,6 +66,8 @@ bool ATallowDoor::CanInteract_Implementation(AActor* Interactor) const
 FText ATallowDoor::GetInteractionPromptText_Implementation(AActor* Interactor) const
 {
 	if (IsBarricaded()) { return FText::FromString("BARRICADED"); }
+	
+	if (bIsLocked) { return FText::FromString("DOOR LOCKED: UNLOCK"); }
 	
 	if (!bIsOpen) { return FText::FromString("OPEN DOOR"); }
 	
@@ -170,6 +173,7 @@ void ATallowDoor::ResetDoor()
 	DoorTimeline->SetPlaybackPosition(0.0f, false);
 	bIsOpen = false;
 	BarricadePlanks = InitialPlanks;
+	bIsLocked = bInitiallyLocked;
 	
 	for (ATallowPlank* Plank : InitialPlanks)
 	{

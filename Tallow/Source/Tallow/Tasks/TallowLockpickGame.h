@@ -23,6 +23,10 @@ enum class EPinState : uint8
 	Overset
 };
 
+/** Helper enum for hint to widget */
+UENUM(BlueprintType)
+enum class ELockpickHint : uint8 { None, ApplyTension, EaseTension, LowerPick, FindBindingPin };
+
 /** Holds editable details on a single pin */
 USTRUCT(BlueprintType)
 struct FPinChamber
@@ -31,6 +35,7 @@ struct FPinChamber
 	
 public:
 	bool bHasFalseGate = false;
+	bool bFalseGateCleared = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PinChamber")
 	float TargetHeight = 0.6f;
@@ -77,6 +82,8 @@ public:
 	void GenerateLock(int32 PinCount);
 	
 	/** Methods exposed for widget */
+	ELockpickHint GetHint() const;
+	
 	float GetPickDepth() const { return PickDepth; }
 	
 	float GetPickLift() const { return PickLift; }
@@ -84,6 +91,8 @@ public:
 	float GetTargetPickLift() const { return TargetPickLift; }
 	
 	float GetCurrentTorque() const { return CurrentTorque; }
+	
+	float GetMinTorque() const { return MinimumTorque; }
 	
 	TArray<FPinChamber> GetPinChambers() const { return PinChambers; }
 	
@@ -98,6 +107,8 @@ public:
 	{
 		return BindingSequence.IsValidIndex(CurrentBindingStep) ? BindingSequence[CurrentBindingStep] : INDEX_NONE;	
 	}
+	
+	bool IsInMinigame() const { return IsComponentTickEnabled(); } 
 	
 	/** Lock picking events */
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "LockPick|Events")
@@ -146,7 +157,6 @@ protected:
 	/** Drop-speed of pin on release */
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float PinSpringDropSpeed = 25.0f; 
-
 	
 	/** Current binding unlock level */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
@@ -159,10 +169,10 @@ protected:
 	/** Stress variables */
 	float OversetStressTimer = 0.0f;
 	
-	UPROPERTY(EditAnywhere, Category="Lockpick|Tuning") float OversetMargin = 0.03f;
+	UPROPERTY(EditAnywhere, Category="Lockpick|Tuning") float OversetMargin = 0.06f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float MaxStressDuration = 0.45f;
+	float MaxStressDuration = 0.55f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float LockpickSnapLoudness = 1.0f;
@@ -171,9 +181,21 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
 	float CurrentTorque = 0.0f;
 	
+	/** Min Torque */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
+	float MinimumTorque = 0.15f;
+	
+	/** Max false set Torque */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
+	float MaxFalseTorque = 0.4f;
+	
 	/** Depth of pick */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
 	float PickDepth = 0.0f;
+	
+	/** Pick select threshold */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
+	float PinWidthThreshold = 0.3f;
 	
 	/** Lift level of pick */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
@@ -188,7 +210,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float TorqueRiseRate = 0.7f;
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float TorqueFallRate = 1.0f;
+	float TorqueFallRate = 0.5f;
 	bool bTensionHeld = false;
 	bool bTensionResetDone = true;
 	
@@ -208,6 +230,11 @@ protected:
 	float SetDwellDuration = 0.15f;
 
 	float SetDwellTimer = 0.0f;
+	
+	/** Timers for hint */
+	float TimeSinceProgress = 0.0f;
+		
+	float HintDelay = 8.0f;
 	
 	/** Weak pointer to target actor */
 	TWeakObjectPtr<AActor> TargetLockable = nullptr;

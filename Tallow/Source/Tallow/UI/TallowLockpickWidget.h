@@ -72,6 +72,9 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* EventFeedbackText;
 	
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* HintFeedbackText;
+	
 	float StatusTimeRemaining = 0.0f;
 	
 	/** Tunables for layout */
@@ -89,4 +92,8 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = "Lockpick|Layout") 
 	float ShakeFadeSpeed = 12.0f;
+	
+	float BarShakeAlpha = 0.0f;
+	UPROPERTY(EditAnywhere, Category="Lockpick|Shake") 
+	float MaxBarShakePixels = 3.0f;
 };

@@ -30,13 +30,14 @@ void UTallowLockpickWidget::NativeTick(const FGeometry& Geometry, float InDeltaT
 	if (!LockpickGame.IsValid() || !PickImage) { return; }
 
 	bool bIsAnyPinOverset = false;
+	bool bIsAnyFalseSet = false;
 	
 	ShakeTime += InDeltaTime;
 	const float CurrentTorque = LockpickGame->GetCurrentTorque();
 	const int32 BindingPinIndex = LockpickGame->GetCurrentBindingPinIndex();
 	const bool bPickOnBinding = BindingPinIndex == FMath::RoundToInt(LockpickGame->GetPickDepth());
 	const bool bIsPickMovingUp = (LockpickGame->GetTargetPickLift() - LockpickGame->GetPickLift()) > 0.01f;
-	const bool bShouldShake = bPickOnBinding && CurrentTorque > 0.15f &&bIsPickMovingUp;
+	const bool bShouldShake = bPickOnBinding && CurrentTorque > LockpickGame->GetMinTorque() &&bIsPickMovingUp;
 	
 	ShakeAlpha = FMath::FInterpTo(ShakeAlpha, bShouldShake ? 1.0f : 0.0f, InDeltaTime, ShakeFadeSpeed);
 	const float Amp = CurrentTorque * MaxShakePixels * ShakeAlpha;
@@ -78,6 +79,7 @@ void UTallowLockpickWidget::NativeTick(const FGeometry& Geometry, float InDeltaT
 			break;
 		case EPinState::FalseSet:
 			PinWidgets[i]->SetBrushColor(FLinearColor(0.95f, 0.69f, 0.28f));
+			bIsAnyFalseSet = true;
 			break;
 		}
 	}
@@ -85,8 +87,31 @@ void UTallowLockpickWidget::NativeTick(const FGeometry& Geometry, float InDeltaT
 	if (TensionBar)
 	{
 		TensionBar->SetPercent(CurrentTorque);
-		TensionBar->SetFillColorAndOpacity((CurrentTorque >= 0.75f && bIsAnyPinOverset) ? FLinearColor(0.95f, 0.15f, 0.12f) 
-			: FLinearColor(0.2f, 0.95f, 0.35f));
+		
+		FLinearColor BarColor;
+		if (CurrentTorque >= 0.75f && bIsAnyPinOverset)
+		{
+			BarColor = FLinearColor(0.95f, 0.15f, 0.12f); 
+		}
+		else if (bIsAnyFalseSet)
+		{
+			BarColor = FLinearColor(0.95f, 0.69f, 0.28f);
+		}
+		else if (CurrentTorque < LockpickGame->GetMinTorque())
+		{
+			BarColor = Gray;                                
+		}
+		else
+		{
+			BarColor = FLinearColor(0.2f, 0.95f, 0.35f);    
+		}
+		
+		TensionBar->SetFillColorAndOpacity(BarColor);
+		
+		const bool bBarDanger = bIsAnyPinOverset && CurrentTorque >= 0.75f;
+		BarShakeAlpha = FMath::FInterpTo(BarShakeAlpha, bBarDanger ? 1.0f : 0.0f, InDeltaTime, ShakeFadeSpeed);
+		const float BarAmp = MaxBarShakePixels * BarShakeAlpha;
+		TensionBar->SetRenderTranslation(FVector2D(FMath::Sin(ShakeTime * 40.0f) * BarAmp, 0.0f));
 	}
 	
 	// Status check
@@ -95,8 +120,27 @@ void UTallowLockpickWidget::NativeTick(const FGeometry& Geometry, float InDeltaT
 	{
 		EventFeedbackText->SetOpacity(FMath::Clamp(StatusTimeRemaining / 0.5f, 0.0f, 1.0f));
 	}
+	
+	if (!HintFeedbackText) { return; }
+	switch (LockpickGame->GetHint())
+	{
+	case ELockpickHint::None:
+		HintFeedbackText->SetText(FText::FromString(""));
+		break;
+	case ELockpickHint::ApplyTension:
+		HintFeedbackText->SetText(FText::FromString("Hold LMB"));
+		break;
+	case ELockpickHint::EaseTension:
+		HintFeedbackText->SetText(FText::FromString("Ease off the tension"));
+		break;
+	case ELockpickHint::FindBindingPin:
+		HintFeedbackText->SetText(FText::FromString("Find stiff pin"));
+		break;
+	case ELockpickHint::LowerPick:
+		HintFeedbackText->SetText(FText::FromString("Lower the pick"));
+	}
 }
-
+	
 void UTallowLockpickWidget::NativeDestruct()
 {
 	if (LockpickGame.IsValid())
@@ -127,7 +171,7 @@ void UTallowLockpickWidget::ShowStatus(const FText& Message)
 
 void UTallowLockpickWidget::HandleOnFalseSet()
 {
-	ShowStatus(FText::FromString("Something feels off, maybe ease stress"));
+	ShowStatus(FText::FromString("Something feels off"));
 }
 void UTallowLockpickWidget::HandleOnTensionReleasedOrOnSnap()
 {
