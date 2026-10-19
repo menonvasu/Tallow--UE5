@@ -237,7 +237,7 @@ animation = keeper.get_component_by_class(u.TallowCreatureAnimationComponent)
 # V09: repaired body (seams welded, no tears in crawl poses) and the new maw, on the V07 skeleton.
 animation.keeper_mesh = asset('/Game/Presentation/KeeperRiggedV07/SK_KeeperRiggedV07_Mouth09','/Game/Presentation/KeeperRiggedV07/SK_KeeperRiggedV07_Reveal02')
 animation.use_presentation_rig = True
-animation.keeper_mesh_scale = 1
+animation.keeper_mesh_scale = 1.15  # ~2.75 m standing: crouched and crawling most of the time, 2.4 m did not tower over the child
 animation.keeper_mesh_yaw = -90
 animation.keeper_mesh_offset = u.Vector(0,0,-96)
 animation.host_bob_height = 0

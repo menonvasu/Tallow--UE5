@@ -453,6 +453,7 @@ void ATallowPlayDirector::OnCaught()
 		if (Look.Normalize())
 		{
 			float Reach = 125.f; FHitResult Hit;
+			if (const auto* Anim = Keeper->FindComponentByClass<UTallowCreatureAnimationComponent>()) Reach *= FMath::Clamp(Anim->KeeperMeshScale, .5f, 2.f);  // staged for a 1.0 scale Keeper
 			FCollisionQueryParams Params(TEXT("CaptureStage"), false, Player); Params.AddIgnoredActor(Keeper);
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + Look * Reach, ECC_Visibility, Params)) Reach = FMath::Max(60.f, Hit.Distance - 40.f);
 			Keeper->SetActorLocationAndRotation(FVector(Eye.X + Look.X * Reach, Eye.Y + Look.Y * Reach, Keeper->GetActorLocation().Z), (-Look).Rotation(), false, nullptr, ETeleportType::TeleportPhysics);
