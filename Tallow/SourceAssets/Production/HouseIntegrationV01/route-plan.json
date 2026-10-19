@@ -1,0 +1,618 @@
+{
+  "units": "Unreal centimetres",
+  "map": "/Game/Presentation/Playable/Lvl_Tallow_Playable",
+  "ownership": "Candidate markers only; root director relocates existing pickups, gates existing task actors, and owns progression. Capture preserves roll; fresh run rerolls.",
+  "order": [
+    "chair/candle safe opening",
+    "workshop random crowbar",
+    "noisy boards opens BOTH west-to-central arches",
+    "three randomized fuses, at least one on each accessible floor",
+    "return power box",
+    "upper film-room collection gate",
+    "short exit to ending threshold"
+  ],
+  "gate_boundary": [
+    {
+      "label": "WorkshopBoardGate",
+      "location": [
+        585,
+        -1040,
+        -330
+      ]
+    },
+    {
+      "label": "StartHallCompanionGate",
+      "location": [
+        585,
+        -325,
+        -330
+      ]
+    }
+  ],
+  "crowbar_candidates": [
+    {
+      "id": "Crowbar_Workbench",
+      "location": [
+        250,
+        -1040,
+        -236.037
+      ],
+      "support_surface_z_cm": -237.037,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Crowbar_SideCabinet",
+      "location": [
+        440,
+        -780,
+        -225.0
+      ],
+      "support_surface_z_cm": -226.0,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    }
+  ],
+  "fuse_candidates": [
+    {
+      "id": "Fuse_BasementBoiler",
+      "floor": "basement",
+      "location": [
+        1420,
+        -350,
+        -235.0
+      ],
+      "support_surface_z_cm": -236.0,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Fuse_BasementLaundry",
+      "floor": "basement",
+      "location": [
+        1420,
+        -1080,
+        -232.886
+      ],
+      "support_surface_z_cm": -233.886,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Fuse_GroundStudy",
+      "floor": "ground",
+      "location": [
+        1330,
+        -350,
+        91.862
+      ],
+      "support_surface_z_cm": 90.862,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Fuse_GroundDining",
+      "floor": "ground",
+      "location": [
+        280,
+        -1040,
+        111.295
+      ],
+      "support_surface_z_cm": 110.295,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Fuse_UpperBedroom",
+      "floor": "upper",
+      "location": [
+        1200,
+        -520,
+        475.0
+      ],
+      "support_surface_z_cm": 474.0,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    },
+    {
+      "id": "Fuse_UpperToyShelf",
+      "floor": "upper",
+      "location": [
+        155,
+        -380,
+        485
+      ],
+      "support_surface_z_cm": 484,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation."
+    }
+  ],
+  "power_box": {
+    "location": [
+      1400,
+      -320,
+      -330
+    ],
+    "note": "Boiler room floor; retain task transform/panel offsets owned by root."
+  },
+  "final_room": {
+    "id": "UpperFilmCollection",
+    "bounds_xy_cm": [
+      30,
+      -1270,
+      550,
+      -740
+    ],
+    "floor_z_cm": 390,
+    "gate_location": [
+      585,
+      -1105,
+      390
+    ],
+    "collection_focus": [
+      220,
+      -1020,
+      390
+    ],
+    "exit_threshold": [
+      100,
+      -1210,
+      390
+    ],
+    "escape_polyline": [
+      [
+        450,
+        -1105,
+        390
+      ],
+      [
+        320,
+        -1120,
+        390
+      ],
+      [
+        180,
+        -1170,
+        390
+      ],
+      [
+        100,
+        -1210,
+        390
+      ]
+    ],
+    "note": "Ending threshold inside upper film-room; exterior transition is root-owned cinematic. No new roof hole/fourth storey or item behind power gate.",
+    "additional_power_boundaries": [
+      "ToyRoomCollectionPowerGate",
+      "CollectionCrawlPowerGate"
+    ]
+  },
+  "constraints": [
+    "At least one fuse per floor; randomize within eligible floor pools when expanded.",
+    "Reachability requires root runtime sweep/path checks before committing candidate pools.",
+    "Do not place a fuse in final room or behind power gate.",
+    "Target coordinates will be supported by owned furnishing shelves/tabletops; root may adjust pickup local pivot height after interaction check."
+  ],
+  "native_gates": [
+    {
+      "label": "StartHallCompanionGate",
+      "hinge_location": [
+        585,
+        -405,
+        -330
+      ],
+      "yaw": 90,
+      "requires_power": false,
+      "door_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateDoor_Wide",
+      "frame_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateFrame_Wide"
+    },
+    {
+      "label": "FinalCollectionPowerGate",
+      "hinge_location": [
+        585,
+        -1160,
+        390
+      ],
+      "yaw": 90,
+      "requires_power": true,
+      "door_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateDoor_Narrow",
+      "frame_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateFrame_Narrow"
+    },
+    {
+      "label": "ToyRoomCollectionPowerGate",
+      "hinge_location": [
+        231,
+        -650,
+        390
+      ],
+      "yaw": 0,
+      "requires_power": true,
+      "door_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateDoor_Narrow",
+      "frame_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateFrame_Narrow",
+      "mesh_scale": [
+        1,
+        1,
+        1
+      ],
+      "open_angle": 100,
+      "clearance_note": "Closed spans X231..339 in110cm opening. Opens toward +Y into toy room; leaf endpoint approximately(212.25,-543.64), clear of current toy furniture."
+    },
+    {
+      "label": "CollectionCrawlPowerGate",
+      "hinge_location": [
+        585,
+        -1208,
+        390
+      ],
+      "yaw": -90,
+      "requires_power": true,
+      "door_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateDoor_Narrow",
+      "frame_mesh": "/Game/Presentation/Environment/HouseIntegrationV01/Architecture/SM_HouseV01_GateFrame_Narrow",
+      "mesh_scale": [
+        0.7407407407407407,
+        1,
+        0.3448275862068966
+      ],
+      "open_angle": 100,
+      "clearance_note": "Apply mesh_scale to Door and Frame components, not actor/hinge. Closed leaf spans Y-1208..-1288,Z390..470. Opens east into central hall; endpoint approximately(663.78,-1194.11), avoiding south exterior wall. Frame height82.76cm slightly overlaps source lintel as intended."
+    }
+  ],
+  "vasu_boarded_door": {
+    "location": [
+      585,
+      -1040,
+      -330
+    ],
+    "note": "Root must fit actual actor/board local pivots to opening; center given, not hinge."
+  },
+  "stairs": {
+    "clear_width_cm": 134,
+    "rise_cm_max": 19.5,
+    "run_cm": 28,
+    "slope_degrees": 34.86,
+    "keeper_height_cm": 240,
+    "status": "Source tread geometry measured; runtime capsule/head-clearance sweeps required"
+  },
+  "hiding_candidates": [
+    {
+      "id": "Hide_ParlourSofaBack",
+      "center": [
+        260,
+        -44,
+        60
+      ],
+      "view": [
+        260,
+        -44,
+        108
+      ],
+      "exit": [
+        430,
+        -60,
+        60
+      ],
+      "concealment": "Behind north-wall sofa; approach around east arm",
+      "exit_path": [
+        [
+          260,
+          -44,
+          60
+        ],
+        [
+          430,
+          -44,
+          60
+        ],
+        [
+          430,
+          -60,
+          60
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.6000000238418579,
+        "SM_HouseV01_Ground_Floor",
+        [
+          2.5999999046325684,
+          0.4399999976158142,
+          0.0
+        ]
+      ],
+      "yaw": -90
+    },
+    {
+      "id": "Hide_StudyCupboardCorner",
+      "center": [
+        1480,
+        -95,
+        60
+      ],
+      "view": [
+        1480,
+        -95,
+        108
+      ],
+      "exit": [
+        1320,
+        -100,
+        60
+      ],
+      "concealment": "Northeast corner behind study cupboard; approach from west",
+      "exit_path": [
+        [
+          1480,
+          -95,
+          60
+        ],
+        [
+          1320,
+          -100,
+          60
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.6000000238418579,
+        "SM_HouseV01_Ground_Floor",
+        [
+          14.800000190734863,
+          0.949999988079071,
+          0.0
+        ]
+      ],
+      "yaw": 180
+    },
+    {
+      "id": "Hide_BedroomSofa",
+      "center": [
+        1320,
+        -245,
+        450
+      ],
+      "view": [
+        1320,
+        -245,
+        498
+      ],
+      "exit": [
+        1120,
+        -245,
+        450
+      ],
+      "concealment": "Behind bedroom sofa; approach around west arm",
+      "exit_path": [
+        [
+          1320,
+          -245,
+          450
+        ],
+        [
+          1120,
+          -245,
+          450
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.5999999046325684,
+        "SM_HouseV01_Upper_Floor",
+        [
+          13.199999809265137,
+          2.450000047683716,
+          3.9000000953674316
+        ]
+      ],
+      "yaw": -90
+    }
+  ],
+  "draft_candidates": [
+    {
+      "id": "Draft_BasementWindow",
+      "location": [
+        80,
+        -200,
+        -210
+      ],
+      "extent": [
+        100,
+        120,
+        130
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "signal": "Hanging cloth at window; weak cold window fill"
+    },
+    {
+      "id": "Draft_StudyWindow",
+      "location": [
+        1460,
+        -300,
+        120
+      ],
+      "extent": [
+        100,
+        120,
+        130
+      ],
+      "direction": [
+        -1,
+        0,
+        0
+      ],
+      "signal": "Window cloth, existing cold window fill; shelter behind desk/cabinet"
+    },
+    {
+      "id": "Draft_UpperToyWindow",
+      "location": [
+        90,
+        -220,
+        510
+      ],
+      "extent": [
+        100,
+        120,
+        130
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "signal": "Hanging cloth, cold window spill; no fuse inside locked final room"
+    }
+  ],
+  "measured_hiding_contracts": [
+    {
+      "id": "Hide_ParlourSofaBack",
+      "center": [
+        260,
+        -44,
+        60
+      ],
+      "view": [
+        260,
+        -44,
+        108
+      ],
+      "exit": [
+        430,
+        -60,
+        60
+      ],
+      "concealment": "Behind north-wall sofa; approach around east arm",
+      "exit_path": [
+        [
+          260,
+          -44,
+          60
+        ],
+        [
+          430,
+          -44,
+          60
+        ],
+        [
+          430,
+          -60,
+          60
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.6000000238418579,
+        "SM_HouseV01_Ground_Floor",
+        [
+          2.5999999046325684,
+          0.4399999976158142,
+          0.0
+        ]
+      ],
+      "yaw": -90
+    },
+    {
+      "id": "Hide_StudyCupboardCorner",
+      "center": [
+        1480,
+        -95,
+        60
+      ],
+      "view": [
+        1480,
+        -95,
+        108
+      ],
+      "exit": [
+        1320,
+        -100,
+        60
+      ],
+      "concealment": "Northeast corner behind study cupboard; approach from west",
+      "exit_path": [
+        [
+          1480,
+          -95,
+          60
+        ],
+        [
+          1320,
+          -100,
+          60
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.6000000238418579,
+        "SM_HouseV01_Ground_Floor",
+        [
+          14.800000190734863,
+          0.949999988079071,
+          0.0
+        ]
+      ],
+      "yaw": 180
+    },
+    {
+      "id": "Hide_BedroomSofa",
+      "center": [
+        1320,
+        -245,
+        450
+      ],
+      "view": [
+        1320,
+        -245,
+        498
+      ],
+      "exit": [
+        1120,
+        -245,
+        450
+      ],
+      "concealment": "Behind bedroom sofa; approach around west arm",
+      "exit_path": [
+        [
+          1320,
+          -245,
+          450
+        ],
+        [
+          1120,
+          -245,
+          450
+        ]
+      ],
+      "path_obstructions": [],
+      "center_obstructions": [],
+      "exit_obstructions": [],
+      "floor_support": [
+        0.5999999046325684,
+        "SM_HouseV01_Upper_Floor",
+        [
+          13.199999809265137,
+          2.450000047683716,
+          3.9000000953674316
+        ]
+      ],
+      "yaw": -90
+    }
+  ],
+  "disabled_candidates": [
+    {
+      "id": "Crowbar_WallShelf",
+      "location": [
+        90,
+        -1130,
+        -250.0
+      ],
+      "support_surface_z_cm": -251.0,
+      "placement_note": "Candidate marker 1cm above measured support; root adjusts visual mesh local pivot/orientation.",
+      "disabled_reason": "Runtime capsule/nav approach sampling found no complete path around this furniture pocket; excluded from new-run rolls. Two accessible crowbar alternatives remain."
+    }
+  ]
+}

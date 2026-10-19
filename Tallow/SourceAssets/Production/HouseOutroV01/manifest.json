@@ -1,0 +1,93 @@
+{
+  "map": "/Game/Presentation/Cinematics/Maps/Lvl_OutroPresentation",
+  "meshes": [
+    {
+      "mesh": "SM_Outro_Garden",
+      "triangles": 3196,
+      "materials": [
+        "M_Outro_Earth",
+        "M_Outro_WetStone",
+        "M_Outro_CharredWood",
+        "M_Outro_Iron"
+      ]
+    }
+  ],
+  "materials": {
+    "M_Outro_CharredWood": {
+      "color": [
+        0.04500000178813934,
+        0.032999999821186066,
+        0.024000000208616257
+      ],
+      "roughness": 0.84,
+      "metallic": 0.0,
+      "texture": null,
+      "two_sided": false
+    },
+    "M_Outro_Iron": {
+      "color": [
+        0.027000000700354576,
+        0.03500000014901161,
+        0.04100000113248825
+      ],
+      "roughness": 0.84,
+      "metallic": 0.44999998807907104,
+      "texture": null,
+      "two_sided": false
+    },
+    "M_Outro_WetStone": {
+      "color": [
+        0.07500000298023224,
+        0.0860000029206276,
+        0.09000000357627869
+      ],
+      "roughness": 0.84,
+      "metallic": 0.0,
+      "texture": null,
+      "two_sided": false
+    },
+    "M_Outro_Earth": {
+      "color": [
+        0.024000000208616257,
+        0.029999999329447746,
+        0.026000000536441803
+      ],
+      "roughness": 0.84,
+      "metallic": 0.0,
+      "texture": null,
+      "two_sided": false
+    },
+    "M_Outro_PaleEdge": {
+      "color": [
+        0.11999999731779099,
+        0.10999999940395355,
+        0.07999999821186066
+      ],
+      "roughness": 0.84,
+      "metallic": 0.0,
+      "texture": null,
+      "two_sided": false
+    }
+  },
+  "placements": [
+    {
+      "label": "Garden",
+      "mesh": "SM_Outro_Garden",
+      "location_cm": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "yaw": 0,
+      "tilt": 0
+    }
+  ],
+  "uv": "Original ProductionUV smart atlas; zero-area triangles 0. Overlap and padding not measured.",
+  "collision": "None, cinematic decoration only",
+  "provenance": "Original source-authored geometry, no external assets or generation spend."
+}
