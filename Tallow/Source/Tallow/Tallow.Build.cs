@@ -22,6 +22,8 @@ public class Tallow : ModuleRules
 			"Slate",
 			"SlateCore",
             "GameplayTags",
+            "LevelSequence",
+            "MovieScene",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

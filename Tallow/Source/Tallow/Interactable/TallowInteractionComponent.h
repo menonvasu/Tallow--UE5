@@ -24,6 +24,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interact")
 	void CancelInteract();
 
+	/** Read-only presentation hooks; interaction timing and completion remain owned here. */
+	UFUNCTION(BlueprintPure, Category="Interact")
+	bool IsInteracting() const { return bIsHoldingInteract; }
+	UFUNCTION(BlueprintPure, Category="Interact")
+	AActor* GetInteractionTarget() const { return CurrentInteractTarget.Get(); }
+
 protected:
 	virtual void BeginPlay() override;
 	

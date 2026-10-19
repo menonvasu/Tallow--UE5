@@ -1,0 +1,683 @@
+{
+  "clips": [
+    {
+      "name": "Idle",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": true,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "HostWalk",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {},
+      "note": "glide, 65 cm/s suggested"
+    },
+    {
+      "name": "Walk",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "reference_speed_cm_s": 36.67,
+      "stride_m": 0.243,
+      "stance_duty": 0.709,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.172325134277344e-07,
+      "events_seconds": {},
+      "note": "2 s loop (was 1 s): two steps per hand with a varied second cycle",
+      "length_changed_from_v07_frames": 25
+    },
+    {
+      "name": "Sneak",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "reference_speed_cm_s": 13.33,
+      "stride_m": 0.178,
+      "stance_duty": 0.694,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 2.638690622974015e-05,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Chase",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 17,
+      "seconds": 0.6667,
+      "loop": true,
+      "reference_speed_cm_s": 60.0,
+      "stride_m": 0.25,
+      "stance_duty": 0.706,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 2.980530247093737e-05,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "RunChase",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 13,
+      "seconds": 0.5,
+      "loop": true,
+      "reference_speed_cm_s": 224.0,
+      "stride_m": 0.28,
+      "stance_duty": 0.327,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.877166459339168e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "WallCrawl",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "reference_speed_cm_s": 13.235,
+      "stride_m": 0.199,
+      "stance_duty": 0.776,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 5.407705101854817e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "CeilingCrawl",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 73,
+      "seconds": 3.0,
+      "loop": true,
+      "reference_speed_cm_s": 5.833,
+      "stride_m": 0.141,
+      "stance_duty": 0.822,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.816559456248789e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "SearchUnder",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.982,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.5886748369909214e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "SearchOver",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.613,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.185608597155851e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Reveal",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 73,
+      "seconds": 3.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.205,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.842304232499576e-07,
+      "events_seconds": {
+        "notice": 0.6666666666666666,
+        "burst": 1.125,
+        "drop": 1.9166666666666667,
+        "planted": 2.5
+      },
+      "note": ""
+    },
+    {
+      "name": "JumpscareDeath",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 47,
+      "seconds": 1.9167,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.053,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.2236140449023154e-07,
+      "events_seconds": {
+        "lurch": 0.0,
+        "tower": 0.4583333333333333,
+        "hold": [
+          0.4583333333333333,
+          0.875
+        ],
+        "micro_twitch": 0.6666666666666666,
+        "strike_start": 0.875,
+        "strike": 1.0416666666666667,
+        "hood_open": [
+          0.875,
+          1.0
+        ],
+        "chomp": [
+          0.9166666666666666,
+          1.0416666666666667
+        ],
+        "fade_starts_at": 1.117,
+        "capture_root_distance_m": 1.25
+      },
+      "note": "",
+      "length_changed_from_v07_frames": 73
+    },
+    {
+      "name": "Squeeze",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 73,
+      "seconds": 3.0,
+      "loop": true,
+      "reference_speed_cm_s": 5.556,
+      "stride_m": 0.13,
+      "stance_duty": 0.795,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.3392836387637365e-07,
+      "events_seconds": {},
+      "note": "closed loop (game loops it)"
+    },
+    {
+      "name": "Listen",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 73,
+      "seconds": 3.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 1.0,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.7342202920143806e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Alert",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 25,
+      "seconds": 1.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 1.0,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.6863436927953305e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Reset",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 73,
+      "seconds": 3.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.312,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.796142102139293e-07,
+      "events_seconds": {
+        "fold_start": 0.8333333333333334,
+        "host_ready": 2.75
+      },
+      "note": ""
+    },
+    {
+      "name": "WallEnter",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.184,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.7371922147227685e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "WallExit",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.219,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.4240261593687705e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "CeilingEnter",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.184,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.7371922147227685e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "CeilingExit",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "game",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.219,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.4240261593687705e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Idle_Breathe",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": true,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Idle_HeadTilt",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": true,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Idle_Twitch",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": true,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Jumpscare_Ceiling",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 53,
+      "seconds": 2.1667,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {
+        "hang": 0.0,
+        "drop": [
+          0.2916666666666667,
+          0.5416666666666666
+        ],
+        "hold": [
+          0.75,
+          1.1666666666666667
+        ],
+        "strike_start": 1.1666666666666667,
+        "strike": 1.3333333333333333,
+        "hood_open": [
+          1.1666666666666667,
+          1.2916666666666667
+        ],
+        "chomp": [
+          1.2083333333333333,
+          1.3333333333333333
+        ],
+        "fade_starts_at": 1.367,
+        "capture_root_distance_m": 1.25,
+        "staging": "actor upright on the floor; the body hangs inverted from ~2.5 m (robe gathered up to the ceiling)"
+      },
+      "note": ""
+    },
+    {
+      "name": "Jumpscare_Grab",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 74,
+      "seconds": 3.0417,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": null,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 0.0,
+      "events_seconds": {
+        "hands_in": [
+          0,
+          0.5833333333333334
+        ],
+        "head_rise": [
+          0.25,
+          1.25
+        ],
+        "hold": [
+          1.25,
+          2.0
+        ],
+        "strike_start": 2.0,
+        "strike": 2.125,
+        "hood_open": [
+          2.0,
+          2.125
+        ],
+        "chomp": [
+          2.0,
+          2.125
+        ],
+        "fade_starts_at": 2.242,
+        "capture_root_distance_m": 1.25
+      },
+      "note": ""
+    },
+    {
+      "name": "LostYou",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 61,
+      "seconds": 2.5,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.943,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.695639388736704e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Lunge",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 31,
+      "seconds": 1.25,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.855,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 5.280984981855556e-07,
+      "events_seconds": {
+        "slam_s": 0.6666666666666666
+      },
+      "note": ""
+    },
+    {
+      "name": "Search_LookAround",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.964,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.853754483134249e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Search_Peek",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 97,
+      "seconds": 4.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 1.0,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.8743019104003906e-07,
+      "events_seconds": {},
+      "note": ""
+    },
+    {
+      "name": "Sniff",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 1.0,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.5886748369909214e-07,
+      "events_seconds": {
+        "sniff_1": 0.625,
+        "sniff_2": 0.875
+      },
+      "note": ""
+    },
+    {
+      "name": "Stalk",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "reference_speed_cm_s": 24.0,
+      "stride_m": 0.154,
+      "stance_duty": 0.689,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 4.400260168383539e-07,
+      "events_seconds": {},
+      "note": "new; heavier than Walk, slower than it"
+    },
+    {
+      "name": "Turn_L90",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 37,
+      "seconds": 1.5,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.676,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.78442558622369e-07,
+      "events_seconds": {
+        "actor_yaw_deg": 90,
+        "actor_yaw_rate_deg_s": 60.0,
+        "profile": "linear"
+      },
+      "note": ""
+    },
+    {
+      "name": "Turn_R90",
+      "status": "final V08 (no V07 stand-ins remain)",
+      "set": "variant",
+      "frames": 37,
+      "seconds": 1.5,
+      "loop": false,
+      "reference_speed_cm_s": 0.0,
+      "stride_m": 0.0,
+      "stance_duty": 0.676,
+      "contact_plane": "+Z local floor; runtime rotates surface",
+      "max_contact_error_m": 3.885747435809761e-07,
+      "events_seconds": {
+        "actor_yaw_deg": -90,
+        "actor_yaw_rate_deg_s": -60.0,
+        "profile": "linear"
+      },
+      "note": ""
+    }
+  ],
+  "root_motion": false,
+  "fps": 24,
+  "source_forward": "-Y",
+  "engine_legacy_forward": "+Y",
+  "engine_mesh_yaw": -90,
+  "mesh_scale": 1,
+  "head_bone": "head",
+  "morph_curves": [
+    "FULL_HORROR",
+    "HOOD_OPEN",
+    "CHOMP",
+    "Blink_L",
+    "Blink_R"
+  ],
+  "capture": {
+    "note": "Jumpscares are staged for the capture camera: player eye 1.1 m, Keeper root ~1.25 m in front facing it (grab sphere 85 cm + capsules). The game fade (FadeOutTimer 0.8 s) starts at clip_end-0.8 s: every strike lands just before it. Proximity only holds near 1.25 m: at 1.0 m the head reaches the lens, beyond ~1.6 m the maw is under 30% of frame height. Recommended: on capture, place the Keeper root 1.25 m from the camera along the look line before playing the clip.",
+    "variants": {
+      "JumpscareDeath": {
+        "lurch": 0.0,
+        "tower": 0.4583333333333333,
+        "hold": [
+          0.4583333333333333,
+          0.875
+        ],
+        "micro_twitch": 0.6666666666666666,
+        "strike_start": 0.875,
+        "strike": 1.0416666666666667,
+        "hood_open": [
+          0.875,
+          1.0
+        ],
+        "chomp": [
+          0.9166666666666666,
+          1.0416666666666667
+        ],
+        "fade_starts_at": 1.117,
+        "capture_root_distance_m": 1.25
+      },
+      "Jumpscare_Ceiling": {
+        "hang": 0.0,
+        "drop": [
+          0.2916666666666667,
+          0.5416666666666666
+        ],
+        "hold": [
+          0.75,
+          1.1666666666666667
+        ],
+        "strike_start": 1.1666666666666667,
+        "strike": 1.3333333333333333,
+        "hood_open": [
+          1.1666666666666667,
+          1.2916666666666667
+        ],
+        "chomp": [
+          1.2083333333333333,
+          1.3333333333333333
+        ],
+        "fade_starts_at": 1.367,
+        "capture_root_distance_m": 1.25,
+        "staging": "actor upright on the floor; the body hangs inverted from ~2.5 m (robe gathered up to the ceiling)"
+      },
+      "Jumpscare_Grab": {
+        "hands_in": [
+          0,
+          0.5833333333333334
+        ],
+        "head_rise": [
+          0.25,
+          1.25
+        ],
+        "hold": [
+          1.25,
+          2.0
+        ],
+        "strike_start": 2.0,
+        "strike": 2.125,
+        "hood_open": [
+          2.0,
+          2.125
+        ],
+        "chomp": [
+          2.0,
+          2.125
+        ],
+        "fade_starts_at": 2.242,
+        "capture_root_distance_m": 1.25
+      }
+    }
+  },
+  "turns": "Turn_L90/Turn_R90: the ACTOR must yaw 90 deg linearly over the clip (actor_yaw_rate_deg_s); planted hands are world-fixed under that rotation.",
+  "runtime_owner": "Vasu AI unchanged; playback adapter selects/crossfades only",
+  "quality_status": "V08: saved-source validation + clean bake + FBX roundtrip; Unreal import pending"
+}

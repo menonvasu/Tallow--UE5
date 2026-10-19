@@ -76,7 +76,7 @@ void UTallowCandleFlameComponent::BeginPlay()
 void UTallowCandleFlameComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (HeldCandle && Candle.IsValid()) HeldCandle->SetVisibility(Candle->IsAcquired());
+	if (!bExternalPresentation && HeldCandle && Candle.IsValid()) HeldCandle->SetVisibility(Candle->IsAcquired());
 	if (!Light.IsValid()) return;
 	Time += DeltaTime;
 
@@ -108,8 +108,31 @@ void UTallowCandleFlameComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	if (Gutter > 0.4f && DropoutTimer <= 0.f && FMath::FRand() < Gutter * DeltaTime * 3.f) DropoutTimer = FMath::FRandRange(0.05f, 0.2f);
 	if (DropoutTimer > 0.f) Scale *= 0.15f;
 
+	const bool bCupped = Candle.IsValid() && Candle->GetCandleState() == ECandleState::Cupped;
+	if (bExternalPresentation)
+	{
+		// Preserve nearby floor and stair readability while the flame gutters. Cupping still narrows the gameplay radius.
+		Scale = FMath::Max(.42f, Scale) * (bCupped ? .72f : 1.f);
+	}
 	Light->SetIntensity(BaseIntensity * FMath::Max(0.02f, Scale));
 	// The flame leans and trembles; the light source moves a few millimetres with it.
 	const FVector Lean(FMath::PerlinNoise1D(Time * 2.1f + 3.f), FMath::PerlinNoise1D(Time * 2.3f + 7.f), 0.f);
 	Light->SetRelativeLocation(BaseLocation + Lean * (0.6f + 2.f * Gutter));
+}
+
+void UTallowCandleFlameComponent::UseExternalPresentation(USceneComponent* Wick, float LightIntensity)
+{
+	if (!Wick || Wick->GetOwner() != GetOwner()) return;
+	bExternalPresentation = true;
+	if (HeldCandle) HeldCandle->SetVisibility(false);
+	if (Controls) Controls->RemoveFromParent();
+	if (Light.IsValid())
+	{
+		Light->AttachToComponent(Wick, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		BaseLocation = FVector::ZeroVector;
+		Light->SetIntensityUnits(ELightUnits::Lumens);
+		Light->bUseInverseSquaredFalloff = true;
+		BaseIntensity = FMath::Max(.1f, LightIntensity);
+		Light->SetIntensity(BaseIntensity);
+	}
 }

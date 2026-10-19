@@ -10,6 +10,7 @@ class ATallowCreature;
 class UAudioComponent;
 class UStaticMeshComponent;
 class UTallowControlsWidget;
+class USceneComponent;
 
 /** Makes the candle's point light read as a living flame: layered flicker, a slight lean,
  *  and guttering (dimming, sputtering) as the Keeper gets close. Works alongside the candle state machine. */
@@ -26,6 +27,9 @@ public:
 	/** 0 = calm flame, 1 = fully guttering */
 	UFUNCTION(BlueprintPure, Category = "Candle|Flame")
 	float GetGutterAmount() const { return Gutter; }
+	/** The integrated presentation owns the prop and wick; retain this component's existing gutter/light rules. */
+	UFUNCTION(BlueprintCallable, Category="Candle|Flame")
+	void UseExternalPresentation(USceneComponent* Wick, float LightIntensity = 18.f);
 
 	/** Beyond this distance (cm) the Keeper has no effect on the flame */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Candle|Flame")
@@ -58,4 +62,5 @@ private:
 	float Gutter = 0.f;
 	float Time = 0.f;
 	float DropoutTimer = 0.f;
+	bool bExternalPresentation = false;
 };
