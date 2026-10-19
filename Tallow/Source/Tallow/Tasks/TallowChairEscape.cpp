@@ -86,7 +86,7 @@ void ATallowChairEscape::Tick(float DeltaTime)
 		AngularVelocity = 0.0f; // inelastic collision
 	}
 
-	RockingPivot->SetRelativeRotation(FRotator(-CurrentSwingAngle, 0.0f, 0.0f));
+	RockingPivot->SetRelativeRotation(FRotator(CurrentSwingAngle, 0.0f, 0.0f));
 
 	// reset count if at rest
 	const bool bIsFlatOnFloor = FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
@@ -211,7 +211,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		ChairMesh->SetRelativeTransform(InitialChairRelativeTransform);
 	}
 
-	const float ChairYaw = ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw;
+	const float ChairYaw = SeatAttachPoint->GetComponentRotation().Yaw;
 	
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
@@ -254,11 +254,11 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
 
 	// attach player to component, ignore pawn, disable movement, re-enable tick
+	InPlayer->bUseControllerRotationYaw = false;
 	InPlayer->AttachToComponent(SeatAttachPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	InPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	InPlayer->GetCharacterMovement()->DisableMovement();
 	InPlayer->SetTiedChair(this);
-	InPlayer->bUseControllerRotationYaw = false;
 	SetActorTickEnabled(true);
 }
 

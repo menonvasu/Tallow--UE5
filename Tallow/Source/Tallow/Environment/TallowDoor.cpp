@@ -189,7 +189,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	ATallowCreature* Creature = Cast<ATallowCreature>(OtherActor);
 	if (!Creature || !DoorTimeline) { return; }
 	
-	if (IsBarricaded()) { return; } // only works with un-barricaded
+	if (IsBarricaded() && !bIsLocked) { return; } // only works with un-barricaded, unlocked
 	
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
 	
