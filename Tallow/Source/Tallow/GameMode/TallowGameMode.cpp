@@ -14,6 +14,7 @@
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
 #include "Environment/TallowDoor.h"
+#include "Tasks/TallowFilmReelPickup.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -53,6 +54,7 @@ void ATallowGameMode::BeginPlay()
 			CachedDoors.Add(Door);
 		}
 	}
+	FilmReelPickup = Cast<ATallowFilmReelPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFilmReelPickup::StaticClass()));
 	
 }
 
@@ -186,5 +188,10 @@ void ATallowGameMode::ResetGame()
 		{
 			Door->ResetDoor();
 		}
+	}
+	
+	if (FilmReelPickup)
+	{
+		FilmReelPickup->ResetReelPickup();
 	}
 }

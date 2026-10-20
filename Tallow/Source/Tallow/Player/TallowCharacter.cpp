@@ -566,12 +566,6 @@ void ATallowCharacter::UpdateHeldItemVisual()
 	// Checks the carried item and if it has a mesh, set it with correct transform  
 	if (const UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("--> HELD VISUAL: Carried=[%d] | Def=[%s] | Mesh=[%s] | Loc=[%s]"),
-		(int32)CarriedItem,
-		*GetNameSafe(ItemDef),
-		ItemDef ? *GetNameSafe(ItemDef->HeldMesh.Get()) : TEXT("None"),
-		ItemDef ? *ItemDef->HeldRelativeTransform.GetLocation().ToString() : TEXT("N/A"));
-		
 		if (ItemDef && ItemDef->HeldMesh)
 		{
 			HeldItemMesh->SetStaticMesh(ItemDef->HeldMesh);

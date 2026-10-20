@@ -56,6 +56,9 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
 	TArray<TObjectPtr<class ATallowDoor>> CachedDoors;
 	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TObjectPtr<class ATallowFilmReelPickup> FilmReelPickup;
+	
 	/** Registry of runtime drops */
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> RuntimeDroppedItems;

@@ -33,7 +33,8 @@ enum class ECarriedItemType : uint8
 {
 	None,
 	Fuse,
-	Crowbar
+	Crowbar,
+	FilmReel
 };
 
 /**
