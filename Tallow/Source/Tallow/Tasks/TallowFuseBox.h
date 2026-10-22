@@ -49,6 +49,8 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "FuseBox|State")
 	int32 CurrentFuses = 0;
 	
+	bool bHasPower = false;
+	
 	/** Events */
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "FuseBox|Events")
 	FOnFuseInserted OnFuseInserted;

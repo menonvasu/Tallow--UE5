@@ -40,7 +40,7 @@ void ATallowFuseBox::BeginPlay()
 float ATallowFuseBox::GetInteractionDuration_Implementation() const
 {
 	// if already fully powered, ignore
-	if (CurrentFuses >= RequiredFuses) { return 0.0f; }
+	if (bHasPower) { return 0.0f; }
 	return InsertionHoldDuration;
 }
 
@@ -53,7 +53,7 @@ void ATallowFuseBox::OnInteractComplete_Implementation(AActor* Interactor)
 {
 	if (!Interactor) return;
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player || CurrentFuses >= RequiredFuses) return;
+	if (!Player || bHasPower) return;
 	
 	// if holding fuse - consume
 	if (Player->ConsumeFuse())
@@ -85,8 +85,13 @@ void ATallowFuseBox::OnInteractComplete_Implementation(AActor* Interactor)
 		// Broadcast final event 
 		if (CurrentFuses >= RequiredFuses)
 		{
+			bHasPower = true;
 			OnPowerRestored.Broadcast();
 		}
+	}
+	else
+	{
+		OnNothingInserted.Broadcast();	
 	}
 }
 
@@ -100,10 +105,10 @@ bool ATallowFuseBox::CanInteract_Implementation(AActor* Interactor) const
 {
 	if (!Interactor) return true;
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player || CurrentFuses >= RequiredFuses) return true;
+	if (!Player) return true;
 	
 	// if already powered, cannot interact
-	if (CurrentFuses >= RequiredFuses)
+	if (bHasPower)
 	{
 		return false;
 	}
@@ -123,7 +128,7 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 	if (!Player) return FText::GetEmpty();
 	
 	// if already powered
-	if (CurrentFuses >= RequiredFuses)
+	if (bHasPower)
 	{
 		return FText::FromString(TEXT("POWER RESTORED"));
 	}
@@ -139,6 +144,7 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 void ATallowFuseBox::ResetVisual()
 {
 	CurrentFuses = 0;
+	bHasPower = false;
 	FuseMesh1->SetVisibility(false);
 	FuseMesh2->SetVisibility(false);
 	FuseMesh3->SetVisibility(false);

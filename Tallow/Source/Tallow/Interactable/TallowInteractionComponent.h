@@ -71,6 +71,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|Tunables")
 	float HoldLookThreshold = 0.8f;
 	
+	FText CachedPrompt;
+	
 	void DoHoverCheck();
 	
 	void UpdateHoldStep();

@@ -10,6 +10,7 @@ class USpotLightComponent;
 class UAudioComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
+class ATallowFuseBox;
 
 UENUM(BlueprintType)
 enum class EProjectorState : uint8
@@ -21,6 +22,7 @@ enum class EProjectorState : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnProjectorStateChanged, EProjectorState, NewState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReelLoaded);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnProjectorCodeRevealed, int32, Value, int32, Index);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProjectorFinished);
 
@@ -39,6 +41,8 @@ public:
 	
 	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
 	
+	TArray<int32> GetCodes() const { return Codes; }
+	
 	UFUNCTION(BlueprintCallable, Category = "Projector|Reset")
 	void ResetProjector();
 	
@@ -54,6 +58,9 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnProjectorFinished OnProjectorFinished;
 	
+	UPROPERTY(BlueprintCallable)
+	FOnReelLoaded OnReelLoaded;
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -61,6 +68,9 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
+	UFUNCTION()
+	void ProjectorFinished();
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector")
 	TObjectPtr<UStaticMeshComponent> ProjectorMesh;
@@ -71,8 +81,27 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector")
 	TObjectPtr<USpotLightComponent> ProjectorLight;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector")
+	UPROPERTY(EditInstanceOnly) 
+	TObjectPtr<ATallowFuseBox> LinkedFuseBox;
+	
+	// audio
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector|Audio")
 	TObjectPtr<UAudioComponent> ClatterAudioComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector|Audio")
+	TObjectPtr<UAudioComponent> ProjectionAudioComponent;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Audio")
+	USoundBase* ClatterLoopSound;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Audio")
+	USoundBase* ProjectorLoopSound;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Audio")
+	float MinPitch = 0.5f;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Audio")
+	float MaxPitch = 2.0f;
 	
 	// mash tuning
 	UPROPERTY(EditAnywhere, Category = "Projector|Threading")
@@ -88,7 +117,7 @@ protected:
 	float InputLockoutAfterThreshold = 0.75f; // to prevent e spam into projector start
 	
 	UPROPERTY(EditAnywhere, Category = "Projector|Threading")
-	float TapLoudness = 0.3f;
+	float TapLoudness = 0.5f;
 	
 	// projecting tuning
 	UPROPERTY(EditAnywhere, Category = "Projector|Projecting") 
@@ -105,6 +134,9 @@ protected:
 	TObjectPtr<UMaterialInterface> LightFunctionBase;
 	
 	UPROPERTY(EditAnywhere, Category = "Projector|Visual")
+	float ProjectionIntensity = 5000.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Visual")
 	float RotationSpeedNormal = 0.5f;
 	
 	UPROPERTY(EditAnywhere, Category = "Projector|Visual")
@@ -118,7 +150,10 @@ protected:
 	
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> LightMID;
+	
 	FTimerHandle GapTimerHandle;
+	FTimerHandle CodeTimerHandle;
+	FTimerHandle EndTimerHandle;
 	
 	void HideCode(); // timer callback 
 	
@@ -127,11 +162,10 @@ private:
 	void RevealNextCode();
 	
 	EProjectorState CurrentState = EProjectorState::Empty;
-	FTimerHandle CodeTimerHandle;
 	float ThreadProgress = 0.0f;
 	float TimeSinceLastTap = 0.0f;
-	float LockoutRemaining = 0.0f;
 	int32 CodeIndex = 0;
 	bool bReelLoaded = false;
 	float LockoutEndTime = 0.0f;
+	bool bHasFinishedProjectingOnce = false;
 };
