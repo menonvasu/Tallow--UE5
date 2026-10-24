@@ -138,6 +138,7 @@ void UTallowInteractionComponent::DoHoverCheck()
 	{
 		CurrentHoverActor = nullptr;
 		CachedPrompt = FText::GetEmpty();
+		bHasProgress = false;
 		if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
 		return;
 	}
@@ -160,13 +161,26 @@ void UTallowInteractionComponent::DoHoverCheck()
 		}
 	}
 	
+	float NewProgress = -1.0f;
+	if (!bFromHideVolume && bNewCanInteract)
+	{
+		NewProgress = IInteractable::Execute_GetInteractionProgress(Target, GetOwner());
+	}
+	const bool bNewHasProgress  = NewProgress >= 0.0f;	
+	
+	if (bNewHasProgress && !bIsHoldingInteract && HoldProgressWidgetInstance)
+	{
+		HoldProgressWidgetInstance->SetHoldProgress(NewProgress);
+	}
+	
 	// only react if something changed
-	const bool bChanged = Target != CurrentHoverActor.Get() || bNewCanInteract != bCanInteract || bNewIsHold != bIsHoldType || !NewPrompt.EqualTo(CachedPrompt);
+	const bool bChanged = Target != CurrentHoverActor.Get() || bNewCanInteract != bCanInteract || bNewIsHold != bIsHoldType || bNewHasProgress != bHasProgress || !NewPrompt.EqualTo(CachedPrompt);
 	if (!bChanged) { return; }
 	
 	CurrentHoverActor = Target;
 	bCanInteract = bNewCanInteract;
 	bIsHoldType = bNewIsHold;
+	bHasProgress = bNewHasProgress;
 	CachedPrompt = NewPrompt;
 	
 	if (HoldProgressWidgetInstance)
@@ -177,7 +191,7 @@ void UTallowInteractionComponent::DoHoverCheck()
 		}
 		else
 		{
-			HoldProgressWidgetInstance->ShowPrompt(NewPrompt, bNewIsHold, bNewCanInteract);
+			HoldProgressWidgetInstance->ShowPrompt(NewPrompt, bNewIsHold || bNewHasProgress, bNewCanInteract);
 		}
 	}
 }

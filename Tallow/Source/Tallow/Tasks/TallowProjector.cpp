@@ -7,6 +7,7 @@
 #include "Tasks/TallowFuseBox.h"
 #include "Player/TallowCharacter.h"
 #include "Noise/TallowNoiseSubsystem.h"
+#include "Components/DecalComponent.h"
 
 // Sets default values
 ATallowProjector::ATallowProjector()
@@ -35,6 +36,11 @@ ATallowProjector::ATallowProjector()
 	ProjectionAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("ProjectionAudioComponent"));
 	ProjectionAudioComponent->SetupAttachment(RootComponent);
 	ProjectionAudioComponent->bAutoActivate = false;
+	
+	ProjectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("ProjectionDecal"));
+	ProjectionDecal->SetupAttachment(ProjectorMesh);
+	ProjectionDecal->DecalSize = FVector(DecalDepth, 50.0f, 50.0f);
+	ProjectionDecal->SetVisibility(false); 
 }
 
 // Called when the game starts or when spawned
@@ -42,12 +48,14 @@ void ATallowProjector::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if (LightFunctionBase)
+	if (DecalMaterialBase)
 	{
-		LightMID = UMaterialInstanceDynamic::Create(LightFunctionBase, this);
-		LightMID->SetScalarParameterValue(VisibleParam, 0.0f);
-		ProjectorLight->SetLightFunctionMaterial(LightMID);	
+		DecalMID = UMaterialInstanceDynamic::Create(DecalMaterialBase, this);
+		DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
+		ProjectionDecal->SetDecalMaterial(DecalMID);	
 	}
+	
+	PlaceDecal();
 	
 	if (ProjectionAudioComponent && ProjectorLoopSound)
 	{
@@ -60,7 +68,7 @@ void ATallowProjector::BeginPlay()
 	}
 	
 	// populate code array
-	Codes.Empty();	
+	Codes.Reset();	
 	for (int32 i = 0; i < 5; i++)
 	{
 		Codes.Add(FMath::RandRange(0, 9));
@@ -87,9 +95,9 @@ void ATallowProjector::SetState(EProjectorState NewState)
 		{
 			ProjectorLight->SetIntensity(0.0f);
 		}
-		if (LightMID)
+		if (DecalMID)
 		{
-			LightMID->SetScalarParameterValue(VisibleParam, 0.0f);
+			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
 		}
 		
 		break;
@@ -100,9 +108,9 @@ void ATallowProjector::SetState(EProjectorState NewState)
 		{
 			ProjectorLight->SetIntensity(0.0f);
 		}
-		if (LightMID)
+		if (DecalMID)
 		{
-			LightMID->SetScalarParameterValue(VisibleParam, 0.0f);
+			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
 		}
 		
 		break;
@@ -112,10 +120,6 @@ void ATallowProjector::SetState(EProjectorState NewState)
 		if (ProjectorLight)
 		{
 			ProjectorLight->SetIntensity(ProjectionIntensity);	
-		}
-		if (LightMID)
-		{
-			LightMID->SetScalarParameterValue(VisibleParam, 1.0f);
 		}
 		if (ProjectionAudioComponent && !ProjectionAudioComponent->IsPlaying())
 		{
@@ -130,9 +134,9 @@ void ATallowProjector::SetState(EProjectorState NewState)
 		{
 			ProjectorLight->SetIntensity(0.0f);	
 		}
-		if (LightMID)
+		if (DecalMID)
 		{
-			LightMID->SetScalarParameterValue(VisibleParam, 0.0f);
+			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
 		}
 		
 		GetWorld()->GetTimerManager().SetTimer(
@@ -204,7 +208,7 @@ void ATallowProjector::OnInteract_Implementation(AActor* Interactor)
 			break;
 		}
 	case EProjectorState::Threaded:
-		if (LinkedFuseBox && LinkedFuseBox->bHasPower && ThreadProgress >= 1.0f)
+		if (LinkedFuseBox && LinkedFuseBox->HasPower())
 		{
 			// run projection if already threaded
 			if (GetWorld()->GetTimeSeconds() < LockoutEndTime) { return; }
@@ -231,9 +235,7 @@ void ATallowProjector::Tick(float DeltaTime)
 
 	// rotate film reel mesh
 	const float CurrentRotationSpeed = (TimeSinceLastTap < DecayDelay) ? RotationSpeedNormal : RotationSpeedSlow;
-	FRotator CurrentRotation = SpoolMesh->GetRelativeRotation();
-	CurrentRotation.Pitch += CurrentRotationSpeed * DeltaTime;
-	SpoolMesh->SetRelativeRotation(CurrentRotation);
+	SpoolMesh->AddLocalRotation(FRotator(CurrentRotationSpeed * DeltaTime, 0.0f, 0.0f));
 	
 	// play clatter audio 
 	if (ClatterAudioComponent)
@@ -284,7 +286,7 @@ bool ATallowProjector::CanInteract_Implementation(AActor* Interactor) const
 	if (CurrentState == EProjectorState::Threaded)
 	{
 		// if has no power, cannot interact
-		if (LinkedFuseBox && LinkedFuseBox->bHasPower)
+		if (LinkedFuseBox && LinkedFuseBox->HasPower())
 		{
 			return true;
 		}
@@ -317,10 +319,14 @@ FText ATallowProjector::GetInteractionPromptText_Implementation(AActor* Interact
 			}	
 			return FText::FromString("INSERT REEL");
 		}
-		return FText::FromString("THREAD REEL");
+		if (ThreadProgress <= 0.0f)
+		{
+			return FText::FromString("TAP TO THREAD REEL");
+		}
+		return FText::FromString("KEEP MASHING");
 	
 	case EProjectorState::Threaded:
-		if (LinkedFuseBox && LinkedFuseBox->bHasPower)
+		if (LinkedFuseBox && LinkedFuseBox->HasPower())
 		{
 			return FText::FromString("START PROJECTOR");
 		}
@@ -333,7 +339,7 @@ FText ATallowProjector::GetInteractionPromptText_Implementation(AActor* Interact
 
 void ATallowProjector::RevealNextCode()
 {
-	if (!LightMID)
+	if (!DecalMID)
 	{
 		return;
 	}
@@ -358,8 +364,8 @@ void ATallowProjector::RevealNextCode()
 	
 	// show code
 	const int32 CodeValue = Codes[CodeIndex];
-	LightMID->SetScalarParameterValue(VisibleParam, 1.0f);
-	LightMID->SetScalarParameterValue(DigitParam, static_cast<float>(CodeValue));
+	DecalMID->SetScalarParameterValue(VisibleParam, 1.0f);
+	DecalMID->SetScalarParameterValue(DigitParam, static_cast<float>(CodeValue));
 	OnProjectorCodeRevealed.Broadcast(CodeValue, CodeIndex);
 	
 	// start timer - call hide code on finish
@@ -374,10 +380,10 @@ void ATallowProjector::RevealNextCode()
 
 void ATallowProjector::HideCode()
 {
-	if (!LightMID) { return; }
+	if (!DecalMID) { return; }
 	
 	// hide light
-	LightMID->SetScalarParameterValue(VisibleParam, 0.0f);
+	DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
 	
 	// start timer - call show on finish
 	GetWorld()->GetTimerManager().SetTimer(
@@ -439,6 +445,48 @@ void ATallowProjector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 // helper for end timer 
 void ATallowProjector::ProjectorFinished()
 {
+	
 	SetState(EProjectorState::Threaded);
 }
  
+void ATallowProjector::PlaceDecal()
+{
+	if (!ProjectionDecal || !ProjectorLight) { return; }
+
+	const FVector Start = ProjectorLight->GetComponentLocation();
+	const FVector End = Start + ProjectorLight->GetForwardVector() * MaxProjectionDistance;
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	// if not reaching surface
+	FHitResult Hit;
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s: projector isn't aimed at a surface"), *GetName());
+		ProjectionDecal->SetVisibility(false);
+		return;
+	}
+
+	// face the decal into the wall
+	FRotator Rot = FRotationMatrix::MakeFromXZ(-Hit.ImpactNormal, ProjectorLight->GetUpVector()).Rotator();
+	Rot.Roll += DecalRollOffset;
+	ProjectionDecal->SetWorldLocationAndRotation(Hit.ImpactPoint, Rot);
+
+	// match the beam footprint
+	const float HalfWidth = Hit.Distance * FMath::Tan(FMath::DegreesToRadians(ProjectorLight->OuterConeAngle));
+	ProjectionDecal->DecalSize = FVector(DecalDepth, HalfWidth, HalfWidth);
+	ProjectionDecal->MarkRenderStateDirty();
+	ProjectionDecal->SetVisibility(true);
+}
+
+float ATallowProjector::GetInteractionProgress_Implementation(AActor* Interactor) const
+{
+	// only when mashing
+	if (CurrentState == EProjectorState::Empty && bReelLoaded)
+	{
+		return ThreadProgress;
+	}
+	return -1.0f;
+}
+

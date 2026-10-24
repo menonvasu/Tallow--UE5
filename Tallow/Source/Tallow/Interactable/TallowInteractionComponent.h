@@ -55,6 +55,8 @@ protected:
 	
 	bool bIsHoldType = false;
 	
+	bool bHasProgress = false;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|UI")
 	TSubclassOf<UTallowInteractWidget> HoldProgressWidgetClass;
 	

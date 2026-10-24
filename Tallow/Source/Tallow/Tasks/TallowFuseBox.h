@@ -33,6 +33,8 @@ public:
 	
 	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
 	
+	bool HasPower() const { return bHasPower; }
+	
 	/** Required fuses */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FuseBox|Tunables")
 	int32 RequiredFuses = 3;
@@ -48,8 +50,6 @@ public:
 	/** Current fuse count to toggle visibility */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "FuseBox|State")
 	int32 CurrentFuses = 0;
-	
-	bool bHasPower = false;
 	
 	/** Events */
 	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "FuseBox|Events")
@@ -67,6 +67,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FuseBox|Reset")
 	void ResetVisual();
 	
+	
 protected:
 	/** Called when the game starts */
 	virtual void BeginPlay() override;
@@ -81,4 +82,6 @@ protected:
 	TObjectPtr<UStaticMeshComponent> FuseMesh2;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FuseBox")
 	TObjectPtr<UStaticMeshComponent> FuseMesh3;
+	
+	bool bHasPower = false;
 };

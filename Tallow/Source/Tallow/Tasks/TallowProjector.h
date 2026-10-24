@@ -11,6 +11,7 @@ class UAudioComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class ATallowFuseBox;
+class UDecalComponent;
 
 UENUM(BlueprintType)
 enum class EProjectorState : uint8
@@ -40,6 +41,10 @@ public:
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	
 	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
+	
+	virtual float GetInteractionProgress_Implementation(AActor* Interactor) const override;
+	
+	bool IsReelLoaded() const { return bReelLoaded; },
 	
 	TArray<int32> GetCodes() const { return Codes; }
 	
@@ -80,6 +85,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector")
 	TObjectPtr<USpotLightComponent> ProjectorLight;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projector")
+    TObjectPtr<UDecalComponent> ProjectionDecal;
 
 	UPROPERTY(EditInstanceOnly) 
 	TObjectPtr<ATallowFuseBox> LinkedFuseBox;
@@ -131,7 +139,7 @@ protected:
 	
 	// visual
 	UPROPERTY(EditAnywhere, Category = "Projector|Visual") 
-	TObjectPtr<UMaterialInterface> LightFunctionBase;
+	TObjectPtr<UMaterialInterface> DecalMaterialBase;
 	
 	UPROPERTY(EditAnywhere, Category = "Projector|Visual")
 	float ProjectionIntensity = 5000.0f;
@@ -148,8 +156,17 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Projector|Visual")
 	FName VisibleParam = TEXT("Visible");
 	
+	UPROPERTY(EditAnywhere, Category = "Projector|Visual") 
+	float MaxProjectionDistance = 2000.0f;
+    
+    UPROPERTY(EditAnywhere, Category = "Projector|Visual") 
+	float DecalDepth = 60.0f;
+	
+	UPROPERTY(EditAnywhere, Category = "Projector|Visual") 
+	float DecalRollOffset = 90.0f;
+   
 	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> LightMID;
+	TObjectPtr<UMaterialInstanceDynamic> DecalMID;
 	
 	FTimerHandle GapTimerHandle;
 	FTimerHandle CodeTimerHandle;
@@ -160,12 +177,13 @@ protected:
 private:
 	void SetState(EProjectorState NewState);
 	void RevealNextCode();
+	void PlaceDecal();
 	
 	EProjectorState CurrentState = EProjectorState::Empty;
 	float ThreadProgress = 0.0f;
 	float TimeSinceLastTap = 0.0f;
+	float LockoutEndTime = 0.0f;
 	int32 CodeIndex = 0;
 	bool bReelLoaded = false;
-	float LockoutEndTime = 0.0f;
 	bool bHasFinishedProjectingOnce = false;
 };

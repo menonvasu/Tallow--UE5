@@ -15,6 +15,7 @@
 #include "Tasks/TallowFuseBox.h"
 #include "Environment/TallowDoor.h"
 #include "Tasks/TallowFilmReelPickup.h"
+#include "Tasks/TallowProjector.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -55,7 +56,7 @@ void ATallowGameMode::BeginPlay()
 		}
 	}
 	FilmReelPickup = Cast<ATallowFilmReelPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFilmReelPickup::StaticClass()));
-	
+	Projector = Cast<ATallowProjector>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowProjector::StaticClass()));
 }
 
 void ATallowGameMode::HandlePlayerCaptured()
@@ -190,8 +191,13 @@ void ATallowGameMode::ResetGame()
 		}
 	}
 	
-	if (FilmReelPickup)
+	if (FilmReelPickup && !(Projector && Projector->IsReelLoaded()))
 	{
 		FilmReelPickup->ResetReelPickup();
+	}
+	
+	if (Projector)
+	{
+		Projector->ResetProjector();
 	}
 }
