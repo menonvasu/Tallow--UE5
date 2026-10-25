@@ -19,7 +19,8 @@
 #include "Environment/TallowHideVolume.h"
 #include "Interactable/TallowInteractionComponent.h"
 #include "GameMode/TallowGameMode.h"
-#include "Items/TallowItemDefinition.h"	
+#include "Items/TallowItemDefinition.h"
+#include "Tasks/TallowLockpickGame.h"
 #include "Tallow.h"
 
 
@@ -99,7 +100,9 @@ ATallowCharacter::ATallowCharacter()
 	HeldItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HeldItemMesh->SetVisibility(false);
 	HeldItemMesh->SetRelativeLocation(FVector(45.0f, 25.0f, -25.0f));
-
+	
+	// Lockpick component
+	LockpickComponent = CreateDefaultSubobject<UTallowLockpickGame>(TEXT("LockpickComponent"));
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -155,9 +158,18 @@ void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			EnhancedInputComponent->BindAction(StillnessAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoStillnessEnd);
 		}
 		
+		// Drop item
 		if (DropAction)
 		{
 			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &ATallowCharacter::DoDropItem);
+		}
+		
+		// Tension action
+		if (TensionAction)
+		{
+			EnhancedInputComponent->BindAction(TensionAction, ETriggerEvent::Started, this, &ATallowCharacter::DoTensionStart);
+			EnhancedInputComponent->BindAction(TensionAction, ETriggerEvent::Completed, this, &ATallowCharacter::DoTensionEnd);
+			EnhancedInputComponent->BindAction(TensionAction, ETriggerEvent::Canceled, this, &ATallowCharacter::DoTensionEnd);
 		}
 	}
 	else
@@ -223,6 +235,14 @@ void ATallowCharacter::MoveInput(const FInputActionValue& Value)
 
 void ATallowCharacter::LookInput(const FInputActionValue& Value)
 {
+	// if in lock pick
+	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
+	{
+		FVector2D LookAxisVector = Value.Get<FVector2D>();
+		LockpickComponent->UpdatePickPosition(LookAxisVector.X * 0.04f, -LookAxisVector.Y * 0.04f); // sens scalar
+		return;
+	}
+	
 	// get the Vector2D look axis
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
@@ -313,6 +333,13 @@ void ATallowCharacter::DoInteractStart()
 	if (CurrentHideVolume)
 	{
 		IInteractable::Execute_OnInteract(CurrentHideVolume, this);
+		return;
+	}
+	
+	// if in lock pick minigame, call exit
+	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled() && LockpickComponent->GetIsCompleting() != true)
+	{
+		LockpickComponent->EndLockpickSession(false);
 		return;
 	}
 	
@@ -488,6 +515,22 @@ void ATallowCharacter::DoDropItem()
 	if (SpawnItem(ItemDef->PickupClass, SpawnLocation, SpawnRotation))
 	{
 		ClearCarriedItem();
+	}
+}
+
+void ATallowCharacter::DoTensionStart()
+{
+	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
+	{
+		LockpickComponent->SetTensionHeld(true);
+	}
+}
+
+void ATallowCharacter::DoTensionEnd()
+{
+	if (LockpickComponent)
+	{
+		LockpickComponent->SetTensionHeld(false);
 	}
 }
 

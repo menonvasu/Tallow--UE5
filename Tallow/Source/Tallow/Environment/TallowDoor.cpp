@@ -8,6 +8,7 @@
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Tasks/TallowPlank.h"
 #include "Components/BoxComponent.h"
+#include "Tasks/TallowLockpickGame.h"
 
 // Sets default values
 ATallowDoor::ATallowDoor()
@@ -40,6 +41,7 @@ void ATallowDoor::BeginPlay()
 	Super::BeginPlay();
 	
 	InitialPlanks = BarricadePlanks;
+	bInitiallyLocked = bIsLocked;
 	
 	if (DoorTimeline && DoorTimelineCurve)
 	{
@@ -65,6 +67,8 @@ FText ATallowDoor::GetInteractionPromptText_Implementation(AActor* Interactor) c
 {
 	if (IsBarricaded()) { return FText::FromString("BARRICADED"); }
 	
+	if (bIsLocked) { return FText::FromString("DOOR LOCKED: UNLOCK"); }
+	
 	if (!bIsOpen) { return FText::FromString("OPEN DOOR"); }
 	
 	return FText::FromString("CLOSE DOOR");
@@ -80,6 +84,15 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	if (!Interactor) { return; }
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
+	
+	if (bIsLocked)
+	{
+		if (UTallowLockpickGame* Lockpick = Player->GetLockpickComponent())
+		{
+			Lockpick->StartLockpickSession(this, 4);
+		}
+		return;
+	}
 	
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
 	 
@@ -113,6 +126,16 @@ void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 	}
 	
 	ToggleDoor(Player);
+}
+
+void ATallowDoor::OnInteractComplete_Implementation(AActor* Interactor)
+{
+	if (!Interactor) { return; }
+	
+	bIsLocked = false;
+	OnDoorUnlocked.Broadcast();
+	
+	OnInteract_Implementation(Interactor);
 }
 
 void ATallowDoor::UpdateDoorRotation(float OutputValue) 
@@ -150,6 +173,7 @@ void ATallowDoor::ResetDoor()
 	DoorTimeline->SetPlaybackPosition(0.0f, false);
 	bIsOpen = false;
 	BarricadePlanks = InitialPlanks;
+	bIsLocked = bInitiallyLocked;
 	
 	for (ATallowPlank* Plank : InitialPlanks)
 	{
@@ -165,7 +189,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	ATallowCreature* Creature = Cast<ATallowCreature>(OtherActor);
 	if (!Creature || !DoorTimeline) { return; }
 	
-	if (IsBarricaded()) { return; } // only works with un-barricaded
+	if (IsBarricaded() && !bIsLocked) { return; } // only works with un-barricaded, unlocked
 	
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
 	

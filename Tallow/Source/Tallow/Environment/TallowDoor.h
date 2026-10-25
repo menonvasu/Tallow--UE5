@@ -10,6 +10,8 @@ class ATallowPlank;
 class ATallowCharacter;
 class UCurveFloat;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDoorUnlocked);
+
 UCLASS()
 class TALLOW_API ATallowDoor : public AActor, public IInteractable
 {
@@ -26,6 +28,8 @@ public:
 	void NotifyPlankRemoved(ATallowPlank* Plank);
 	
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
+	
+	virtual void OnInteractComplete_Implementation(AActor* Interactor) override;
 	
 	/** Called during timeline update */
 	UFUNCTION()
@@ -61,7 +65,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float DoorClosePlayRate = 1.2f;
 	
+	UPROPERTY(EditInstanceOnly, Category = "Door|Lock")
+	bool bIsLocked = false;
+	
 	FOnTimelineFloat TimelineProgress;
+	
+	UPROPERTY(BlueprintAssignable, EditAnywhere, Category = "Door|Events")
+	FOnDoorUnlocked OnDoorUnlocked;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -79,6 +89,8 @@ protected:
 	TArray<TObjectPtr<ATallowPlank>> BarricadePlanks;
 	
 	TArray<TObjectPtr<ATallowPlank>> InitialPlanks;
+	
+	bool bInitiallyLocked = false;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
 	TObjectPtr<class UBoxComponent> AIProximityBox;

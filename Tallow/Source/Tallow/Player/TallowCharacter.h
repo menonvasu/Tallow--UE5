@@ -20,6 +20,7 @@ class ATallowChairEscape;
 class UAIPerceptionStimuliSourceComponent;
 class UTallowInteractionComponent;
 class UCharacterMovementComponent;
+class UTallowLockpickGame;
 class UTallowItemDefinition;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -102,6 +103,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory|Registry")
 	TMap<ECarriedItemType, TObjectPtr<UTallowItemDefinition>> ItemRegistry;
 	
+	/** Lockpick component */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick")
+	TObjectPtr<UTallowLockpickGame> LockpickComponent;
+	
 	/** Transformation counter */
 	int32 TransformationLevel = 0;
 
@@ -160,6 +165,9 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* DropAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* TensionAction;
 
 public:
 	ATallowCharacter();
@@ -238,6 +246,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Visuals	")
 	void UpdateHeldItemVisual();
 	
+	UFUNCTION(BlueprintCallable, Category = "Player|Components")
+	UTallowLockpickGame* GetLockpickComponent() const { return LockpickComponent; }
+	
 	/** Player Events */
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event")
 	FOnStill OnStill;
@@ -314,6 +325,13 @@ protected:
 	/** Handles drop */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoDropItem();
+	
+	/** Handles tension */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoTensionStart();
+	
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoTensionEnd();
 	
 	/** Helper to instantiate an item pickup cleanly on the floor */
 	AActor* SpawnItem(TSubclassOf<AActor> ItemPickupClass, const FVector& SpawnLocation, const FRotator& SpawnRotation);

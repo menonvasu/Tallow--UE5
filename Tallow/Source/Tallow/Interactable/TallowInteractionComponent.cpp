@@ -5,6 +5,7 @@
 #include "IInteractable.h"
 #include "Player/TallowCharacter.h"
 #include "Environment/TallowHideVolume.h"
+#include "Tasks/TallowLockpickGame.h"
 
 UTallowInteractionComponent::UTallowInteractionComponent()
 {
@@ -94,8 +95,23 @@ AActor* UTallowInteractionComponent::RunRaycast() const
 // called to check if player hovers on item
 void UTallowInteractionComponent::DoHoverCheck()
 {
-	// if hidden - call hidden prompt without raycast
 	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
+	
+	// minigame open: no prompt
+	if (Player)
+	{
+		if (UTallowLockpickGame* LockpickGame = Player->GetLockpickComponent())
+		{
+			if (LockpickGame->IsInMinigame())
+			{
+				CurrentHoverActor = nullptr;
+				if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
+				return;
+			}
+		}
+	}
+	
+	// if hidden - call hidden prompt without raycast
 	if (Player && Player->IsHiddenInSpot())
 	{
 		if (ATallowHideVolume* HideVolume = Player->GetCurrentHideVolume())
