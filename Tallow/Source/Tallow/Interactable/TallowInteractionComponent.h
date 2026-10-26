@@ -55,6 +55,8 @@ protected:
 	
 	bool bIsHoldType = false;
 	
+	bool bHasProgress = false;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|UI")
 	TSubclassOf<UTallowInteractWidget> HoldProgressWidgetClass;
 	
@@ -70,6 +72,8 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|Tunables")
 	float HoldLookThreshold = 0.8f;
+	
+	FText CachedPrompt;
 	
 	void DoHoverCheck();
 	
