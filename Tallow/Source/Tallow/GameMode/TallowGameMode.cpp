@@ -14,8 +14,10 @@
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
 #include "Environment/TallowDoor.h"
+#include "Presentation/TallowEscapePoint.h"
 #include "Tasks/TallowFilmReelPickup.h"
 #include "Tasks/TallowProjector.h"
+#include "Presentation/TallowEscapePoint.h"
 
 ATallowGameMode::ATallowGameMode()
 {
@@ -57,6 +59,7 @@ void ATallowGameMode::BeginPlay()
 	}
 	FilmReelPickup = Cast<ATallowFilmReelPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFilmReelPickup::StaticClass()));
 	Projector = Cast<ATallowProjector>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowProjector::StaticClass()));
+	EscapePoint = Cast<ATallowEscapePoint>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowEscapePoint::StaticClass()));
 }
 
 void ATallowGameMode::HandlePlayerCaptured()
@@ -199,5 +202,10 @@ void ATallowGameMode::ResetGame()
 	if (Projector)
 	{
 		Projector->ResetProjector();
+	}
+	
+	if (EscapePoint)
+	{
+		EscapePoint->SetCodeVerified(false);
 	}
 }

@@ -62,6 +62,9 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
 	TObjectPtr<class ATallowProjector> Projector;
 	
+	UPROPERTY(VisibleInstanceOnly, Category = "Tallow|Game")
+	TObjectPtr<class ATallowEscapePoint> EscapePoint;
+	
 	/** Registry of runtime drops */
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> RuntimeDroppedItems;

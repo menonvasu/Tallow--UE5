@@ -5,6 +5,8 @@
 #include "IInteractable.h"
 #include "Player/TallowCharacter.h"
 #include "Environment/TallowHideVolume.h"
+#include "Tasks/TallowChairEscape.h"
+#include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowLockpickGame.h"
 
 UTallowInteractionComponent::UTallowInteractionComponent()
@@ -98,17 +100,14 @@ void UTallowInteractionComponent::DoHoverCheck()
 	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
 	
 	// minigame open: no prompt
-	if (Player)
+	if (PC.IsValid() && (PC->IsLookInputIgnored() || PC->bShowMouseCursor))
 	{
-		if (UTallowLockpickGame* LockpickGame = Player->GetLockpickComponent())
+		CurrentHoverActor = nullptr;
+		if (HoldProgressWidgetInstance)
 		{
-			if (LockpickGame->IsInMinigame())
-			{
-				CurrentHoverActor = nullptr;
-				if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
-				return;
-			}
+			HoldProgressWidgetInstance->HidePrompt();
 		}
+		return;
 	}
 
 	// pick the target: hide volume if hidden, otherwise whatever the raycast hits

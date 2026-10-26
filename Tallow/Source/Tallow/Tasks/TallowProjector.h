@@ -44,7 +44,7 @@ public:
 	
 	virtual float GetInteractionProgress_Implementation(AActor* Interactor) const override;
 	
-	bool IsReelLoaded() const { return bReelLoaded; },
+	bool IsReelLoaded() const { return bReelLoaded; }
 	
 	TArray<int32> GetCodes() const { return Codes; }
 	
