@@ -68,14 +68,11 @@ void UTallowKeypadWidget::NativeConstruct()
 
 void UTallowKeypadWidget::NativeDestruct()
 {
-	Super::NativeDestruct();
-	
-	// safety 
-	if (APlayerController* PC = GetOwningPlayer())
+	if (LinkedLatch.IsValid())
 	{
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
+		LinkedLatch->CloseKeypad();
 	}
+	Super::NativeDestruct();
 }
 
 FReply UTallowKeypadWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -95,7 +92,8 @@ FReply UTallowKeypadWidget::NativeOnKeyDown(const FGeometry& InGeometry, const F
 	if (Key == EKeys::Escape || Key == EKeys::E)
 	{
 		// Close the widget and cancel
-		RemoveFromParent();
+		if (LinkedLatch.IsValid()) LinkedLatch->CloseKeypad();
+		else RemoveFromParent();
 		return FReply::Handled();
 	}
 	

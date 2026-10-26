@@ -17,6 +17,7 @@ class TALLOW_API ATallowEscapePoint : public AActor, public IInteractable
 public:
 	ATallowEscapePoint();
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Latch;
 	virtual float GetInteractionDuration_Implementation() const override;
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
@@ -29,7 +30,10 @@ public:
 	
 	bool GetIsCurrentlyInputtingKeypad() const { return bIsCurrentlyInputtingKeypad; }
 	
-	void SetCodeVerified(bool bNewState) { bCodeVerified = bNewState; }
+	void SetCodeVerified(bool bNewState) { bCodeVerified = bNewState; if (!bNewState) CloseKeypad(); }
+
+	UFUNCTION(BlueprintCallable, Category = "Escape")
+	void CloseKeypad();
 	
 	UPROPERTY(BlueprintCallable, Category = "Escape|Events")
 	FOnWrongAccessCode OnWrongAccessCode;
@@ -38,6 +42,8 @@ public:
 	FOnCorrectAccessCode OnCorrectAccessCode;
 
 protected:
+	UFUNCTION()
+	void HandlePlayerCaptured();
 	UPROPERTY(EditInstanceOnly, Category = "Escape")
 	TObjectPtr<ATallowProjector> LinkedProjector;
 	
@@ -52,8 +58,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Escape|Sound")
 	float InputFailedLoudness = 0.8f;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Escape|Sound")
-	float InputFailedRange = 1.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Escape|Sound", meta = (ClampMin = "0.0", Units = "cm"))
+	float InputFailedRange = 1200.0f;
 	
 	TArray<int32> CurrentCode;
 	

@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "UI/TallowKeypadWidget.h"
 #include "Noise/TallowNoiseSubsystem.h"
+#include "GameMode/TallowGameMode.h"
 
 ATallowEscapePoint::ATallowEscapePoint()
 {
@@ -17,6 +18,44 @@ void ATallowEscapePoint::BeginPlay()
 {
 	Super::BeginPlay();
 	LinkedProjector = Cast<ATallowProjector>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowProjector::StaticClass()));
+	if (auto* GameMode = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		GameMode->OnCaught.AddUniqueDynamic(this, &ATallowEscapePoint::HandlePlayerCaptured);
+	}
+}
+
+void ATallowEscapePoint::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (auto* GameMode = GetWorld()->GetAuthGameMode<ATallowGameMode>())
+	{
+		GameMode->OnCaught.RemoveDynamic(this, &ATallowEscapePoint::HandlePlayerCaptured);
+	}
+	CloseKeypad();
+	Super::EndPlay(EndPlayReason);
+}
+
+void ATallowEscapePoint::HandlePlayerCaptured()
+{
+	CloseKeypad();
+}
+
+void ATallowEscapePoint::CloseKeypad()
+{
+	UTallowKeypadWidget* Widget = ActiveWidgetInstance;
+	ActiveWidgetInstance = nullptr;
+	// Release only the locks this keypad owns, once. Capture and other UI
+	// may hold their own locks on the same controller.
+	if (bIsCurrentlyInputtingKeypad)
+	{
+		bIsCurrentlyInputtingKeypad = false;
+		if (CachedPC.IsValid())
+		{
+			CachedPC->SetIgnoreMoveInput(false);
+			CachedPC->SetIgnoreLookInput(false);
+		}
+	}
+	CachedPC.Reset();
+	if (IsValid(Widget)) Widget->RemoveFromParent();
 }
 
 bool ATallowEscapePoint::CanInteract_Implementation(AActor* Interactor) const
@@ -48,17 +87,18 @@ void ATallowEscapePoint::OnInteract_Implementation(AActor* Interactor)
 	if (!Interactor) return;
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	APlayerController* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
-	CachedPC = PC;
 	
-	if (!bCodeVerified && PC && KeypadWidgetClass)
+	if (!bCodeVerified && !bIsCurrentlyInputtingKeypad && PC && KeypadWidgetClass)
 	{
+		ActiveWidgetInstance = CreateWidget<UTallowKeypadWidget>(PC, KeypadWidgetClass);
+		if (!ActiveWidgetInstance) return;
+		CachedPC = PC;
+		bIsCurrentlyInputtingKeypad = true;
 		PC->SetIgnoreMoveInput(true);
 		PC->SetIgnoreLookInput(true);
-		ActiveWidgetInstance = CreateWidget<UTallowKeypadWidget>(PC, KeypadWidgetClass);
 		ActiveWidgetInstance->AddToViewport();
 		ActiveWidgetInstance->InitializeKeypad(this);
 		ActiveWidgetInstance->SetKeyboardFocus();
-		bIsCurrentlyInputtingKeypad = true;
 	}
 }
 
@@ -74,22 +114,11 @@ void ATallowEscapePoint::OnInteractComplete_Implementation(AActor* Interactor)
 
 bool ATallowEscapePoint::CheckSubmittedCode(const TArray<int32>& EnteredCode) 
 {
-	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
 	// if code match, remove keypad and enable input
 	if (LinkedProjector && EnteredCode == LinkedProjector->GetCodes())
 	{
 		bCodeVerified = true;
-		if (CachedPC.IsValid())
-		{
-			CachedPC->SetIgnoreLookInput(false);
-			CachedPC->SetIgnoreMoveInput(false);
-		}
-		if (ActiveWidgetInstance)
-		{
-			ActiveWidgetInstance->RemoveFromParent();
-			ActiveWidgetInstance = nullptr;
-			bIsCurrentlyInputtingKeypad = false;
-		}
+		CloseKeypad();
 		OnCorrectAccessCode.Broadcast();
 		return true;
 	}
