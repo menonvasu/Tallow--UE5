@@ -26,7 +26,7 @@ public class Tallow : ModuleRules
             "MovieScene",
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimationCore", "RHI", "Json", "CinematicCamera" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Tallow"

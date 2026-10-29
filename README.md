@@ -23,6 +23,8 @@ Approximately 2 to 4 minutes, walking through the design.
 
 **[ Watch the Tallow Prototype Video ]** ( https://drive.google.com/file/d/1j_8SLlXs3CKcgyyvYG7_7HSj_uw0RM3v/view?usp=sharing )
 
+**[ Watch the Tallow Gameplay Video ]** ( https://drive.google.com/file/d/1LJLO-Z8zk7DMqo0IwCCphOA1Joii8iya/view?usp=sharing )
+
 ---
 
 ## Game Description

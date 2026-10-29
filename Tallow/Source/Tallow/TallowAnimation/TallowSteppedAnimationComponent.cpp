@@ -1,5 +1,7 @@
 #include "TallowAnimation/TallowSteppedAnimationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "AI/Hunter/TallowHunterCreature.h"
+#include "AI/Hunter/TallowHunterMotionComponent.h"
 #include "GameFramework/Actor.h"
 
 void UTallowSteppedAnimationComponent::BeginPlay()
@@ -30,7 +32,10 @@ void UTallowSteppedAnimationComponent::ApplyStepping()
 {
 	// Ticking the mesh on an interval means the animation is evaluated with the time since its last tick,
 	// so the timing stays correct and only the pose updates are held
-	const float TickInterval = bStepped ? 1.0f / StepRate : 0.0f;
+	// Mim is never stepped (off twos), whatever order the components came up in
+	const auto* Hunter = Cast<ATallowHunterCreature>(GetOwner());
+	const bool bSmoothMim = Hunter && Hunter->HunterMotion && (Hunter->HunterMotion->UsesMim() || !Hunter->HunterMotion->HasInitialized());
+	const float TickInterval = bStepped && !bSmoothMim ? 1.0f / StepRate : 0.0f;
 
 	for (USkeletalMeshComponent* Mesh : SteppedMeshes)
 	{

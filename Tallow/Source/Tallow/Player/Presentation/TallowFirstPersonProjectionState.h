@@ -30,6 +30,8 @@ struct FTallowFirstPersonProjectionState
 			FPrimitiveState& State = Primitives.AddDefaulted_GetRef();
 			State.Primitive = Primitive;
 			State.Previous = Primitive->FirstPersonPrimitiveType;
+			State.PreviousLighting = Primitive->LightingChannels;
+			Primitive->SetLightingChannels(false, true, false);
 			Primitive->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
 		}
 	}
@@ -56,6 +58,8 @@ struct FTallowFirstPersonProjectionState
 			{
 				if (Primitive->FirstPersonPrimitiveType == EFirstPersonPrimitiveType::FirstPerson)
 					Primitive->SetFirstPersonPrimitiveType(State.Previous);
+				if (!Primitive->LightingChannels.bChannel0 && Primitive->LightingChannels.bChannel1 && !Primitive->LightingChannels.bChannel2)
+					Primitive->SetLightingChannels(State.PreviousLighting.bChannel0, State.PreviousLighting.bChannel1, State.PreviousLighting.bChannel2);
 			}
 		}
 		Camera.Reset(); Primitives.Reset();
@@ -66,6 +70,7 @@ private:
 	{
 		TWeakObjectPtr<UPrimitiveComponent> Primitive;
 		EFirstPersonPrimitiveType Previous = EFirstPersonPrimitiveType::None;
+		FLightingChannels PreviousLighting;
 	};
 	TWeakObjectPtr<UCameraComponent> Camera;
 	TArray<FPrimitiveState> Primitives;

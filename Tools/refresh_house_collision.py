@@ -10,5 +10,3 @@ for path in u.EditorAssetLibrary.list_assets('/Game/Environment/M3House',recursi
   assert sub.remove_collisions(m)
   u.EditorAssetLibrary.save_loaded_asset(m)
 ed.save_current_level()
-p=os.path.join(os.path.dirname(os.path.abspath(__file__)),'validate_m3_greybox.py')
-exec(compile(open(p).read(),p,'exec'),dict(__file__=p))

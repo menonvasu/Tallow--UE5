@@ -8,7 +8,25 @@
 #include "Components/SphereComponent.h"
 #include "TallowAIController.h"
 
-ATallowCreature::ATallowCreature()
+void ATallowCreature::PrepareCapturePresentation() {}
+
+float ATallowCreature::GetCapturePresentationDuration() const
+{
+	return KeeperAnimation ? KeeperAnimation->GetCaptureDuration() : 0.f;
+}
+
+float ATallowCreature::GetCaptureStrikeTime() const
+{
+	return KeeperAnimation ? KeeperAnimation->GetCaptureStrikeTime() : 0.f;
+}
+
+float ATallowCreature::GetCaptureStagingDistance() const
+{
+	return 125.f * (KeeperAnimation ? FMath::Clamp(KeeperAnimation->KeeperMeshScale, .5f, 2.f) : 1.f);
+}
+
+ATallowCreature::ATallowCreature(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
 	KeeperAnimation = CreateDefaultSubobject<UTallowCreatureAnimationComponent>(TEXT("KeeperAnimation"));
 	SurfaceTraversal = CreateDefaultSubobject<UTallowSurfaceTraversalComponent>(TEXT("SurfaceTraversal"));

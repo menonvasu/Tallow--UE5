@@ -1,5 +1,8 @@
 #include "UI/Presentation/TallowLessonWidget.h"
 #include "Styling/CoreStyle.h"
+#include "UI/Presentation/TallowPaper.h"
+#include "UI/Presentation/STallowMark.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SOverlay.h"
@@ -59,17 +62,17 @@ FText UTallowLessonWidget::GetLessonPrompt() const
 	switch (ActiveLesson)
 	{
 	case ETallowLesson::Chair:
-		return FText::Format(LOCTEXT("Chair", "Press {0} to rock. Time each push with the backward swing."), RockKey);
+		return FText::Format(LOCTEXT("Chair", "[ {0} ]  to rock. Push as it swings back."), RockKey);
 	case ETallowLesson::CandlePickup:
-		return FText::Format(LOCTEXT("Pickup", "Look at the candle and press {0} to pick it up."), InteractKey);
+		return FText::Format(LOCTEXT("Pickup", "Look at the candle.  [ {0} ]  to take it."), InteractKey);
 	case ETallowLesson::Draft:
-		return LOCTEXT("Draft", "A draft is catching the flame. Watch it bend and gutter.");
+		return LOCTEXT("Draft", "A draught is catching the flame. Watch it bend.");
 	case ETallowLesson::Cup:
-		return FText::Format(LOCTEXT("Cup", "Hold {0} to shield the flame from the draft."), CupKey);
+		return FText::Format(LOCTEXT("Cup", "Hold  [ {0} ]  to shield the flame from the draught."), CupKey);
 	case ETallowLesson::Relight:
-		return FText::Format(LOCTEXT("Relight", "With the flame out, press {0} to strike a match. Relighting makes noise."), RelightKey);
+		return FText::Format(LOCTEXT("Relight", "[ {0} ]  strikes a match. It is loud."), RelightKey);
 	case ETallowLesson::Stillness:
-		return FText::Format(LOCTEXT("Stillness", "Hold {0} to keep still and avoid being seen. You cannot move or look around."), StillnessKey);
+		return FText::Format(LOCTEXT("Stillness", "Hold  [ {0} ]  to hold your breath. It still sees your light."), StillnessKey);
 	default:
 		return FText::GetEmpty();
 	}
@@ -77,30 +80,30 @@ FText UTallowLessonWidget::GetLessonPrompt() const
 
 TSharedRef<SWidget> UTallowLessonWidget::RebuildWidget()
 {
+	// One italic line, low in the middle, a small thread tick before it, on soot rather than a panel.
 	return SNew(SOverlay)
 	+ SOverlay::Slot()
 	.HAlign(HAlign_Center)
 	.VAlign(VAlign_Bottom)
-	.Padding(FMargin(24.f, 0.f, 24.f, 48.f))
+	.Padding(FMargin(24.f, 0.f, 24.f, 92.f))
 	[
-		SNew(SBox)
-		.MaxDesiredWidth(640.f)
+		SNew(SOverlay)
 		.Visibility_Lambda([this]()
 		{
 			return ActiveLesson == ETallowLesson::None ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
 		})
+		+ SOverlay::Slot()[SNew(STallowSmudge).Alpha(.9f)]
+		+ SOverlay::Slot().Padding(FMargin(10.f, 6.f))
 		[
-			SNew(SBorder)
-			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-			.BorderBackgroundColor(FLinearColor(.025f, .021f, .016f, .88f))
-			.Padding(FMargin(24.f, 14.f))
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f, 0.f)
+			[SNew(SBox).WidthOverride(24.f).HeightOverride(8.f)[SNew(STallowThread).Seed(11)]]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return GetLessonPrompt(); })
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 20))
-				.ColorAndOpacity(FLinearColor(.9f, .84f, .67f, 1.f))
-				.Justification(ETextJustify::Center)
-				.AutoWrapText(true)
+				SNew(STallowKeys)
+				.Text_Lambda([this]() { return GetLessonPrompt().ToString(); })
+				.Font(TallowPaper::FellItalic(TallowPaper::Pt::Lead))
+				.Colour(TallowPaper::Ink).KeyColour(TallowPaper::Ivory)
 			]
 		]
 	];

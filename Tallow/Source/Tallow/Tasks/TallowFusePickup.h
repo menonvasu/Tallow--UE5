@@ -28,8 +28,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "FuseBox|Reset")
 	void ResetPickup();
+	void SetDormant(bool bDormant);
+	void SetChapterNoun(const FText& Noun) { ChapterNoun = Noun; }
 	
 protected:
+	bool bChapterDormant = false;
+	FText ChapterNoun;
 	/** The fuse mesh */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FuseBoxPickup")
 	TObjectPtr<UStaticMeshComponent> FuseMesh;

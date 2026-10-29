@@ -25,12 +25,7 @@ bool ATallowCrowbarPickup::CanInteract_Implementation(AActor* Interactor) const
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) return false;
 	
-	// Can only interact if hand free
-	if (Player->GetCarriedItem() != ECarriedItemType::None)
-	{
-		return false;
-	}
-	return true;
+	return !IsHidden() && Player->CanCollectItem(ECarriedItemType::Crowbar);
 }
 
 FText ATallowCrowbarPickup::GetInteractionPromptText_Implementation(AActor* Interactor) const
@@ -40,7 +35,7 @@ FText ATallowCrowbarPickup::GetInteractionPromptText_Implementation(AActor* Inte
 	if (!Player) return FText::GetEmpty();
 	
 	// hands free!
-	if (Player->GetCarriedItem() == ECarriedItemType::None)
+	if (Player->CanCollectItem(ECarriedItemType::Crowbar))
 	{
 		return FText::FromString("TAKE CROWBAR");
 	}
@@ -54,7 +49,7 @@ void ATallowCrowbarPickup::OnInteract_Implementation(AActor* Interactor)
 	if (!Player) return;
 	
 	// sets carried item, hides actor and disables collision
-	Player->SetCarriedItem(ECarriedItemType::Crowbar);
+	if (IsHidden() || !Player->CollectItem(ECarriedItemType::Crowbar)) return;
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);
 	

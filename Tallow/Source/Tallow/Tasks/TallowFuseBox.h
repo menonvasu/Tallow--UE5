@@ -33,6 +33,7 @@ public:
 	
 	virtual FText GetInteractionPromptText_Implementation(AActor* Interactor) const override;
 	
+	UFUNCTION(BlueprintPure, Category="FuseBox|State")
 	bool HasPower() const { return bHasPower; }
 	
 	/** Required fuses */
@@ -66,9 +67,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "FuseBox|Reset")
 	void ResetVisual();
+	void RestoreInstalledFuses(int32 Count);
+	void SetChapterNoun(const FText& Noun) { ChapterNoun = Noun; }
 	
 	
 protected:
+	FText ChapterNoun;
 	/** Called when the game starts */
 	virtual void BeginPlay() override;
 	

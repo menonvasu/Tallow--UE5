@@ -33,6 +33,11 @@ public:
 	void OnInteractComplete(AActor* Interactor); 
 	virtual void OnInteractComplete_Implementation(AActor* Interactor) {}
 	
+	/** Optional accumulated task progress, independent of a held interaction. Negative hides it. */
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Interactions")
+	float GetInteractionProgress(AActor* Interactor) const;
+	virtual float GetInteractionProgress_Implementation(AActor* Interactor) const { return -1.f; }
+
 	// called if player cancels action	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	void OnInteractCancel(AActor* Interactor);
@@ -50,8 +55,4 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
 	void OnInteractTick(AActor* Interactor, float DeltaTime, float Progress);
 	virtual void OnInteractTick_Implementation(AActor* Interactor, float DeltaTime, float Progress) {}
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interactions")
-	float GetInteractionProgress(AActor* Interactor) const;
-	virtual float GetInteractionProgress_Implementation(AActor* Interactor) const { return -1.0f; }
 };

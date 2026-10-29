@@ -11,6 +11,9 @@
 #include "UI/TallowChairEscapeWidget.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "Noise/TallowNoiseTypes.h"
+#include "EngineUtils.h"
+#include "Engine/OverlapResult.h"
+#include "GameFramework/Character.h"
 
 // Sets default values
 ATallowChairEscape::ATallowChairEscape()
@@ -39,6 +42,7 @@ ATallowChairEscape::ATallowChairEscape()
 void ATallowChairEscape::BeginPlay()
 {
 	Super::BeginPlay();
+    StartTransform = GetActorTransform();
 	Stiffness = FMath::Square(RockingFrequency * 2.0f * UE_PI);
 
 	if (ChairMesh)
@@ -86,7 +90,7 @@ void ATallowChairEscape::Tick(float DeltaTime)
 		AngularVelocity = 0.0f; // inelastic collision
 	}
 
-	RockingPivot->SetRelativeRotation(FRotator(CurrentSwingAngle, 0.0f, 0.0f));
+	RockingPivot->SetRelativeRotation(FRotator(-CurrentSwingAngle, 0.0f, 0.0f));
 
 	// reset count if at rest
 	const bool bIsFlatOnFloor = FMath::IsNearlyZero(CurrentSwingAngle, 1.0f);
@@ -122,8 +126,18 @@ void ATallowChairEscape::Tick(float DeltaTime)
 		if (ChairMesh)
 		{
 			ChairMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+			// 25 Oct: "the chair flies off the map once you get up". She is teleported to the exit point the
+			// same frame, right where it falls, and her capsule shoved it out at any speed. It ignores pawns while it
+			// falls, separates from anything gently, and a stray one is put back where it stood. Once it has settled
+			// it freezes and blocks pawns again (SettleChair), so it is solid furniture for her and for Mim.
+			ChairMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+			if (FBodyInstance* Body = ChairMesh->GetBodyInstance()) Body->SetMaxDepenetrationVelocity(60.f);
+			const FTransform Stood = ChairMesh->GetComponentTransform();
 			ChairMesh->SetSimulatePhysics(true);
 			ChairMesh->AddImpulse(GetActorForwardVector() * CrashForce);
+			ChairSettleElapsed = 0.f;
+			ChairRestTime = 0.f;
+			GetWorldTimerManager().SetTimer(ChairSettleHandle, FTimerDelegate::CreateUObject(this, &ATallowChairEscape::SettleChair, Stood), 0.1f, false);
 		}
 
 		if (ActiveOverlayWidget)
@@ -198,12 +212,15 @@ void ATallowChairEscape::AttemptRock()
 void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 {
 	if (!InPlayer) return;
+    if (TiedPlayerCharacter) ReleasePlayerQuietly();
 	
 	// Reattach chair mesh if not already
 	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
 	if (ChairMesh)
 	{
 		ChairMesh->SetSimulatePhysics(false);
+		ChairMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		GetWorldTimerManager().ClearTimer(ChairSettleHandle);
 		if (RockingPivot && ChairMesh->GetAttachParent() != RockingPivot)
 		{
 			ChairMesh->AttachToComponent(RockingPivot, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
@@ -211,7 +228,8 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		ChairMesh->SetRelativeTransform(InitialChairRelativeTransform);
 	}
 
-	const float ChairYaw = SeatAttachPoint->GetComponentRotation().Yaw;
+	// The way the seated player faces: the mesh's yaw plus where its front points in mesh space.
+	const float ChairYaw = (ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw) + MeshFrontYaw;
 	
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
 	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
@@ -232,15 +250,15 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 		CachedYawMax = CamManager->ViewYawMax;
 
 		// Calculate clamps
-		const float TargetYawMin = ChairYaw - 40.0f;
-		const float TargetYawMax = ChairYaw + 40.0f;
+		const float TargetYawMin = ChairYaw - TiedYawRange;
+		const float TargetYawMax = ChairYaw + TiedYawRange;
 
 		CamManager->ViewPitchMin = -60.0f;
 		CamManager->ViewPitchMax = 30.0f;
 		CamManager->ViewYawMin = FRotator::ClampAxis(TargetYawMin);
 		CamManager->ViewYawMax = FRotator::ClampAxis(TargetYawMax);
 
-		PC->SetControlRotation(FRotator(-60.0f, ChairYaw, 0.0f));
+		PC->SetControlRotation(FRotator(TiedStartPitch, ChairYaw, 0.0f));
 
 	}
 
@@ -260,6 +278,129 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	InPlayer->GetCharacterMovement()->DisableMovement();
 	InPlayer->SetTiedChair(this);
 	SetActorTickEnabled(true);
+}
+
+void ATallowChairEscape::SettleChair(FTransform Stood)
+{
+	// Re-tied after a capture: TiePlayerToChair owns the chair again.
+	if (!ChairMesh || ChairMesh->GetAttachParent() == RockingPivot) return;
+	const float Step = 0.1f;
+	if (ChairMesh->IsSimulatingPhysics())
+	{
+		ChairSettleElapsed += Step;
+		const FVector Now = ChairMesh->GetComponentLocation();
+		const bool bStray = FVector::Dist2D(Now, Stood.GetLocation()) > 250.f || Now.Z < Stood.GetLocation().Z - 80.f;
+		const bool bStill = ChairMesh->GetPhysicsLinearVelocity().SizeSquared() < 4.f * 4.f
+			&& ChairMesh->GetPhysicsAngularVelocityInDegrees().SizeSquared() < 5.f * 5.f;
+		ChairRestTime = bStill ? ChairRestTime + Step : 0.f;
+		const bool bRested = ChairRestTime >= 0.3f;
+		const bool bTimedOut = ChairSettleElapsed >= 6.f;
+		float UpZ = 1.f;
+		// Lying down on the floor and not across her feet.
+		const bool bFlat = IsChairLyingOnFloor(UpZ) && !IsCharacterInsideChair();
+		if (!bStray && !bTimedOut && !(bRested && bFlat))
+		{
+			// Still tumbling, or sleeping while propped on something: keep watching.
+			if (!bRested)
+			{
+				GetWorldTimerManager().SetTimer(ChairSettleHandle, FTimerDelegate::CreateUObject(this, &ATallowChairEscape::SettleChair, Stood), Step, false);
+				return;
+			}
+		}
+		ChairMesh->SetSimulatePhysics(false);
+		if (bStray)
+		{
+			ChairMesh->SetWorldTransform(Stood, false, nullptr, ETeleportType::ResetPhysics);
+			SnapChairToKnockedOverPose(Stood);
+		}
+		else if (!(bRested && bFlat))
+		{
+			// Timed out, or came to rest tilted against something: lay it down properly.
+			SnapChairToKnockedOverPose(Stood);
+		}
+	}
+	// She lands right where it falls: wait until no capsule stands inside it, or blocking would shove her out.
+	if (IsCharacterInsideChair())
+	{
+		GetWorldTimerManager().SetTimer(ChairSettleHandle, FTimerDelegate::CreateUObject(this, &ATallowChairEscape::SettleChair, Stood), .25f, false);
+		return;
+	}
+	// Blocking pawns also makes it navigation relevant again, so the dynamic navmesh paths Mim around it.
+	ChairMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAIR settled at %s; blocking pawns"), *ChairMesh->GetComponentLocation().ToCompactString());
+}
+
+bool ATallowChairEscape::IsChairLyingOnFloor(float& OutUpZ) const
+{
+	OutUpZ = ChairMesh->GetUpVector().Z;
+	// Down on its back or side. Upright (it did not go over) or anything in between (propped on something) is not.
+	const bool bOrientationOk = FMath::Abs(OutUpZ) < 0.3f;
+	const FBoxSphereBounds Bounds = ChairMesh->Bounds;
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ChairFloor), false, this);
+	const FVector Start = Bounds.Origin;
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, Start - FVector(0, 0, Bounds.BoxExtent.Z + 300.f), ECC_WorldStatic, Params);
+	const float Gap = bHit ? (Bounds.Origin.Z - Bounds.BoxExtent.Z) - Hit.ImpactPoint.Z : 1e6f;
+	return bOrientationOk && Gap < 8.f;
+}
+
+bool ATallowChairEscape::IsChairPoseClear() const
+{
+	FComponentQueryParams Params(SCENE_QUERY_STAT(ChairPose), this);
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->ComponentOverlapMultiByChannel(Overlaps, ChairMesh, ChairMesh->GetComponentLocation(), ChairMesh->GetComponentQuat(), ECC_WorldStatic, Params);
+	for (const FOverlapResult& O : Overlaps)
+	{
+		if (O.Component.IsValid() && O.Component->GetCollisionResponseToChannel(ECC_WorldStatic) == ECR_Block)
+		{
+			UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAIR pose blocked by %s"), *GetNameSafe(O.Component.Get()));
+			return false;
+		}
+	}
+	return !IsCharacterInsideChair();
+}
+
+void ATallowChairEscape::SnapChairToKnockedOverPose(const FTransform& Stood)
+{
+	// Fall away from where she steps out, onto its back; failing that onto either side; failing that upright where it stood.
+	const FVector Pivot = Stood.GetLocation();
+	FVector Away = (Pivot - EscapeExitPoint->GetComponentLocation()).GetSafeNormal2D();
+	if (Away.IsNearlyZero()) Away = -GetActorForwardVector().GetSafeNormal2D();
+	const FVector Candidates[3] = { Away, Away.RotateAngleAxis(90.f, FVector::UpVector), Away.RotateAngleAxis(-90.f, FVector::UpVector) };
+	for (int32 i = 0; i < 4; ++i)
+	{
+		FTransform Pose = Stood;
+		if (i < 3)
+		{
+			const FVector Axis = FVector::CrossProduct(FVector::UpVector, Candidates[i]).GetSafeNormal();
+			Pose.SetRotation(FQuat(Axis, UE_HALF_PI) * Stood.GetRotation());
+		}
+		ChairMesh->SetWorldTransform(Pose, false, nullptr, ETeleportType::ResetPhysics);
+		// Lower it onto the floor under it.
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(ChairKnock), false, this);
+		const FBoxSphereBounds B = ChairMesh->Bounds;
+		const FVector Start(B.Origin.X, B.Origin.Y, Stood.GetLocation().Z + B.BoxExtent.Z + 40.f);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, Start - FVector(0, 0, 600.f), ECC_WorldStatic, Params))
+		{
+			const float Lift = Hit.ImpactPoint.Z + 0.5f - (B.Origin.Z - B.BoxExtent.Z);
+			ChairMesh->SetWorldLocation(ChairMesh->GetComponentLocation() + FVector(0, 0, Lift), false, nullptr, ETeleportType::ResetPhysics);
+		}
+		if (i == 3 || IsChairPoseClear()) break;
+	}
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAIR knocked-over pose at %s up.z=%.2f"), *ChairMesh->GetComponentLocation().ToCompactString(), ChairMesh->GetUpVector().Z);
+}
+
+bool ATallowChairEscape::IsCharacterInsideChair() const
+{
+	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
+	{
+		const UCapsuleComponent* Capsule = It->GetCapsuleComponent();
+		if (!Capsule || !Capsule->IsCollisionEnabled()) continue;
+		const FCollisionShape Shape = FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius() + 2.f, Capsule->GetScaledCapsuleHalfHeight() + 2.f);
+		if (ChairMesh->OverlapComponent(Capsule->GetComponentLocation(), Capsule->GetComponentQuat(), Shape)) return true;
+	}
+	return false;
 }
 
 // Helper: return correct window
@@ -295,3 +436,34 @@ void ATallowChairEscape::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	Super::EndPlay(EndPlayReason);
 }
+void ATallowChairEscape::SetRequiredRocks(int32 Rocks)
+{
+    RequiredRocks = FMath::Clamp(Rocks, 1, 6);
+    OnRockProgressChanged.Broadcast(CurrentRockCount, RequiredRocks);
+}
+void ATallowChairEscape::ReleasePlayerQuietly()
+{
+    if (TiedPlayerCharacter)
+    {
+        if (auto* PC = TiedPlayerCharacter->GetController<APlayerController>(); PC && PC->PlayerCameraManager)
+        {
+            auto* Camera = PC->PlayerCameraManager.Get();
+            Camera->ViewPitchMin = CachedPitchMin; Camera->ViewPitchMax = CachedPitchMax;
+            Camera->ViewYawMin = CachedYawMin; Camera->ViewYawMax = CachedYawMax;
+        }
+        TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+        TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        TiedPlayerCharacter->SetTiedChair(nullptr);
+        TiedPlayerCharacter->bUseControllerRotationYaw = true;
+        TiedPlayerCharacter = nullptr;
+    }
+    if (ActiveOverlayWidget) { ActiveOverlayWidget->RemoveFromParent(); ActiveOverlayWidget = nullptr; }
+    bIsTied = false; CurrentRockCount = 0; CurrentSwingAngle = 0.f; AngularVelocity = 0.f;
+    RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
+    SetActorTickEnabled(false);
+}
+FTransform ATallowChairEscape::GetExitTransform() const { return EscapeExitPoint->GetComponentTransform(); }
+FTransform ATallowChairEscape::GetExitRelativeTransform() const { return EscapeExitPoint->GetRelativeTransform(); }
+FTransform ATallowChairEscape::GetStandingMeshRelativeTransform() const { return InitialChairRelativeTransform; }
+FTransform ATallowChairEscape::GetSeatRelativeTransform() const { return SeatAttachPoint->GetRelativeTransform() * InitialChairRelativeTransform; }

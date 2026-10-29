@@ -28,6 +28,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Noise")
 	void EmitStep();
 
+	/** Distance in cm between steps, so the walk camera can bob on the same cadence */
+	float GetStrideLength() const { return StrideLength; }
+
 protected:
 
 	/** Distance travelled in cm between steps */

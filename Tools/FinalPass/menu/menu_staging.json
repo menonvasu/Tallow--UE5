@@ -1,0 +1,17 @@
+{
+ "about": "The menu close-up and the screen goals for Mim's two flash frames. build_menu_scene.py places the camera from 'camera'; solve_staging.py reads 'camera' and 'goals'. World cm, UE axes. Nell's head bone is at (83, -72, 85.5); her face is about (83, -65, 92.5).",
+ "camera": {
+  "eye": [-3.0, 58.0, 100.5],
+  "target": [71.3, -73.2, 87.9],
+  "focal": 35.0,
+  "filmback": 23.76,
+  "aspect": 1.7778,
+  "aperture": 2.0,
+  "focus_point": [83.0, -65.0, 94.0],
+  "drift_cm": 0.8
+ },
+ "goals": {
+  "behind": {"screen": [0.8, 0.28], "dist": [170, 340], "step": 10, "ideal": 250, "facing": 0.55, "tol_y": 0.25},
+  "close": {"screen": [0.36, 0.48], "dist": [55, 140], "step": 5, "ideal": 90, "facing": 0.7, "tol_y": 0.25}
+ }
+}

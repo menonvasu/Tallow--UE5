@@ -9,7 +9,39 @@
 UTallowCandleComponent::UTallowCandleComponent()
 {
     // performance 
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.TickInterval = .1f;
+}
+
+ETallowCandleFuelStage UTallowCandleComponent::GetFuelStage() const
+{
+    if (CurrentState==ECandleState::Out || WaxFraction<=0.f) return ETallowCandleFuelStage::Out;
+    if (IsGuttering()) return ETallowCandleFuelStage::Danger;
+    if (WaxFraction>.65f) return ETallowCandleFuelStage::Full;
+    if (WaxFraction>.35f) return ETallowCandleFuelStage::Medium;
+    if (WaxFraction>.15f) return ETallowCandleFuelStage::Low;
+    return ETallowCandleFuelStage::Danger;
+}
+
+void UTallowCandleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
+{
+    Super::TickComponent(DeltaTime,TickType,TickFunction);
+    if (!bIsAcquired || bGivenUp || CurrentState==ECandleState::Out) return;
+    const float Rate=CurrentState==ECandleState::Cupped ? FMath::Clamp(CuppedBurnMultiplier,.1f,1.f) : 1.f;
+    WaxFraction=FMath::Max(0.f,WaxFraction-FMath::Max(DeltaTime,0.f)*Rate/FMath::Max(BurnDurationSeconds,1.f));
+    if (WaxFraction<=0.f)
+    {
+        GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
+        SetCandleState(ECandleState::Out);
+    }
+    OnFuelChanged.Broadcast(WaxFraction,GetFuelStage());
+}
+
+void UTallowCandleComponent::AddWax(float Fraction)
+{
+    if (!bIsAcquired || bGivenUp || !FMath::IsFinite(Fraction) || Fraction<=0.f) return;
+    WaxFraction=FMath::Clamp(WaxFraction+Fraction,0.f,1.f);
+    OnFuelChanged.Broadcast(WaxFraction,GetFuelStage());
 }
 
 void UTallowCandleComponent::BeginPlay()
@@ -45,6 +77,8 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
 {
     // exit if state already newstate, otherwise set state and broadcast anim change
 	if (CurrentState == NewState) return;
+	if (bGivenUp && NewState != ECandleState::Out) return;     // left in the collection: it stays out
+	if (WaxFraction<=0.f && NewState!=ECandleState::Out) return;
 
 	CurrentState = NewState;
 
@@ -65,6 +99,7 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
     }
 
 	OnCandleStateChanged.Broadcast(CurrentState);
+    OnFuelChanged.Broadcast(WaxFraction,GetFuelStage());
 
     switch (CurrentState)
     {
@@ -121,12 +156,13 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
 
 void UTallowCandleComponent::StartRelighting()
 {
-    // if not acquired, return
-    if (!bIsAcquired) return;
+    // if not acquired, or left in the collection, return
+    if (!bIsAcquired || bGivenUp || WaxFraction<=0.f) return;
     // if lit, return
     if (CurrentState == ECandleState::Lit) return;
     // if candle already out or no matches left or still currently relighting, end early
-    if (CurrentState != ECandleState::Out || MatchCount <= 0) return;
+    if (CurrentState != ECandleState::Out) return;
+    if (!bUnlimitedMatches && MatchCount <= 0) { OnMatchesChanged.Broadcast(0, true); return; }
     if (GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle)) return;
 
     // Striking a match immediately breaks full sprint:
@@ -157,10 +193,10 @@ void UTallowCandleComponent::StartRelighting()
 void UTallowCandleComponent::FinishRelighting()
 {
     // A reset can invalidate this attempt before its timer callback runs.
-    if (!bIsAcquired) return;
+    if (!bIsAcquired || bGivenUp || WaxFraction<=0.f || CurrentState!=ECandleState::Out) return;
 
     // remove a match and set candle to lit
-	MatchCount -= 1;
+	if (!bUnlimitedMatches) { MatchCount = FMath::Max(0, MatchCount - 1); OnMatchesChanged.Broadcast(MatchCount, false); }
 	SetCandleState(ECandleState::Lit);
 }
 
@@ -249,11 +285,39 @@ void UTallowCandleComponent::HandleDraftExtinguishTimerExpired()
     SetCandleState(ECandleState::Out);
 }
 
+void UTallowCandleComponent::GiveUp()
+{
+    GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
+    SetCandleState(ECandleState::Out);
+    bGivenUp = true;
+}
+
 void UTallowCandleComponent::ResetCandle()
 {
     GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
     bIsAcquired = false;
+    bGivenUp = false;
+    WaxFraction = 1.f;
     SetCandleState(ECandleState::Out);
     ResetMatchCount();
     OnCandleReset.Broadcast();
+    OnFuelChanged.Broadcast(WaxFraction,GetFuelStage());
+}
+
+void UTallowCandleComponent::RestoreForChapter(bool bAcquired, float Wax, int32 Matches, ECandleState State)
+{
+    if (GetWorld())
+    {
+        auto& Timers = GetWorld()->GetTimerManager();
+        Timers.ClearTimer(RelightTimerHandle); Timers.ClearTimer(SprintExtinguishTimerHandle); Timers.ClearTimer(DraftExtinguishTimerHandle);
+    }
+    bIsAcquired = bAcquired; bGivenUp = false;
+    WaxFraction = FMath::Clamp(Wax, 0.f, 1.f); MatchCount = FMath::Max(0, Matches);
+    ActiveDraftCount = 0;
+    CurrentState = bAcquired && WaxFraction > 0.f ? State : ECandleState::Out;
+    if (CachedMovementComponent) CachedMovementComponent->MaxWalkSpeed = DefaultWalkSpeed;
+    OnCandleGutteringChanged.Broadcast(false);
+    OnMatchesChanged.Broadcast(MatchCount, false);
+    OnFuelChanged.Broadcast(WaxFraction, GetFuelStage());
+    OnCandleStateChanged.Broadcast(CurrentState);
 }

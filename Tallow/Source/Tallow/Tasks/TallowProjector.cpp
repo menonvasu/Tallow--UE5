@@ -2,491 +2,359 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/DecalComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "Camera/CameraComponent.h"
+#include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Tasks/TallowFuseBox.h"
 #include "Player/TallowCharacter.h"
+#include "Presentation/TallowPlayDirector.h"
 #include "Noise/TallowNoiseSubsystem.h"
-#include "Components/DecalComponent.h"
+#include "Tasks/TallowFuseBox.h"
+#include "Sound/SoundBase.h"
 
-// Sets default values
 ATallowProjector::ATallowProjector()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false;
-	
-	ProjectorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectorMesh"));
-	RootComponent = ProjectorMesh;
-	ProjectorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	ProjectorMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECR_Block);
-	
-	SpoolMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SpoolMesh"));
-	SpoolMesh->SetupAttachment(ProjectorMesh);
-	SpoolMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	SpoolMesh->SetVisibility(false);
-	
-	ProjectorLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("ProjectorLight")); 
-	ProjectorLight->SetupAttachment(ProjectorMesh);
-	ProjectorLight->SetIntensity(0.0f);
-	
-	ClatterAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("ClatterAudioComponent"));
-	ClatterAudioComponent->SetupAttachment(RootComponent);
-	ClatterAudioComponent->bAutoActivate = false;
-	
-	ProjectionAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("ProjectionAudioComponent"));
-	ProjectionAudioComponent->SetupAttachment(RootComponent);
-	ProjectionAudioComponent->bAutoActivate = false;
-	
-	ProjectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("ProjectionDecal"));
-	ProjectionDecal->SetupAttachment(ProjectorMesh);
-	ProjectionDecal->DecalSize = FVector(DecalDepth, 50.0f, 50.0f);
-	ProjectionDecal->SetVisibility(false); 
+ PrimaryActorTick.bCanEverTick = true;
+ PrimaryActorTick.bStartWithTickEnabled = false;
+ ProjectorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectorMesh"));
+ RootComponent = ProjectorMesh;
+ ProjectorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+ ProjectorMesh->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
+ ProjectorMesh->SetCollisionResponseToChannel(ECC_Pawn,ECR_Ignore);
+ SpoolMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SpoolMesh"));
+ SpoolMesh->SetupAttachment(RootComponent);
+ SpoolMesh->SetRelativeLocation(FVector(-8,15,48));
+ SpoolMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ SpoolMesh->SetVisibility(false);
+ TakeupSpoolMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TakeupSpoolMesh"));
+ TakeupSpoolMesh->SetupAttachment(RootComponent);
+ TakeupSpoolMesh->SetRelativeLocation(FVector(23,15,48));
+ TakeupSpoolMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ InsertionReelMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("InsertionReelMesh"));
+ InsertionReelMesh->SetupAttachment(RootComponent);
+ InsertionReelMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ InsertionReelMesh->SetVisibility(false);
+ ProjectorLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("ProjectorLight"));
+ ProjectorLight->SetupAttachment(RootComponent);
+ ProjectorLight->SetRelativeLocation(FVector(35,0,34));
+ ProjectorLight->SetIntensity(0.f);
+ ProjectorLight->SetOuterConeAngle(15.f);
+ ClatterAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("ClatterAudioComponent"));
+ ProjectionAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("ProjectionAudioComponent"));
+ ReelInsertAudioComponent=CreateDefaultSubobject<UAudioComponent>(TEXT("ReelInsertAudioComponent"));
+ for (UAudioComponent* Audio : {ClatterAudioComponent.Get(),ProjectionAudioComponent.Get(),ReelInsertAudioComponent.Get()})
+ {
+  Audio->SetupAttachment(RootComponent);
+  Audio->bAutoActivate = false;
+  Audio->bAllowSpatialization = true;
+  Audio->bOverrideAttenuation = true;
+  Audio->AttenuationOverrides.bAttenuate = true;
+  Audio->AttenuationOverrides.bSpatialize = true;
+  Audio->AttenuationOverrides.AttenuationShapeExtents = FVector(140.f);
+  Audio->AttenuationOverrides.FalloffDistance = 1800.f;
+ }
+ ProjectionDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("ProjectionDecal"));
+ ProjectionDecal->SetupAttachment(RootComponent);
+ ProjectionDecal->DecalSize = FVector(DecalDepth,50,50);
+ ProjectionDecal->SetVisibility(false);
+ ProjectedDigit = CreateDefaultSubobject<UTextRenderComponent>(TEXT("ProjectedDigit"));
+ ProjectedDigit->SetupAttachment(RootComponent);
+ ProjectedDigit->SetHorizontalAlignment(EHTA_Center);
+ ProjectedDigit->SetVerticalAlignment(EVRTA_TextCenter);
+ ProjectedDigit->SetTextRenderColor(FColor(255,237,191));
+ ProjectedDigit->SetWorldSize(55.f);
+ ProjectedDigit->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ ProjectedDigit->SetCastShadow(false);
+ ProjectedDigit->SetVisibility(false);
 }
 
-// Called when the game starts or when spawned
 void ATallowProjector::BeginPlay()
 {
-	Super::BeginPlay();
-	
-	if (DecalMaterialBase)
-	{
-		DecalMID = UMaterialInstanceDynamic::Create(DecalMaterialBase, this);
-		DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
-		ProjectionDecal->SetDecalMaterial(DecalMID);	
-	}
-	
-	PlaceDecal();
-	
-	if (ProjectionAudioComponent && ProjectorLoopSound)
-	{
-		ProjectionAudioComponent->SetSound(ProjectorLoopSound);
-	}
-	
-	if (ClatterAudioComponent && ClatterLoopSound)
-	{
-		ClatterAudioComponent->SetSound(ClatterLoopSound);
-	}
-	
-	// populate code array
-	Codes.Reset();	
-	for (int32 i = 0; i < 5; i++)
-	{
-		Codes.Add(FMath::RandRange(0, 9));
-	}
-	
-	// get fuse box
-	AActor* FoundActor = UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFuseBox::StaticClass());
-	if (FoundActor)
-	{
-		LinkedFuseBox = Cast<ATallowFuseBox>(FoundActor);
-	}
+ Super::BeginPlay();
+ SupplyRestRotation=SpoolMesh->GetRelativeRotation();
+ TakeupRestRotation=TakeupSpoolMesh->GetRelativeRotation();
+ auto MeshIfEmpty = [](UStaticMeshComponent* Component,const TCHAR* Path)
+ { if (!Component->GetStaticMesh()) Component->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,Path)); };
+ MeshIfEmpty(ProjectorMesh,TEXT("/Game/Presentation/ProjectorFinal/SM_Projector.SM_Projector"));
+ MeshIfEmpty(SpoolMesh,TEXT("/Game/Presentation/ProjectorFinal/SM_ProjectorReel.SM_ProjectorReel"));
+ MeshIfEmpty(TakeupSpoolMesh,TEXT("/Game/Presentation/ProjectorFinal/SM_ProjectorReel.SM_ProjectorReel"));
+ MeshIfEmpty(InsertionReelMesh,TEXT("/Game/Presentation/ProjectorFinal/SM_FilmReel.SM_FilmReel"));
+ if (!ClatterLoopSound) ClatterLoopSound = LoadObject<USoundBase>(nullptr,TEXT("/Game/Audio/Projector/S_Projector_Thread_Loop.S_Projector_Thread_Loop"));
+ if (!ProjectorLoopSound) ProjectorLoopSound = LoadObject<USoundBase>(nullptr,TEXT("/Game/Audio/Projector/S_Projector_Run_Loop.S_Projector_Run_Loop"));
+ if (!ReelInsertSound) ReelInsertSound = LoadObject<USoundBase>(nullptr,TEXT("/Game/Audio/Projector/S_Projector_ReelInsert.S_Projector_ReelInsert"));
+ ProjectionAudioComponent->SetSound(ProjectorLoopSound);
+ ClatterAudioComponent->SetSound(ClatterLoopSound);
+ ReelInsertAudioComponent->SetSound(ReelInsertSound);
+ if (!DecalMaterialBase)
+ {
+  UMaterialInterface* Assigned=ProjectionDecal->GetDecalMaterial();
+  if (Assigned && !Assigned->GetPathName().StartsWith(TEXT("/Engine/"))) DecalMaterialBase=Assigned;
+  else DecalMaterialBase=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Tasks/Film_Reel/M_ProjectorFilm_Decal.M_ProjectorFilm_Decal"));
+ }
+ if (DecalMaterialBase)
+ {
+  DecalMID = UMaterialInstanceDynamic::Create(DecalMaterialBase,this);
+  ProjectionDecal->SetDecalMaterial(DecalMID);
+ }
+ SetDigitVisible(false);
+ PlaceDecal();
+ // Authored/test codes remain intact. A fresh run generates its own only when unspecified.
+ if (Codes.Num() != 5)
+ {
+  Codes.Reset();
+  for (int32 Index=0;Index<5;++Index) Codes.Add(FMath::RandRange(0,9));
+ }
+ for (int32& Digit : Codes) Digit=FMath::Clamp(Digit,0,9);
+ if (!LinkedFuseBox) LinkedFuseBox=Cast<ATallowFuseBox>(UGameplayStatics::GetActorOfClass(this,ATallowFuseBox::StaticClass()));
+}
+
+bool ATallowProjector::HasPower() const { return !bRequiresPower || (IsValid(LinkedFuseBox) && LinkedFuseBox->HasPower()); }
+
+void ATallowProjector::SetDigitVisible(bool bVisible)
+{
+ if (DecalMID) DecalMID->SetScalarParameterValue(VisibleParam,bVisible?1.f:0.f);
+ ProjectionDecal->SetVisibility(bVisible && DecalMID != nullptr);
+ ProjectedDigit->SetVisibility(bVisible && DecalMID == nullptr);
 }
 
 void ATallowProjector::SetState(EProjectorState NewState)
 {
-	CurrentState = NewState;
-		
-	switch (CurrentState)
-	{
-	case EProjectorState::Empty:
-		OnProjectorStateChanged.Broadcast(EProjectorState::Empty);
-		ThreadProgress = 0.0f;
-		if (ProjectorLight)
-		{
-			ProjectorLight->SetIntensity(0.0f);
-		}
-		if (DecalMID)
-		{
-			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
-		}
-		
-		break;
-		
-	case EProjectorState::Threaded:
-		OnProjectorStateChanged.Broadcast(EProjectorState::Threaded);
-		if (ProjectorLight)
-		{
-			ProjectorLight->SetIntensity(0.0f);
-		}
-		if (DecalMID)
-		{
-			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
-		}
-		
-		break;
-		
-	case EProjectorState::Projecting:
-		OnProjectorStateChanged.Broadcast(EProjectorState::Projecting);
-		if (ProjectorLight)
-		{
-			ProjectorLight->SetIntensity(ProjectionIntensity);	
-		}
-		if (ProjectionAudioComponent && !ProjectionAudioComponent->IsPlaying())
-		{
-			ProjectionAudioComponent->FadeIn(0.5f, 1.0f);
-		}
-		RevealNextCode();
-		break;
-		
-	case EProjectorState::Finished:
-		OnProjectorStateChanged.Broadcast(EProjectorState::Finished);
-		if (ProjectorLight)
-		{
-			ProjectorLight->SetIntensity(0.0f);	
-		}
-		if (DecalMID)
-		{
-			DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
-		}
-		
-		GetWorld()->GetTimerManager().SetTimer(
-			EndTimerHandle,	
-			this,
-			&ATallowProjector::ProjectorFinished,
-			InputLockoutAfterThreshold,
-			false
-		);
-		break;
-		
-	default:
-		break;
-	}
+ CurrentState=NewState;
+ SetDigitVisible(false);
+ ProjectorLight->SetIntensity(NewState==EProjectorState::Projecting?ProjectionIntensity:0.f);
+ OnProjectorStateChanged.Broadcast(NewState);
+ if (NewState==EProjectorState::Projecting)
+ {
+  PlaceDecal();
+  NoiseCountdown=0.f;
+  SetActorTickEnabled(true);
+  if (ProjectorLoopSound) ProjectionAudioComponent->FadeIn(.15f,1.f);
+  RevealNextCode();
+ }
+ else if (NewState==EProjectorState::Finished)
+ {
+  GetWorldTimerManager().SetTimer(EndTimerHandle,this,&ATallowProjector::ProjectorFinished,FMath::Max(.05f,InputLockoutAfterThreshold),false);
+ }
 }
 
+void ATallowProjector::EmitOperationNoise(AActor* Instigator,float Loudness)
+{
+ if (auto* Noise=GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
+  Noise->EmitNoise(ETallowNoiseType::Projector,GetActorLocation(),Instigator?Instigator:this,Loudness,true);
+}
 
 void ATallowProjector::OnInteract_Implementation(AActor* Interactor)
 {
-	if (!Interactor) { return; }
-	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player) { return; }
-	
-	switch (CurrentState)
-	{
-	case EProjectorState::Empty:
-		{
-			// only if not loaded
-			if (!bReelLoaded)
-			{
-				if(!Player->HasCarriedItem(ECarriedItemType::FilmReel)) { return; }
-				Player->ClearCarriedItem();
-				bReelLoaded = true;
-				OnReelLoaded.Broadcast();
-				SpoolMesh->SetVisibility(true);
-				return;
-			}
-		
-			// run threading 
-			ThreadProgress = FMath::Min(1.0f, ThreadProgress + ProgressPerTap);
-			TimeSinceLastTap = 0.0f;
-			if (!IsActorTickEnabled())
-			{
-				SetActorTickEnabled(true);	
-			}
-		
-			// play audio
-			UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
-			if (ClatterAudioComponent && !ClatterAudioComponent->IsPlaying())
-			{
-				ClatterAudioComponent->FadeIn(0.5f, 1.0f);
-			}
-			if (NoiseSubsystem)
-			{
-				NoiseSubsystem->EmitNoise(ETallowNoiseType::Projector, GetActorLocation(), Player, TapLoudness, true);
-			}
-		
-			// on completion - change state
-			if (ThreadProgress >= 1.0f)
-			{
-				if (ClatterAudioComponent && ClatterAudioComponent->IsPlaying())
-				{
-					ClatterAudioComponent->FadeOut(0.3f, 0.0f);
-				}
-				LockoutEndTime = GetWorld()->GetTimeSeconds() + InputLockoutAfterThreshold;
-				SetState(EProjectorState::Threaded);
-				SetActorTickEnabled(false);
-			}
-			break;
-		}
-	case EProjectorState::Threaded:
-		if (LinkedFuseBox && LinkedFuseBox->HasPower())
-		{
-			// run projection if already threaded
-			if (GetWorld()->GetTimeSeconds() < LockoutEndTime) { return; }
-			CodeIndex = 0;
-			SetState(EProjectorState::Projecting);
-		}
-		break;
-		
-	default:
-		break;
-	}
+ if (!CanInteract_Implementation(Interactor)) return;
+ auto* Player=Cast<ATallowCharacter>(Interactor);
+ Operator=Player;
+ if (CurrentState==EProjectorState::Empty)
+ {
+  if (!bReelLoaded)
+  {
+   Player->ClearCarriedItem();
+   bReelLoaded=true;
+   InsertAge=0.f;
+   const auto* Camera=Player->GetFirstPersonCameraComponent();
+   InsertStart=FTransform(Camera->GetComponentRotation(),Camera->GetComponentLocation()+Camera->GetForwardVector()*35.f-Camera->GetRightVector()*17.f-Camera->GetUpVector()*17.f);
+   InsertionReelMesh->SetWorldTransform(InsertStart);
+   InsertionReelMesh->SetVisibility(true);
+   LockoutEndTime=GetWorld()->GetTimeSeconds()+FMath::Max(.1f,ReelInsertDuration);
+   SetActorTickEnabled(true);
+   if (ReelInsertSound) ReelInsertAudioComponent->Play();
+   for (TActorIterator<ATallowPlayDirector> It(GetWorld());It;++It) It->PlayProjectorGesture(true);
+   OnReelLoaded.Broadcast();
+   return;
+  }
+  ThreadProgress=FMath::Min(1.f,ThreadProgress+FMath::Clamp(ProgressPerTap,.01f,1.f));
+  TimeSinceLastTap=0.f;
+  SetActorTickEnabled(true);
+  if (ClatterLoopSound && !ClatterAudioComponent->IsPlaying()) ClatterAudioComponent->FadeIn(.06f,1.f);
+  EmitOperationNoise(Player,TapLoudness);
+  for (TActorIterator<ATallowPlayDirector> It(GetWorld());It;++It) It->PlayProjectorGesture(false);
+  if (ThreadProgress>=1.f-KINDA_SMALL_NUMBER)
+  {
+   ThreadProgress=1.f;
+   ClatterAudioComponent->Stop();
+   LockoutEndTime=GetWorld()->GetTimeSeconds()+InputLockoutAfterThreshold;
+   SetState(EProjectorState::Threaded);
+   SetActorTickEnabled(false);
+  }
+ }
+ else if (CurrentState==EProjectorState::Threaded)
+ {
+  CodeIndex=0;
+  SetState(EProjectorState::Projecting);
+ }
 }
 
 void ATallowProjector::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
-	
-	TimeSinceLastTap += DeltaTime;
-	if (TimeSinceLastTap > DecayDelay)
-	{
-		// reduce progress
-		ThreadProgress = FMath::Max(0.0f, ThreadProgress - DecayPerSecond * DeltaTime);
-	}
-
-	// rotate film reel mesh
-	const float CurrentRotationSpeed = (TimeSinceLastTap < DecayDelay) ? RotationSpeedNormal : RotationSpeedSlow;
-	SpoolMesh->AddLocalRotation(FRotator(CurrentRotationSpeed * DeltaTime, 0.0f, 0.0f));
-	
-	// play clatter audio 
-	if (ClatterAudioComponent)
-	{
-		if (ThreadProgress > 0.0f)
-		{
-			// play if not
-			if (!ClatterAudioComponent->IsPlaying())
-			{
-				ClatterAudioComponent->FadeIn(0.5f, 1.0f);
-			}
-			
-			const float TargetPitch = FMath::Lerp(MinPitch, MaxPitch, ThreadProgress);
-			ClatterAudioComponent->SetPitchMultiplier(TargetPitch);
-		}
-		else
-		{
-			// stop audio
-			if (ClatterAudioComponent->IsPlaying())
-			{
-				ClatterAudioComponent->FadeOut(0.3f, 0.0f);
-			}
-		}
-	}
-	
-	if (ThreadProgress <= 0.0f)
-	{
-		SetActorTickEnabled(false);
-	}
+ Super::Tick(DeltaTime);
+ if (InsertAge>=0.f)
+ {
+  InsertAge+=DeltaTime;
+  const float T=FMath::SmoothStep(0.f,FMath::Max(ReelInsertDuration,.1f),InsertAge);
+  const FTransform Target=SpoolMesh->GetComponentTransform();
+  const FVector Arc=GetActorUpVector()*FMath::Sin(T*PI)*9.f;
+  InsertionReelMesh->SetWorldLocationAndRotation(FMath::Lerp(InsertStart.GetLocation(),Target.GetLocation(),T)+Arc,FQuat::Slerp(InsertStart.GetRotation(),Target.GetRotation(),T));
+  if (T>=1.f)
+  {
+   InsertAge=-1.f;
+   InsertionReelMesh->SetVisibility(false);
+   SpoolMesh->SetVisibility(true);
+   if (ThreadProgress<=0.f) SetActorTickEnabled(false);
+  }
+  return;
+ }
+ if (CurrentState==EProjectorState::Projecting)
+ {
+  if (!HasPower()) { StopProjection(); return; }
+  NoiseCountdown-=DeltaTime;
+  if (NoiseCountdown<=0.f)
+  {
+   EmitOperationNoise(Operator.Get(),OperationLoudness);
+   NoiseCountdown=FMath::Max(.1f,OperationNoiseInterval);
+  }
+ }
+ else if (CurrentState==EProjectorState::Empty && bReelLoaded)
+ {
+  TimeSinceLastTap+=DeltaTime;
+  if (TimeSinceLastTap>DecayDelay) ThreadProgress=FMath::Max(0.f,ThreadProgress-DecayPerSecond*DeltaTime);
+  if (ThreadProgress<=0.f)
+  {
+   ClatterAudioComponent->Stop();
+   SetActorTickEnabled(false);
+   return;
+  }
+  ClatterAudioComponent->SetPitchMultiplier(FMath::Lerp(MinPitch,MaxPitch,ThreadProgress));
+ }
+ else return;
+ const float Speed=CurrentState==EProjectorState::Projecting || TimeSinceLastTap<DecayDelay?RotationSpeedNormal:RotationSpeedSlow;
+ const FRotator Turn(Speed*DeltaTime,0,0); // FRotator Pitch rotates around local Y.
+ SpoolMesh->AddLocalRotation(Turn);
+ TakeupSpoolMesh->AddLocalRotation(Turn);
 }
 
 bool ATallowProjector::CanInteract_Implementation(AActor* Interactor) const
 {
-	if (!Interactor) { return false; }
-	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player) { return false; }
-	
-	if (CurrentState == EProjectorState::Empty)
-	{
-		if (!bReelLoaded)
-		{
-			if (!Player->HasCarriedItem(ECarriedItemType::FilmReel))
-			{
-				return false;
-			}
-		}
-	}
-	if (CurrentState == EProjectorState::Threaded)
-	{
-		// if has no power, cannot interact
-		if (LinkedFuseBox && LinkedFuseBox->HasPower())
-		{
-			return true;
-		}
-		return false;
-	}
-	// no interaction while projecting or finished
-	if (CurrentState == EProjectorState::Projecting || CurrentState == EProjectorState::Finished)
-	{
-		return false;
-	}
-	
-	return true;
+ const auto* Player=Cast<ATallowCharacter>(Interactor);
+ if (!Player || !Player->CanChangeInventory() || GetWorld()->GetTimeSeconds()<LockoutEndTime) return false;
+ if (CurrentState==EProjectorState::Empty) return bReelLoaded || Player->HasCarriedItem(ECarriedItemType::FilmReel);
+ return CurrentState==EProjectorState::Threaded && HasPower();
 }
 
 FText ATallowProjector::GetInteractionPromptText_Implementation(AActor* Interactor) const
 {
-	if (!Interactor) { return FText::GetEmpty(); }
-	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
-	if (!Player) { return FText::GetEmpty(); }
-	
-	switch (CurrentState)
-	{
-	case EProjectorState::Empty:
-		if (!bReelLoaded)
-		{
-			// doesn't have reel
-			if (!Player->HasCarriedItem(ECarriedItemType::FilmReel))
-			{
-				return FText::FromString("FILM REEL NEEDED");
-			}	
-			return FText::FromString("INSERT REEL");
-		}
-		if (ThreadProgress <= 0.0f)
-		{
-			return FText::FromString("TAP TO THREAD REEL");
-		}
-		return FText::FromString("KEEP MASHING");
-	
-	case EProjectorState::Threaded:
-		if (LinkedFuseBox && LinkedFuseBox->HasPower())
-		{
-			return FText::FromString("START PROJECTOR");
-		}
-		return FText::FromString("NO POWER");
-	
-	default:
-		return FText::GetEmpty();
-	}
+ const auto* Player=Cast<ATallowCharacter>(Interactor);
+ if (!Player) return FText::GetEmpty();
+ if (CurrentState==EProjectorState::Empty)
+ {
+  if (!bReelLoaded) return FText::FromString(Player->HasCarriedItem(ECarriedItemType::FilmReel)?TEXT("INSERT REEL"):Player->GetInventoryCount(ECarriedItemType::FilmReel)>0?TEXT("TAKE FILM REEL FROM POCKET"):TEXT("FILM REEL NEEDED"));
+  return FText::FromString(InsertAge>=0.f?TEXT("SEATING THE REEL"):ThreadProgress<=0.f?TEXT("TAP E TO THREAD REEL"):TEXT("KEEP TAPPING E"));
+ }
+ if (CurrentState==EProjectorState::Threaded) return FText::FromString(HasPower()?bHasFinishedProjectingOnce?TEXT("WATCH CODE AGAIN"):TEXT("START PROJECTOR"):TEXT("THE PROJECTOR NEEDS POWER"));
+ return FText::FromString(CurrentState==EProjectorState::Projecting?TEXT("WATCH THE WALL — FIVE DIGITS"):TEXT("FILM RUNNING OUT"));
 }
 
 void ATallowProjector::RevealNextCode()
 {
-	if (!DecalMID)
-	{
-		return;
-	}
-	
-	// finished sequence
-	if (!Codes.IsValidIndex(CodeIndex))
-	{
-		if (!bHasFinishedProjectingOnce)
-		{
-			OnProjectorFinished.Broadcast();	
-		}
-		if (ProjectionAudioComponent && ProjectionAudioComponent->IsPlaying())
-		{
-			ProjectionAudioComponent->FadeOut(0.3f, 0.0f);
-		}
-		bHasFinishedProjectingOnce = true;
-		SetState(EProjectorState::Finished);
-		
-		
-		return;
-	}
-	
-	// show code
-	const int32 CodeValue = Codes[CodeIndex];
-	DecalMID->SetScalarParameterValue(VisibleParam, 1.0f);
-	DecalMID->SetScalarParameterValue(DigitParam, static_cast<float>(CodeValue));
-	OnProjectorCodeRevealed.Broadcast(CodeValue, CodeIndex);
-	
-	// start timer - call hide code on finish
-	GetWorld()->GetTimerManager().SetTimer(
-		CodeTimerHandle,
-		this,
-		&ATallowProjector::HideCode,
-		ShowDuration,
-		false
-		);
+ if (CurrentState!=EProjectorState::Projecting) return;
+ if (!Codes.IsValidIndex(CodeIndex))
+ {
+  SetDigitVisible(false);
+  ProjectionAudioComponent->Stop();
+  SetActorTickEnabled(false);
+  const bool bFirst=!bHasFinishedProjectingOnce;
+  bHasFinishedProjectingOnce=true;
+  SetState(EProjectorState::Finished);
+  if (bFirst) OnProjectorFinished.Broadcast();
+  UE_LOG(LogTemp,Display,TEXT("TALLOW_PROJECTOR complete %s"),*GetName());
+  return;
+ }
+ const int32 Value=Codes[CodeIndex];
+ if (DecalMID) DecalMID->SetScalarParameterValue(DigitParam,float(Value));
+ ProjectedDigit->SetText(FText::AsNumber(Value));
+ SetDigitVisible(true);
+ OnProjectorCodeRevealed.Broadcast(Value,CodeIndex);
+ UE_LOG(LogTemp,Display,TEXT("TALLOW_PROJECTOR digit %d index %d"),Value,CodeIndex);
+ GetWorldTimerManager().SetTimer(CodeTimerHandle,this,&ATallowProjector::HideCode,FMath::Max(.1f,ShowDuration),false);
 }
 
 void ATallowProjector::HideCode()
 {
-	if (!DecalMID) { return; }
-	
-	// hide light
-	DecalMID->SetScalarParameterValue(VisibleParam, 0.0f);
-	
-	// start timer - call show on finish
-	GetWorld()->GetTimerManager().SetTimer(
-		GapTimerHandle,
-		this,
-		&ATallowProjector::RevealNextCode,
-		GapDuration,
-		false
-		);
-	CodeIndex++;
+ if (CurrentState!=EProjectorState::Projecting) return;
+ SetDigitVisible(false);
+ ++CodeIndex;
+ GetWorldTimerManager().SetTimer(GapTimerHandle,this,&ATallowProjector::RevealNextCode,FMath::Max(.05f,GapDuration),false);
+}
+
+void ATallowProjector::StopProjection()
+{
+ GetWorldTimerManager().ClearTimer(CodeTimerHandle);
+ GetWorldTimerManager().ClearTimer(GapTimerHandle);
+ GetWorldTimerManager().ClearTimer(EndTimerHandle);
+ ClatterAudioComponent->Stop();
+ ProjectionAudioComponent->Stop();
+ ReelInsertAudioComponent->Stop();
+ InsertAge=-1.f;
+ InsertionReelMesh->SetVisibility(false);
+ SpoolMesh->SetVisibility(bReelLoaded);
+ SetDigitVisible(false);
+ ProjectorLight->SetIntensity(0.f);
+ SetActorTickEnabled(false);
+ CodeIndex=0;
+ if (CurrentState!=EProjectorState::Empty) SetState(EProjectorState::Threaded);
 }
 
 void ATallowProjector::ResetProjector()
 {
-	CodeIndex = 0;
-	SetActorTickEnabled(false);
-	if (ClatterAudioComponent && ClatterAudioComponent->IsPlaying())
-	{
-		ClatterAudioComponent->FadeOut(0.2f, 0.0f);
-	}
-	if (ProjectionAudioComponent && ProjectionAudioComponent->IsPlaying())
-	{
-		ProjectionAudioComponent->FadeOut(0.2f, 0.0f);
-	}
-	GetWorld()->GetTimerManager().ClearTimer(CodeTimerHandle);
-	GetWorld()->GetTimerManager().ClearTimer(GapTimerHandle);
-	GetWorld()->GetTimerManager().ClearTimer(EndTimerHandle);
-	if (CurrentState != EProjectorState::Empty)
-	{
-		SetState(EProjectorState::Threaded);
-	}
-	else
-	{
-		SetState(EProjectorState::Empty);
-	}
+ StopProjection();
+ bReelLoaded=false;
+ bHasFinishedProjectingOnce=false;
+ ThreadProgress=0.f;
+ TimeSinceLastTap=0.f;
+ InsertAge=-1.f;
+ LockoutEndTime=0.f;
+ Operator.Reset();
+ InsertionReelMesh->SetVisibility(false);
+ SpoolMesh->SetVisibility(false);
+ SpoolMesh->SetRelativeRotation(SupplyRestRotation);
+ TakeupSpoolMesh->SetRelativeRotation(TakeupRestRotation);
+ SetState(EProjectorState::Empty);
 }
 
-void ATallowProjector::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ATallowProjector::EndPlay(const EEndPlayReason::Type Reason)
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(CodeTimerHandle);
-		World->GetTimerManager().ClearTimer(GapTimerHandle);
-		World->GetTimerManager().ClearTimer(EndTimerHandle);
-	}
-	
-	if (ClatterAudioComponent && ClatterAudioComponent->IsPlaying())
-	{
-		ClatterAudioComponent->Stop();
-	}
-	if (ProjectionAudioComponent && ProjectionAudioComponent->IsPlaying())
-	{
-		ProjectionAudioComponent->Stop();
-	}
-	
-	Super::EndPlay(EndPlayReason);
+ StopProjection();
+ Super::EndPlay(Reason);
 }
+void ATallowProjector::ProjectorFinished() { SetState(EProjectorState::Threaded); }
 
-// helper for end timer 
-void ATallowProjector::ProjectorFinished()
-{
-	
-	SetState(EProjectorState::Threaded);
-}
- 
 void ATallowProjector::PlaceDecal()
 {
-	if (!ProjectionDecal || !ProjectorLight) { return; }
-
-	const FVector Start = ProjectorLight->GetComponentLocation();
-	const FVector End = Start + ProjectorLight->GetForwardVector() * MaxProjectionDistance;
-
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-
-	// if not reaching surface
-	FHitResult Hit;
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("%s: projector isn't aimed at a surface"), *GetName());
-		ProjectionDecal->SetVisibility(false);
-		return;
-	}
-
-	// face the decal into the wall
-	FRotator Rot = FRotationMatrix::MakeFromXZ(-Hit.ImpactNormal, ProjectorLight->GetUpVector()).Rotator();
-	Rot.Roll += DecalRollOffset;
-	ProjectionDecal->SetWorldLocationAndRotation(Hit.ImpactPoint, Rot);
-
-	// match the beam footprint
-	const float HalfWidth = Hit.Distance * FMath::Tan(FMath::DegreesToRadians(ProjectorLight->OuterConeAngle));
-	ProjectionDecal->DecalSize = FVector(DecalDepth, HalfWidth, HalfWidth);
-	ProjectionDecal->MarkRenderStateDirty();
-	ProjectionDecal->SetVisibility(true);
+ const FVector Start=ProjectorLight->GetComponentLocation();
+ const FVector End=Start+ProjectorLight->GetForwardVector()*MaxProjectionDistance;
+ FCollisionQueryParams Query(SCENE_QUERY_STAT(ProjectorSurface),false,this);
+ if (Operator.IsValid()) Query.AddIgnoredActor(Operator.Get());
+ FHitResult Hit;
+ if (!GetWorld()->LineTraceSingleByChannel(Hit,Start,End,ECC_Visibility,Query))
+ {
+  UE_LOG(LogTemp,Warning,TEXT("TALLOW_PROJECTOR %s: aim the lens at a wall within %.0f cm"),*GetName(),MaxProjectionDistance);
+  return;
+ }
+ FRotator Rotation=FRotationMatrix::MakeFromXZ(-Hit.ImpactNormal,ProjectorLight->GetUpVector()).Rotator();
+ Rotation.Roll+=DecalRollOffset;
+ ProjectionDecal->SetWorldLocationAndRotation(Hit.ImpactPoint,Rotation);
+ const float HalfWidth=Hit.Distance*FMath::Tan(FMath::DegreesToRadians(ProjectorLight->OuterConeAngle));
+ ProjectionDecal->DecalSize=FVector(DecalDepth,HalfWidth,HalfWidth);
+ ProjectedDigit->SetWorldLocationAndRotation(Hit.ImpactPoint+Hit.ImpactNormal*1.5f,Hit.ImpactNormal.Rotation());
 }
 
 float ATallowProjector::GetInteractionProgress_Implementation(AActor* Interactor) const
 {
-	// only when mashing
-	if (CurrentState == EProjectorState::Empty && bReelLoaded)
-	{
-		return ThreadProgress;
-	}
-	return -1.0f;
+ return CurrentState==EProjectorState::Empty && bReelLoaded?ThreadProgress:-1.f;
 }
-

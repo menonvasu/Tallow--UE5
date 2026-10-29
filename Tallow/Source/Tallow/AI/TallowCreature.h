@@ -39,7 +39,7 @@ class TALLOW_API ATallowCreature : public ACharacter
 
 public:
 	// Sets default values for this AI's properties
-	ATallowCreature();
+	ATallowCreature(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Keeper")
 	TObjectPtr<UTallowCreatureAnimationComponent> KeeperAnimation;
@@ -74,6 +74,14 @@ public:
 
 	/** Overriden to sweep around on inspecting points */
 	virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
+
+	/** Shared capture timing for the camera, voice, fade and the active creature rig. */
+	UFUNCTION(BlueprintCallable, Category="Capture") virtual void PrepareCapturePresentation();
+	UFUNCTION(BlueprintPure, Category="Capture") virtual float GetCapturePresentationDuration() const;
+	UFUNCTION(BlueprintPure, Category="Capture") virtual float GetCaptureStrikeTime() const;
+	UFUNCTION(BlueprintPure, Category="Capture") virtual float GetCaptureStagingDistance() const;
+    UFUNCTION(BlueprintPure, Category="Capture") virtual bool IsCeilingCapturePresentation() const { return false; }
+    virtual bool UsesCanonicalCaptureBasis() const { return false; }
 
 	/** Get current form */
 	UFUNCTION(BlueprintPure, Category = "AI|Phase")

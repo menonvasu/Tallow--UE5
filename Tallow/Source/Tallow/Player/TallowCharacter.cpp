@@ -1,4 +1,5 @@
 #include "TallowCharacter.h"
+#include "Player/Map/TallowHouseMapComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -8,6 +9,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Interactable/IInteractable.h"
+#include "Tasks/TallowFilmReelPickup.h"
+#include "Engine/StaticMesh.h"
 #include "Candle/TallowCandleComponent.h"
 #include "Candle/TallowCandleFlameComponent.h"
 #include "Noise/TallowFootstepNoiseComponent.h"
@@ -21,12 +24,14 @@
 #include "GameMode/TallowGameMode.h"
 #include "Items/TallowItemDefinition.h"
 #include "Tasks/TallowLockpickGame.h"
+#include "Noise/TallowNoiseSubsystem.h"
 #include "Tallow.h"
 
 
 ATallowCharacter::ATallowCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	// Ticks only for the held breath running out (UpdateHeldBreath).
+	PrimaryActorTick.bCanEverTick = true;
 
 	// Set size for collision capsule
 	constexpr float PlayerHalfHeight = 60.0f;
@@ -93,6 +98,7 @@ ATallowCharacter::ATallowCharacter()
 	
 	// Interaction component
 	InteractionComponent = CreateDefaultSubobject<UTallowInteractionComponent>(TEXT("Interaction Component"));
+	HouseMapComponent = CreateDefaultSubobject<UTallowHouseMapComponent>(TEXT("House Map"));
 	
 	// Held Item Mesh
 	HeldItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeldItemMesh"));
@@ -106,7 +112,8 @@ ATallowCharacter::ATallowCharacter()
 }
 
 void ATallowCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
+{
+	PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ATallowCharacter::ToggleHouseMap);	
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
@@ -182,6 +189,9 @@ void ATallowCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	StandingBoomZ = CameraBoom->GetRelativeLocation().Z;
+	LastCapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+
 	// Bind event to set light perception
 	if (CandleComponent)
 	{
@@ -223,6 +233,80 @@ bool ATallowCharacter::IsHandOccupied() const
 	return false;
 }
 
+int32 ATallowCharacter::GetInventoryCount(ECarriedItemType Item) const
+{
+	return Item == ECarriedItemType::None ? 0 : PocketItems.FindRef(Item) + (CarriedItem == Item ? 1 : 0);
+}
+
+void ATallowCharacter::PrepareForInventory()
+{
+	if (InteractionComponent) InteractionComponent->CancelInteract();
+	DoRunEnd();
+	DoStillnessEnd();
+	DoCupEnd();
+	GetCharacterMovement()->StopMovementImmediately();
+}
+
+void ATallowCharacter::PrepareForHiding()
+{
+	if (InteractionComponent) InteractionComponent->CancelInteract();
+	DoRunEnd();
+	GetCharacterMovement()->StopMovementImmediately();
+}
+
+void ATallowCharacter::ToggleHouseMap()
+{
+	if(HouseMapComponent)HouseMapComponent->ToggleMap();
+}
+
+bool ATallowCharacter::CanChangeInventory() const
+{
+	const auto* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ATallowGameMode>() : nullptr;
+	return !IsTiedToChair() && !bIsHoldingStill && !(GM && GM->IsCaptureInProgress())
+		&& !(CandleComponent && CandleComponent->IsRelighting())
+		&& !(InteractionComponent && InteractionComponent->IsInteracting())
+		&& !(LockpickComponent && LockpickComponent->IsComponentTickEnabled());
+}
+
+bool ATallowCharacter::CanCollectItem(ECarriedItemType Item) const
+{
+	return CanChangeInventory() && (Item == ECarriedItemType::Crowbar || Item == ECarriedItemType::Fuse || Item == ECarriedItemType::FilmReel)
+		&& GetInventoryCount(Item) < (Item == ECarriedItemType::Fuse ? 3 : 1);
+}
+
+bool ATallowCharacter::CollectItem(ECarriedItemType Item)
+{
+	if (!CanCollectItem(Item)) return false;
+	StowCarriedItem();
+	SetCarriedItem(Item);
+	return true;
+}
+
+void ATallowCharacter::StowCarriedItem()
+{
+	if (!CanChangeInventory()) return;
+	if (CarriedItem != ECarriedItemType::None) ++PocketItems.FindOrAdd(CarriedItem);
+	ClearCarriedItem();
+}
+
+bool ATallowCharacter::EquipInventoryItem(ECarriedItemType Item)
+{
+	if (!CanChangeInventory()) return false;
+	if (Item == CarriedItem) return true;
+	if (Item == ECarriedItemType::None) { StowCarriedItem(); return true; }
+	if (PocketItems.FindRef(Item) <= 0) return false;
+	StowCarriedItem();
+	--PocketItems.FindChecked(Item);
+	SetCarriedItem(Item);
+	return true;
+}
+
+void ATallowCharacter::ResetInventory()
+{
+	PocketItems.Reset();
+	ClearCarriedItem();
+}
+
 void ATallowCharacter::MoveInput(const FInputActionValue& Value)
 {
 	// get the Vector2D move axis
@@ -239,7 +323,7 @@ void ATallowCharacter::LookInput(const FInputActionValue& Value)
 	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
 	{
 		FVector2D LookAxisVector = Value.Get<FVector2D>();
-		LockpickComponent->UpdatePickPosition(LookAxisVector.X * 0.04f, -LookAxisVector.Y * 0.04f); // sens scalar
+		LockpickComponent->UpdatePickPosition(LookAxisVector.X * 0.08f, -LookAxisVector.Y * 0.05f); // sens scalar
 		return;
 	}
 	
@@ -274,8 +358,9 @@ void ATallowCharacter::DoMove(float Right, float Forward)
 
 void ATallowCharacter::DoRunStart()
 {
-	// return early (cannot sprint while cupping)
+	// return early (cannot sprint while cupping, or while holding her breath)
 	if (CandleComponent && CandleComponent->GetCandleState() == ECandleState::Cupped) return;
+	if (bIsHoldingStill) return;
 
 	// pass run speed to maxwalkspeed and call sprint start in candle component to extinguish flame
 	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
@@ -391,21 +476,22 @@ void ATallowCharacter::DoRelight()
 void ATallowCharacter::DoStillnessStart()
 {
 	if (IsTiedToChair() || bIsHoldingStill) return;
+	// Out of breath: she has to breathe again before she can hold it.
+	if (HeldAir < .25f || BreathRecovery > 0.f) return;
 
 	StillnessStartTime = GetWorld()->GetTimeSeconds();
 
 	bIsHoldingStill = true;
+	bBreathForced = false;
 	OnStill.Broadcast(bIsHoldingStill);
 
 	// Ignore player capsule
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 
-	// Disable movement
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
-	{
-		PC->SetIgnoreMoveInput(true);
-		PC->SetIgnoreLookInput(true);
-	}
+	// 25 and 28 Oct: holding your breath silences you, it doesn't freeze you. She can still look round and
+	// creep (UpdateHeldBreath keeps her under HeldBreathCreepSpeed); her steps make no sound while she holds it.
+	DoRunEnd();
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Min(GetCharacterMovement()->MaxWalkSpeed, HeldBreathCreepSpeed);
 
 	// Make player immune
 	if (StimulusSourceComponent)
@@ -422,6 +508,8 @@ void ATallowCharacter::DoStillnessEnd()
 {
 	if (!bIsHoldingStill) return;
 	const double HoldDuration = GetWorld()->GetTimeSeconds() - StillnessStartTime;
+	const bool bForced = bBreathForced;
+	bBreathForced = false;
 
 	bIsHoldingStill = false;
 	OnStill.Broadcast(bIsHoldingStill);
@@ -436,12 +524,9 @@ void ATallowCharacter::DoStillnessEnd()
 	// Restore collision 
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 
-	// Re-enable movement
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
-	{
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
-	}
+	// Back to her walking pace for the candle she is holding (shielding it still slows her).
+	if (CandleComponent) CandleComponent->HandleSprintEnded();
+	else GetCharacterMovement()->MaxWalkSpeed = Walkspeed;
 
 	// Restore sight
 	if (CandleComponent)
@@ -450,17 +535,100 @@ void ATallowCharacter::DoStillnessEnd()
 	}
 
 	GetCharacterMovement()->AvoidanceWeight = 0.0f;
+	// A long hold leaves her needing a moment before the breath comes back; letting go at the limit, longer.
+	BreathRecovery = bForced ? 1.4f : HoldDuration > 2.0 ? .5f : 0.f;
+	OnBreathReleased.Broadcast(bForced);
+}
+
+void ATallowCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateHeldBreath(DeltaSeconds);
+	UpdateCrouchEye(DeltaSeconds);
+	UpdateWalkBob(DeltaSeconds);
+}
+
+void ATallowCharacter::UpdateCrouchEye(float DeltaSeconds)
+{
+	// The capsule shrinks when she crouches but the eye rode on it, so a crouched eye still sat 109 cm up, above
+	// the 68 cm crawl gaps. Keep the eye where it was through the change, then ease it down to just under the
+	// crouched capsule's top; standing returns to the authored boom height.
+	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	FVector Boom = CameraBoom->GetRelativeLocation();
+	Boom.Z += LastCapsuleHalfHeight - HalfHeight;
+	LastCapsuleHalfHeight = HalfHeight;
+	const float EyeAboveBoom = FirstPersonCameraComponent->GetComponentLocation().Z - CameraBoom->GetComponentLocation().Z;
+	const float Target = bIsCrouched ? HalfHeight - CrouchEyeBelowCapsuleTop - EyeAboveBoom : StandingBoomZ;
+	Boom.Z = FMath::FInterpTo(Boom.Z, Target, DeltaSeconds, 9.f);
+	CameraBoom->SetRelativeLocation(Boom);
+}
+
+void ATallowCharacter::UpdateWalkBob(float DeltaSeconds)
+{
+	if (!CameraBoom || !FirstPersonCameraComponent || DeltaSeconds <= 0.f) return;
+	const float Speed = GetVelocity().Size2D();
+	const bool bWalking = GetCharacterMovement()->IsMovingOnGround() && !IsTiedToChair() && !bIsHoldingStill && Speed > 25.f;
+	const float StrideLength = FootstepNoiseComponent ? FootstepNoiseComponent->GetStrideLength() : 60.f;
+	// One footfall per stride: the phase turns half a cycle per step, the same distance the footstep sound uses.
+	if (bWalking) WalkBobDistance += Speed * DeltaSeconds / FMath::Max(StrideLength, 10.f) * PI;
+	WalkBobAlpha = FMath::FInterpTo(WalkBobAlpha, bWalking ? 1.f : 0.f, DeltaSeconds, bWalking ? 6.f : 9.f);
+	WalkBobRunAlpha = FMath::FInterpTo(WalkBobRunAlpha, bWalking ? FMath::GetMappedRangeValueClamped(FVector2D(120.f, 380.f), FVector2D(0.f, 1.f), Speed) : 0.f, DeltaSeconds, 5.f);
+	const float Strength = WalkBobAlpha * FMath::Lerp(.7f, 1.6f, WalkBobRunAlpha);
+	WalkBobDistance = FMath::Fmod(WalkBobDistance, 2.f * PI * 1000.f);
+	const float Dip = -.9f * Strength * FMath::Cos(2.f * WalkBobDistance);
+	const float Roll = .35f * Strength * FMath::Sin(WalkBobDistance);
+	FVector Offset = CameraBoom->SocketOffset; Offset.Z = Dip; CameraBoom->SocketOffset = Offset;
+	FirstPersonCameraComponent->ClearAdditiveOffset();
+	if (Strength > KINDA_SMALL_NUMBER)
+		FirstPersonCameraComponent->AddAdditiveOffset(FTransform(FRotator(0.f, 0.f, Roll)), 0.f);
+}
+
+void ATallowCharacter::UpdateHeldBreath(float DeltaSeconds)
+{
+	// Back in the chair (the start, or a capture reset): she breathes again, full.
+	if (IsTiedToChair())
+	{
+		if (bIsHoldingStill) DoStillnessEnd();
+		HeldAir = 1.f; BreathRecovery = 0.f;
+		return;
+	}
+	if (!bIsHoldingStill)
+	{
+		BreathRecovery = FMath::Max(0.f, BreathRecovery - DeltaSeconds);
+		if (BreathRecovery <= 0.f) HeldAir = FMath::Min(1.f, HeldAir + DeltaSeconds / FMath::Max(BreathRecoverSeconds, .5f));
+		return;
+	}
+	HeldAir = FMath::Max(0.f, HeldAir - DeltaSeconds / FMath::Max(BreathHoldSeconds, 1.f));
+	// Shielding the candle resets her pace; holding her breath she only ever creeps.
+	GetCharacterMovement()->MaxWalkSpeed = FMath::Min(GetCharacterMovement()->MaxWalkSpeed, HeldBreathCreepSpeed);
+	if (HeldAir > 0.f) return;
+	// She can't hold it any longer: one gasp for air, a real sound the Keeper can hear if it is close.
+	if (auto* Noise = UTallowNoiseSubsystem::Get(this))
+		Noise->EmitCustomNoise(FirstPersonCameraComponent->GetComponentLocation(), this, BreathGaspLoudness, BreathGaspRange);
+	bBreathForced = true;
+	DoStillnessEnd();
+}
+
+float ATallowCharacter::GetHeldSeconds() const
+{
+	return bIsHoldingStill && GetWorld() ? float(GetWorld()->GetTimeSeconds() - StillnessStartTime) : 0.f;
+}
+
+float ATallowCharacter::GetHeldStrain() const
+{
+	if (!bIsHoldingStill) return 0.f;
+	const float Held = (1.f - HeldAir) * BreathHoldSeconds;
+	return FMath::Clamp((Held - BreathStrainSeconds) / FMath::Max(BreathHoldSeconds - BreathStrainSeconds, .1f), 0.f, 1.f);
 }
 
 void ATallowCharacter::DoDropItem()
 {
 	bool bFoundValidLocation = false;
-	if (CarriedItem == ECarriedItemType::None || !FirstPersonCameraComponent) { return; }
+	if (!CanChangeInventory() || CarriedItem == ECarriedItemType::None || !FirstPersonCameraComponent) { return; }
 	UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem);
-	if (!ItemDef || !ItemDef->PickupClass)
-	{
-		return;
-	}
+	const TSubclassOf<AActor> PickupClass = ItemDef && ItemDef->PickupClass ? ItemDef->PickupClass.Get()
+		: CarriedItem == ECarriedItemType::FilmReel ? ATallowFilmReelPickup::StaticClass() : nullptr;
+	if (!PickupClass) return;
 	
 	const FVector StartLocation = FirstPersonCameraComponent->GetComponentLocation() + (GetActorForwardVector() * 40.0f);
 	const FVector EndLocation = StartLocation + (FirstPersonCameraComponent->GetForwardVector() * 220.0f);
@@ -512,7 +680,7 @@ void ATallowCharacter::DoDropItem()
 	// return if no valid surface found 
 	if (!bFoundValidLocation) { return; }
 	// check item - spawn and clear 
-	if (SpawnItem(ItemDef->PickupClass, SpawnLocation, SpawnRotation))
+	if (SpawnItem(PickupClass, SpawnLocation + (CarriedItem == ECarriedItemType::FilmReel ? FVector(0,0,11.5f) : FVector::ZeroVector), SpawnRotation))
 	{
 		ClearCarriedItem();
 	}
@@ -563,6 +731,13 @@ void ATallowCharacter::UpdateHeldItemVisual()
 		return;
 	}
 	
+	if (CarriedItem == ECarriedItemType::FilmReel && !ItemRegistry.FindRef(CarriedItem))
+	{
+		HeldItemMesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Presentation/ProjectorFinal/SM_FilmReel.SM_FilmReel")));
+		HeldItemMesh->SetRelativeTransform(FTransform(FRotator(0,-65,5), FVector(44.5f,-15.f,-17.f), FVector(.7f)));
+		HeldItemMesh->SetVisibility(HeldItemMesh->GetStaticMesh() != nullptr);
+		return;
+	}
 	// Checks the carried item and if it has a mesh, set it with correct transform  
 	if (const UTallowItemDefinition* ItemDef = ItemRegistry.FindRef(CarriedItem))
 	{

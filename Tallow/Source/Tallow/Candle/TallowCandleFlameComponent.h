@@ -48,9 +48,22 @@ public:
 	float WickHeight = 13.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Candle|Flame")
-	FLinearColor FlameColour = FLinearColor(1.f, 0.55f, 0.22f);
+	FLinearColor FlameColour = FLinearColor(1.f, 0.70f, 0.42f);
+
+	/** While positive, the flame's light stays within this many cm in front of the eye (the capture shot
+	 *  brings Mim's face closer than the held candle; the light must not end up inside her head). */
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "Candle|Flame")
+	float ViewHoldDistance = 0.f;
+
+	/** While positive, the flame's light is this many lumens instead of its own (the capture shot lights her face
+	 *  at the lens with the same few lumens whether the candle is lit or out). */
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "Candle|Flame")
+	float LumensOverride = 0.f;
 
 private:
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> NavigationSpill;
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> PresentationLight;
+	float SpillAlpha = 0.f;
 	UPROPERTY(Transient) TObjectPtr<UAudioComponent> Breath;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> HeldCandle;
 	UPROPERTY(Transient) TObjectPtr<UTallowControlsWidget> Controls;
@@ -60,6 +73,7 @@ private:
 	float BaseIntensity = 0.f;
 	FVector BaseLocation = FVector::ZeroVector;
 	float Gutter = 0.f;
+	float Seen = 0.f;
 	float Time = 0.f;
 	float DropoutTimer = 0.f;
 	bool bExternalPresentation = false;

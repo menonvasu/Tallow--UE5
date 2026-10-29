@@ -50,12 +50,33 @@ public:
 	bool IsAtRest() const;
 
 
+    void SetRequiredRocks(int32 Rocks);
+    void ReleasePlayerQuietly();
+    FTransform GetStartTransform() const { return StartTransform; }
+    UStaticMeshComponent* GetChairMesh() const { return ChairMesh; }
+    FTransform GetExitTransform() const;
+    FTransform GetExitRelativeTransform() const;
+    FTransform GetSeatRelativeTransform() const;
+    FTransform GetStandingMeshRelativeTransform() const;
+
 protected:
 	virtual void BeginPlay() override;
 
 	virtual void Tick(float DeltaTime) override;
 
 	void TryAutoTiePlayer();
+
+	/** After the fall: freeze where it landed and block pawns again once nobody stands inside it. */
+	void SettleChair(FTransform Stood);
+	bool IsCharacterInsideChair() const;
+
+	/** Tips the fallen chair onto its back (or a side) on the floor, away from where she steps out. */
+	void SnapChairToKnockedOverPose(const FTransform& Stood);
+	bool IsChairPoseClear() const;
+	bool IsChairLyingOnFloor(float& OutUpZ) const;
+
+	float ChairSettleElapsed = 0.f;
+	float ChairRestTime = 0.f;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -75,9 +96,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<USceneComponent> EscapeExitPoint;
 
+	FTimerHandle ChairSettleHandle;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<ATallowCharacter> TiedPlayerCharacter;
 
+	FTransform StartTransform;
 	FTransform InitialChairRelativeTransform;
 
 	/** Event properties */
@@ -134,6 +158,17 @@ protected:
 	/** Camera Shake */
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|Effects")
 	TSubclassOf<UCameraShakeBase> FloorSlamCameraShakeClass;
+
+	/** Yaw of the chair mesh's front relative to the mesh's +X. SM_RestraintChair's front is its +Y. */
+	UPROPERTY(EditAnywhere, Category = "Chair|Tuning")
+	float MeshFrontYaw = 90.0f;
+
+	/** Tied view: starting pitch, facing the way the chair faces, and how far either side it can turn. */
+	UPROPERTY(EditAnywhere, Category = "Chair|Tuning")
+	float TiedStartPitch = -38.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Chair|Tuning")
+	float TiedYawRange = 70.0f;
 
 	/** Camera limits */
 	float CachedPitchMin = 0.0f;

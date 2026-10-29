@@ -45,3 +45,8 @@ void ATallowCandlePickup::ResetPickup(AActor* Interactor)
 		SetActorEnableCollision(true);
 	}
 }
+
+void ATallowCandlePickup::SetTakenForChapter(bool bTaken)
+{
+    SetActorHiddenInGame(bTaken); SetActorEnableCollision(!bTaken);
+}

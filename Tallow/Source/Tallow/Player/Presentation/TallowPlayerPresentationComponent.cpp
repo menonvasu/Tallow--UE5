@@ -41,6 +41,7 @@ bool UTallowPlayerPresentationComponent::EnablePresentation(UCameraComponent* Ca
 	Hands->SetGenerateOverlapEvents(false);
 	Hands->SetOnlyOwnerSee(true);
 	Hands->SetCastShadow(false);
+	Hands->SetLightingChannels(false, true, false);
 	// UE import bounds are static and stop at Z=80.96cm, while Cup wrists reach Z=98.38cm.
 	// The tested 3x envelope encloses animated hands/fingers and prevents premature frustum culling.
 	Hands->SetBoundsScale(HandsBoundsScale);
@@ -99,7 +100,7 @@ bool UTallowPlayerPresentationComponent::PlayPresentationClip(UAnimSequence* Cli
 	if (!Cast<UTallowPresentationAnimInstance>(Hands->GetAnimInstance()))
 		Hands->SetAnimInstanceClass(UTallowPresentationAnimInstance::StaticClass());
 	auto* Instance = Cast<UTallowPresentationAnimInstance>(Hands->GetAnimInstance());
-	if (!Instance || !Instance->PlayClip(Clip, bLoop, PlayRate, BlendSeconds, bRestart)) return false;
+	if (!Instance || !Instance->PlayClip(Clip, bLoop, PlayRate * FMath::Clamp(PlaybackRateScale, 0.f, 1.f), BlendSeconds, bRestart)) return false;
 	Hands->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	Hands->SetComponentTickEnabled(true);
 	return true;

@@ -1,0 +1,391 @@
+{
+ "source": "actors I placed or moved by hand in the 12:06 am 28 Oct save; scripts never move these",
+ "locked": [
+  "BP_TallowFusePickup_C_3",
+  "PlayerStart_0",
+  "StaticMeshActor_106",
+  "StaticMeshActor_107",
+  "StaticMeshActor_24",
+  "StaticMeshActor_25",
+  "StaticMeshActor_350",
+  "StaticMeshActor_359",
+  "StaticMeshActor_367",
+  "StaticMeshActor_368",
+  "StaticMeshActor_369",
+  "StaticMeshActor_382",
+  "StaticMeshActor_383",
+  "StaticMeshActor_390",
+  "StaticMeshActor_436",
+  "StaticMeshActor_452",
+  "StaticMeshActor_467",
+  "StaticMeshActor_489",
+  "StaticMeshActor_543",
+  "StaticMeshActor_567",
+  "StaticMeshActor_568",
+  "StaticMeshActor_619",
+  "StaticMeshActor_72",
+  "TallowHousePresence_37",
+  "TallowHousePresence_47",
+  "TallowHousePresence_48",
+  "TallowHousePresence_49",
+  "TallowJournal_32",
+  "TallowPatrolPoint_16",
+  "TallowProjector_0",
+  "TargetPoint_19"
+ ],
+ "labels": {
+  "BP_TallowFusePickup_C_3": "BP_TallowFusePickup2",
+  "PlayerStart_0": "M3_PlayerStart",
+  "StaticMeshActor_106": "Basement_StairApproach_Low",
+  "StaticMeshActor_107": "Basement_StairApproach_High",
+  "StaticMeshActor_24": "House_Flue_Basement",
+  "StaticMeshActor_25": "House_Flue_Ground",
+  "StaticMeshActor_350": "HI_SM_HouseV01_WakeScreen",
+  "StaticMeshActor_359": "HI_SM_HouseV01_WakeTimberScreen",
+  "StaticMeshActor_367": "HI_DiningTable",
+  "StaticMeshActor_368": "HI_DiningChair0",
+  "StaticMeshActor_369": "HI_DiningChair1",
+  "StaticMeshActor_382": "HI_CollectionCabinet3",
+  "StaticMeshActor_383": "HI_UtilityCupboard",
+  "StaticMeshActor_390": "STORY_WakeEmptyPegs",
+  "StaticMeshActor_436": "EV04_B2_SideCabinet_00",
+  "StaticMeshActor_452": "EV04_B4_Boiler_00",
+  "StaticMeshActor_467": "EV04_G1_WritingTable_00",
+  "StaticMeshActor_489": "EV04_G3_Settle_00",
+  "StaticMeshActor_543": "EV05_B4_CoalBoiler",
+  "StaticMeshActor_567": "TRIM_Nosing_Basement_StairApproach_Low",
+  "StaticMeshActor_568": "TRIM_Nosing_Basement_StairApproach_High",
+  "StaticMeshActor_619": "A6_044_ChildDrawing",
+  "StaticMeshActor_72": "Boiler_SightBreak",
+  "TallowHousePresence_37": "A6_010_CandleSconce",
+  "TallowHousePresence_47": "A6_047_HangingDrawing",
+  "TallowHousePresence_48": "A6_048_HangingDrawing",
+  "TallowHousePresence_49": "A6_049_HangingDrawing",
+  "TallowJournal_32": "A6_036_Register1894",
+  "TallowPatrolPoint_16": "M3_PatrolUp_G2",
+  "TallowProjector_0": "FINAL_FilmProjector",
+  "TargetPoint_19": "Crowbar_SideCabinet"
+ },
+ "removed_by_ty": [
+  {
+   "name": "StaticMeshActor_10",
+   "label": "House_Basement_Wall_y5p85_0p00"
+  },
+  {
+   "name": "StaticMeshActor_11",
+   "label": "House_Basement_Wall_y9p75_0p00"
+  },
+  {
+   "name": "StaticMeshActor_13",
+   "label": "House_Bay_Floor_Ground"
+  },
+  {
+   "name": "StaticMeshActor_14",
+   "label": "House_Bay_Floor_Upper"
+  },
+  {
+   "name": "StaticMeshActor_15",
+   "label": "House_Bay_Ground"
+  },
+  {
+   "name": "StaticMeshActor_17",
+   "label": "House_Bay_Roof"
+  },
+  {
+   "name": "StaticMeshActor_18",
+   "label": "House_Bay_Upper"
+  },
+  {
+   "name": "StaticMeshActor_19",
+   "label": "House_Bay_WindowSeat_Ground"
+  },
+  {
+   "name": "StaticMeshActor_233",
+   "label": "HI_SM_HouseV01_Attic_Floor"
+  },
+  {
+   "name": "StaticMeshActor_235",
+   "label": "HI_SM_HouseV01_Balustrade"
+  },
+  {
+   "name": "StaticMeshActor_236",
+   "label": "HI_SM_HouseV01_BasementStairs"
+  },
+  {
+   "name": "StaticMeshActor_249",
+   "label": "HI_SM_HouseV01_Bay_Plinth"
+  },
+  {
+   "name": "StaticMeshActor_254",
+   "label": "HI_SM_HouseV01_Chimneys"
+  },
+  {
+   "name": "StaticMeshActor_256",
+   "label": "HI_SM_HouseV01_Dormers"
+  },
+  {
+   "name": "StaticMeshActor_257",
+   "label": "HI_SM_HouseV01_Flue_Basement"
+  },
+  {
+   "name": "StaticMeshActor_258",
+   "label": "HI_SM_HouseV01_Flue_Ground"
+  },
+  {
+   "name": "StaticMeshActor_26",
+   "label": "House_FrontDoor_Planks"
+  },
+  {
+   "name": "StaticMeshActor_260",
+   "label": "HI_SM_HouseV01_Gable_North"
+  },
+  {
+   "name": "StaticMeshActor_261",
+   "label": "HI_SM_HouseV01_Gable_South"
+  },
+  {
+   "name": "StaticMeshActor_262",
+   "label": "HI_SM_HouseV01_Ground_Floor"
+  },
+  {
+   "name": "StaticMeshActor_272",
+   "label": "HI_SM_HouseV01_LaundryChute_Basement"
+  },
+  {
+   "name": "StaticMeshActor_275",
+   "label": "HI_SM_HouseV01_MainStairs"
+  },
+  {
+   "name": "StaticMeshActor_277",
+   "label": "HI_SM_HouseV01_Porch_Gable"
+  },
+  {
+   "name": "StaticMeshActor_278",
+   "label": "HI_SM_HouseV01_Roof"
+  },
+  {
+   "name": "StaticMeshActor_3",
+   "label": "House_Basement_Floor"
+  },
+  {
+   "name": "StaticMeshActor_30",
+   "label": "House_Ground_Wall_x0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_309",
+   "label": "HI_SM_HouseV01_PuzzleShelves"
+  },
+  {
+   "name": "StaticMeshActor_31",
+   "label": "House_Ground_Wall_x10p40_5p85"
+  },
+  {
+   "name": "StaticMeshActor_32",
+   "label": "House_Ground_Wall_x13p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_33",
+   "label": "House_Ground_Wall_x6p50_9p75"
+  },
+  {
+   "name": "StaticMeshActor_34",
+   "label": "House_Ground_Wall_x7p15_0p00"
+  },
+  {
+   "name": "StaticMeshActor_35",
+   "label": "House_Ground_Wall_y0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_356",
+   "label": "HI_SM_HouseV01_CollectionRevealScreen"
+  },
+  {
+   "name": "StaticMeshActor_36",
+   "label": "House_Ground_Wall_y15p60_0p00"
+  },
+  {
+   "name": "StaticMeshActor_364",
+   "label": "HI_LaundryTable"
+  },
+  {
+   "name": "StaticMeshActor_37",
+   "label": "House_Ground_Wall_y5p85_0p00"
+  },
+  {
+   "name": "StaticMeshActor_370",
+   "label": "HI_DiningChair2"
+  },
+  {
+   "name": "StaticMeshActor_38",
+   "label": "House_Ground_Wall_y9p75_0p00"
+  },
+  {
+   "name": "StaticMeshActor_4",
+   "label": "House_Basement_Wall_x0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_420",
+   "label": "StairHallWall_1"
+  },
+  {
+   "name": "StaticMeshActor_43",
+   "label": "House_Porch"
+  },
+  {
+   "name": "StaticMeshActor_44",
+   "label": "House_Porch_Gable"
+  },
+  {
+   "name": "StaticMeshActor_46",
+   "label": "House_Stoop"
+  },
+  {
+   "name": "StaticMeshActor_462",
+   "label": "EV04_B5_HangingSheet_00"
+  },
+  {
+   "name": "StaticMeshActor_468",
+   "label": "EV04_G1_Stool_00"
+  },
+  {
+   "name": "StaticMeshActor_48",
+   "label": "House_Tower_Attic"
+  },
+  {
+   "name": "StaticMeshActor_480",
+   "label": "EV04_G2_CarvedArmchair_03"
+  },
+  {
+   "name": "StaticMeshActor_49",
+   "label": "House_Tower_Basement"
+  },
+  {
+   "name": "StaticMeshActor_5",
+   "label": "House_Basement_Wall_x13p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_50",
+   "label": "House_Tower_Cap"
+  },
+  {
+   "name": "StaticMeshActor_51",
+   "label": "House_Tower_Floor_Attic"
+  },
+  {
+   "name": "StaticMeshActor_52",
+   "label": "House_Tower_Floor_Basement"
+  },
+  {
+   "name": "StaticMeshActor_53",
+   "label": "House_Tower_Floor_Ground"
+  },
+  {
+   "name": "StaticMeshActor_540",
+   "label": "EV05_B5_LaundryTable"
+  },
+  {
+   "name": "StaticMeshActor_55",
+   "label": "House_Tower_Floor_Upper"
+  },
+  {
+   "name": "StaticMeshActor_552",
+   "label": "EV05_B5_WashDrum"
+  },
+  {
+   "name": "StaticMeshActor_559",
+   "label": "TRIM_Skirting_StairHallWall_1_N"
+  },
+  {
+   "name": "StaticMeshActor_56",
+   "label": "House_Tower_Ground"
+  },
+  {
+   "name": "StaticMeshActor_561",
+   "label": "TRIM_Skirting_StairHallWall_1_S"
+  },
+  {
+   "name": "StaticMeshActor_58",
+   "label": "House_Tower_TowerTop"
+  },
+  {
+   "name": "StaticMeshActor_59",
+   "label": "House_Tower_Upper"
+  },
+  {
+   "name": "StaticMeshActor_6",
+   "label": "House_Basement_Wall_x6p50_0p00"
+  },
+  {
+   "name": "StaticMeshActor_61",
+   "label": "House_Upper_Floor"
+  },
+  {
+   "name": "StaticMeshActor_615",
+   "label": "A6_029_SlattedScreen"
+  },
+  {
+   "name": "StaticMeshActor_62",
+   "label": "House_Upper_Wall_x0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_63",
+   "label": "House_Upper_Wall_x13p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_64",
+   "label": "House_Upper_Wall_x6p50_0p00"
+  },
+  {
+   "name": "StaticMeshActor_65",
+   "label": "House_Upper_Wall_x6p50_9p75"
+  },
+  {
+   "name": "StaticMeshActor_66",
+   "label": "House_Upper_Wall_y0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_67",
+   "label": "House_Upper_Wall_y15p60_0p00"
+  },
+  {
+   "name": "StaticMeshActor_68",
+   "label": "House_Upper_Wall_y5p85_0p00"
+  },
+  {
+   "name": "StaticMeshActor_69",
+   "label": "House_Upper_Wall_y9p75_0p00"
+  },
+  {
+   "name": "StaticMeshActor_7",
+   "label": "House_Basement_Wall_x6p50_9p75"
+  },
+  {
+   "name": "StaticMeshActor_78",
+   "label": "Dining_Table_Top"
+  },
+  {
+   "name": "StaticMeshActor_79",
+   "label": "Dining_Table_Leg"
+  },
+  {
+   "name": "StaticMeshActor_8",
+   "label": "House_Basement_Wall_y0p00_0p00"
+  },
+  {
+   "name": "StaticMeshActor_80",
+   "label": "Dining_Table_Leg"
+  },
+  {
+   "name": "StaticMeshActor_81",
+   "label": "Dining_Table_Leg"
+  },
+  {
+   "name": "StaticMeshActor_82",
+   "label": "Dining_Table_Leg"
+  },
+  {
+   "name": "StaticMeshActor_9",
+   "label": "House_Basement_Wall_y15p60_0p00"
+  }
+ ]
+}
