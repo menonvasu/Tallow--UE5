@@ -46,7 +46,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Door|Lock")
 	void SetLocked(bool bLocked);
 	void ApplyChapterState(ETallowDoorState State);
+	/** A bolted door answers a try with a short rattle and one of Nell's notes. */
+	void RattleBolted(ATallowCharacter* Player);
 	bool bChapterSealed = false;
+	double LastRattleTime = -100.0;
 	bool IsOpenForChapter() const { return bIsOpen; }
 	bool HasChapterBarricade() const { return IsBarricaded(); }
 	bool HasAuthoredPlanks() const { return !InitialPlanks.IsEmpty(); }
@@ -63,6 +66,10 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float DoorCloseLoudness = 0.5f;
+
+	/** The rattle of a chapter-sealed (bolted) door: quiet, and not often. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
+	float BoltedRattleLoudness = 0.2f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float OpenAngle = 90.0f;

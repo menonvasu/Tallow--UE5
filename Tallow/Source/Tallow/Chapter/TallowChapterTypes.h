@@ -37,6 +37,7 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowDoorRules
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MinCrowbar = 0;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MaxCrowbar = 2;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MinChangedFromPrevious = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) bool bLockpickOnRoute = false;                // a lockpick door lies on a shortest way to the chair or the battery
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<ETallowDoorState, float> StateWeights;   // empty: Open .25 Closed .35 Lockpick .25 Crowbar .15
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<FName, ETallowDoorState> ForcedStates;    // edge id -> state
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FName> FixedEdges;                       // keep DefaultState
@@ -189,6 +190,7 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowLayoutHistory
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedBatterySpots;
+	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedCrowbarSpots;
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedChairRooms;
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedStoryObjects;
 	UPROPERTY(BlueprintReadOnly) int32 PreviousDoorHash = 0;

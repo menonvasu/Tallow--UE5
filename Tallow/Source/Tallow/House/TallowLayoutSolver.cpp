@@ -65,6 +65,63 @@ void RepairCounts(const FTallowSolverInput& I,const FTallowChapterRules& R,FTall
         while(Count(L,State)<Min && !Options.IsEmpty()) { const int32 N=Random.RandRange(0,Options.Num()-1); L.Doors[Options[N]].State=State; Options.RemoveAt(N); }
     }
 }
+TMap<FName,int32> HopDistance(const FTallowSolverInput& I,const FTallowChapterLayout& L,FName From,bool Power)
+{
+    TMap<FName,int32> Out; if(From.IsNone()) return Out;
+    TArray<FName> Queue{From}; Out.Add(From,0);
+    for(int32 N=0;N<Queue.Num();++N) for(const auto* E:I.Graph.EdgesOf(Queue[N]))
+    {
+        const DS State=L.GetDoorState(E->Id,E->DefaultState);
+        if((E->bRequiresPower&&!Power)||State==DS::StoryGated) continue;
+        const FName Next=E->Other(Queue[N]); if(!Out.Contains(Next)) {Out.Add(Next,Out[Queue[N]]+1);Queue.Add(Next);}
+    }
+    return Out;
+}
+// Doors on a shortest way from the start to the chair and from the chair to the battery: the ones the player walks into.
+TSet<FName> RouteEdges(const FTallowSolverInput& I,const FTallowChapterLayout& L,bool Power)
+{
+    TSet<FName> Out;
+    const TPair<FName,FName> Legs[]={{L.StartRoom,L.ChairRoom},{L.ChairRoom,L.BatteryRoom}};
+    for(const auto& Leg:Legs)
+    {
+        if(Leg.Key.IsNone()||Leg.Value.IsNone()) continue;
+        const auto FromA=HopDistance(I,L,Leg.Key,Power), ToB=HopDistance(I,L,Leg.Value,Power);
+        const int32* Total=FromA.Find(Leg.Value); if(!Total) continue;
+        for(const auto& E:I.Graph.Edges)
+        {
+            const int32 *A=FromA.Find(E.RoomA),*B=FromA.Find(E.RoomB),*TA=ToB.Find(E.RoomA),*TB=ToB.Find(E.RoomB);
+            if((A&&TB&&*A+1+*TB==*Total)||(B&&TA&&*B+1+*TA==*Total)) Out.Add(E.Id);
+        }
+    }
+    return Out;
+}
+bool HasRouteLockpick(const FTallowSolverInput& I,const FTallowChapterLayout& L,bool Power)
+{
+    for(FName Id:RouteEdges(I,L,Power)) if(const auto* E=I.Graph.Find(Id); E&&L.GetDoorState(E->Id,E->DefaultState)==DS::Lockpick) return true;
+    return false;
+}
+// Moves one lockpick door onto the route when none is there, taking it from a plain door and giving another lockpick door back if the cap needs it.
+void EnsureRouteLockpick(const FTallowSolverInput& I,const FTallowChapterRules& R,FTallowChapterLayout& L,FRandomStream& Random)
+{
+    const bool Power=I.bPowerRestored||R.Kind==ETallowChapterKind::Final;
+    if(HasRouteLockpick(I,L,Power)) return;
+    const auto Route=RouteEdges(I,L,Power);
+    TArray<int32> Options;
+    for(int32 N=0;N<L.Doors.Num();++N)
+    {
+        const auto* E=I.Graph.Find(L.Doors[N].Edge);
+        if(E&&Route.Contains(E->Id)&&Mutable(R,*E)&&E->AllowedStates.Contains(DS::Lockpick)&&(L.Doors[N].State==DS::Open||L.Doors[N].State==DS::Closed)) Options.Add(N);
+    }
+    if(Options.IsEmpty()) return;
+    L.Doors[Options[Random.RandRange(0,Options.Num()-1)]].State=DS::Lockpick;
+    TArray<int32> Spare;
+    for(int32 N=0;N<L.Doors.Num();++N)
+    {
+        const auto* E=I.Graph.Find(L.Doors[N].Edge);
+        if(E&&!Route.Contains(E->Id)&&Mutable(R,*E)&&L.Doors[N].State==DS::Lockpick) Spare.Add(N);
+    }
+    while(Count(L,DS::Lockpick)>R.Doors.MaxLockpick&&!Spare.IsEmpty()) {const int32 N=Random.RandRange(0,Spare.Num()-1);L.Doors[Spare[N]].State=DS::Closed;Spare.RemoveAt(N);}
+}
 void PickSpots(const FTallowSolverInput& I,const FTallowChapterRules& R,const FTallowLayoutHistory& H,FTallowChapterLayout& L,FRandomStream& Random,FName Retarget=NAME_None)
 {
     const bool Power=I.bPowerRestored||R.Kind==ETallowChapterKind::Final;
@@ -90,6 +147,7 @@ void PickSpots(const FTallowSolverInput& I,const FTallowChapterRules& R,const FT
     const auto Start=FTallowLayoutSolver::Reachable(I.Graph,L,L.StartRoom,false,Power);
     const auto Chair=FTallowLayoutSolver::Reachable(I.Graph,L,L.ChairRoom.IsNone()?L.StartRoom:L.ChairRoom,false,Power);
     Tool.RemoveAll([&](const auto* S){return !Start.Contains(S->Room)||!Chair.Contains(S->Room);});
+    PreferUnused(Tool,H.UsedCrowbarSpots);   // the bar turns up somewhere new each chapter, always within reach of the start and the chair without it
     L.CrowbarSpot=NAME_None; if(const auto* S=Pick(Tool)) L.CrowbarSpot=S->Spot;
     if(R.bBattery)
     {
@@ -164,6 +222,7 @@ bool FTallowLayoutSolver::Validate(const FTallowSolverInput& I,const FTallowChap
         const auto* Tool=Spot(I,L.CrowbarSpot,SK::Crowbar);
         if(!Tool||!Reachable(I.Graph,L,I.StartRoom,false,Power).Contains(Tool->Room)||!Reachable(I.Graph,L,L.ChairRoom.IsNone()?I.StartRoom:L.ChairRoom,false,Power).Contains(Tool->Room)) Problem(5,TEXT("crowbar behind a crowbar edge or missing"));
     }
+    if(R.bBattery&&R.Doors.bLockpickOnRoute&&!L.bFallback&&!HasRouteLockpick(I,L,Power)) Problem(6,TEXT("no lockpick door on the way to the chair or battery"));
     if(!Final || H.PreviousDoors.IsEmpty())
         if(Count(L,DS::Lockpick)<R.Doors.MinLockpick||Count(L,DS::Lockpick)>R.Doors.MaxLockpick||Count(L,DS::Crowbar)<R.Doors.MinCrowbar||Count(L,DS::Crowbar)>R.Doors.MaxCrowbar) Problem(6,TEXT("door count outside chapter bounds"));
     for(const auto& Forced:R.Doors.ForcedStates) if(!I.Graph.Find(Forced.Key)) Problem(6,TEXT("forced edge missing from graph"));
@@ -239,6 +298,7 @@ FTallowChapterLayout FTallowLayoutSolver::Solve(const FTallowSolverInput& I,cons
         }
         if(R.Kind!=ETallowChapterKind::Final||H.PreviousDoors.IsEmpty()) RepairCounts(I,R,L,Random);
         PickSpots(I,R,H,L,Random);
+        if(R.bBattery&&R.Doors.bLockpickOnRoute) EnsureRouteLockpick(I,R,L,Random);
         TArray<FString> Problems;
         if(Validate(I,R,L,H,Problems)) {L.Notes=MoveTemp(Notes);return L;}
         Notes.Add(FString::Printf(TEXT("attempt %d: %s"),Attempt,*FString::Join(Problems,TEXT("; "))));

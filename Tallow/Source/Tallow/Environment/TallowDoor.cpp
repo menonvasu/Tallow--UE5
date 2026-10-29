@@ -6,6 +6,9 @@
 #include "Components/TimelineComponent.h"
 #include "Player/TallowCharacter.h"
 #include "Noise/TallowNoiseSubsystem.h"
+#include "Presentation/TallowNellNotes.h"
+#include "Presentation/TallowPlayDirector.h"
+#include "Kismet/GameplayStatics.h"
 #include "Tasks/TallowPlank.h"
 #include "Components/BoxComponent.h"
 #include "Tasks/TallowLockpickGame.h"
@@ -61,15 +64,15 @@ void ATallowDoor::BeginPlay()
 
 bool ATallowDoor::CanInteract_Implementation(AActor* Interactor) const
 {
-	// if door has planks 
-	if (bChapterSealed || IsBarricaded()) { return false; }
+	// A sealed door still answers the player (it rattles); only planks refuse outright.
+	if (!bChapterSealed && IsBarricaded()) { return false; }
 	
 	return true;
 }
 
 FText ATallowDoor::GetInteractionPromptText_Implementation(AActor* Interactor) const
 {
-	if (bChapterSealed) return FText::FromString(TEXT("WON'T OPEN"));
+	if (bChapterSealed) return FText::FromString(TEXT("BOLTED"));
 	if (IsBarricaded()) { return FText::FromString("BARRICADED"); }
 	
 	if (bIsLocked && bOpensFromInside && IsInside(Interactor)) { return FText::FromString("UNBOLT"); }
@@ -113,9 +116,14 @@ void ATallowDoor::SetLocked(bool bLocked)
 
 void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 {
-	if (!Interactor || bChapterSealed) { return; }
+	if (!Interactor) { return; }
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
+	if (bChapterSealed)
+	{
+		RattleBolted(Player);
+		return;
+	}
 	
 	if (bIsLocked && bOpensFromInside && IsInside(Player))
 	{
@@ -172,6 +180,27 @@ bool ATallowDoor::IsInside(const AActor* Actor) const
 	if (!Actor) return false;
 	const FVector Inward = GetActorTransform().TransformVectorNoScale(InsideDirection.GetSafeNormal());
 	return FVector::DotProduct(Actor->GetActorLocation() - GetActorLocation(), Inward) > 0.f;
+}
+
+void ATallowDoor::RattleBolted(ATallowCharacter* Player)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastRattleTime < 1.0) { return; }
+	LastRattleTime = Now;
+	
+	const FVector Where = GetActorLocation();
+	if (ATallowPlayDirector* Director = Cast<ATallowPlayDirector>(UGameplayStatics::GetActorOfClass(this, ATallowPlayDirector::StaticClass())))
+	{
+		Director->PlayChapterCue(TEXT("P_Latch"), 0.25f, &Where);
+	}
+	if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
+	{
+		NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorClose, Where, Player, BoltedRattleLoudness, true);
+	}
+	if (UTallowNellNotesComponent* Notes = UTallowNellNotesComponent::Find(this))
+	{
+		Notes->NoticeBolted();
+	}
 }
 
 void ATallowDoor::OnInteractComplete_Implementation(AActor* Interactor)

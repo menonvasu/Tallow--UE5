@@ -43,11 +43,14 @@ UTallowCampaignDefinition* UTallowCampaignDefinition::BuildDefault(UObject* Oute
             Chapter->StoryObjectCandidates = {FName(*FString::Printf(TEXT("Pass2_Story_Ch%d_A"), Index + 1)), FName(*FString::Printf(TEXT("Pass2_Story_Ch%d_B"), Index + 1))};
             if (Index >= 1) Chapter->StoryObjectCandidates.SetNum(1);
             Chapter->Doors.MinCrowbar = 1;
+            // "we need more lockpicking". Two or three picks a round, one of them on the way to the chair or the battery.
+            // Chapter three caps at two because the final chapter inherits its doors.
+            Chapter->Doors.MinLockpick = 2; Chapter->Doors.MaxLockpick = Index == 2 ? 2 : 3; Chapter->Doors.bLockpickOnRoute = true;
         }
         else Chapter->RequiredRooms = {TEXT("study"), TEXT("collection")};
         if (Index == 0)
         {
-            Chapter->Doors.MaxLockpick = 1; Chapter->Doors.MaxCrowbar = 1;
+            Chapter->Doors.MaxCrowbar = 1;
             Chapter->Doors.ForcedStates.Add(TEXT("BP_TallowDoor"), ETallowDoorState::Crowbar);
         }
         Campaign->Chapters.Add(Chapter);

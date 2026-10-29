@@ -134,8 +134,18 @@ void UTallowNellNotesComponent::OnCandleAcquired()
 	Notice(ETallowNote::Candle, 1.5f);   // after her "Maisie?"
 }
 
-void UTallowNellNotesComponent::OnPlank(bool bBroken) { Notice(ETallowNote::Board, 1.2f); }
-void UTallowNellNotesComponent::OnSnap() { Notice(ETallowNote::Snap, .6f); }
+void UTallowNellNotesComponent::NoticeBolted()
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (!bShowNotes || Now - BoltedAt < 20.f || Pending != ETallowNote::Count || Showing == ETallowNote::Bolted) return;
+	BoltedAt = Now;
+	// Unlike the first-time notes this one may come again; it is not marked learned.
+	LearnedMask &= ~(1ull << uint32(ETallowNote::Bolted));
+	Notice(ETallowNote::Bolted);
+}
+
+void UTallowNellNotesComponent::OnPlank(bool bBroken) {}
+void UTallowNellNotesComponent::OnSnap() {}
 void UTallowNellNotesComponent::OnMatches(int32 Count, bool bTriedWithNone) { if (bTriedWithNone) Notice(ETallowNote::NoMatches); }
 
 void UTallowNellNotesComponent::OnCaught()
@@ -319,6 +329,15 @@ void UTallowNellNotesComponent::Compose(ETallowNote Note, FString& Text, FString
 	case ETallowNote::Code: Text = TEXT("five numbers.\nthe latch by the window wants them."); break;
 	case ETallowNote::Open: Text = TEXT("it is open. i could go now.\nor look for maisie first.\nher place is on the shelves."); break;
 	case ETallowNote::Retry: Text = TEXT("i am still here.\nit put everything back where it was."); Line = 20; break;
+	case ETallowNote::Bolted:
+		{
+			static const TCHAR* Variants[] = {
+				TEXT("bolted from the other side.\ni need another way round."),
+				TEXT("it will not give.\nthere has to be another way."),
+				TEXT("bolted. not this way.\nnot yet.")};
+			Text = Variants[BoltedVariant % UE_ARRAY_COUNT(Variants)];
+		}
+		break;
 	case ETallowNote::Map: Text = TEXT("someone drew the house."); Hint = TEXT("[ M ]  look at it"); break;
 	default: break;
 	}
