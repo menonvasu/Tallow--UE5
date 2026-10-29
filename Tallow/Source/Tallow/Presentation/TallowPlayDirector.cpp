@@ -980,7 +980,8 @@ void ATallowPlayDirector::AddFootsteps()
 	auto* Steps = NewObject<UTallowFootstepComponent>(Player, TEXT("IntegratedFootsteps"));
 	for (int32 I = 0; I < 5; ++I) Steps->Steps.Add(Cue(FString::Printf(TEXT("P_Step_%02d"), I)));
 	for (int32 I = 0; I < 3; ++I) Steps->Extras.Add(Cue(FString::Printf(TEXT("P_Creak_%02d"), I)));
-	Steps->StrideCm = 50.f; Steps->Volume = .28f; Steps->ExtraChance = .12f; Steps->ExtraVolume = .2f;
+	// 50 cm strides read as hurried. Steps up 2.7 dB with the louder calm house (28 Oct) so they keep their margin.
+	Steps->StrideCm = 75.f; Steps->Volume = .34f; Steps->ExtraChance = .12f; Steps->ExtraVolume = .2f;
 	Player->AddInstanceComponent(Steps); Steps->RegisterComponent();
 	// The Keeper: weight on old timber and its damp hem dragging behind, heard from the next room.
 	if (Keeper)
@@ -1025,10 +1026,11 @@ void ATallowPlayDirector::UpdateSound()
 	LastItem = Item;
 	// The house settling somewhere nearby, rarely and quietly, so silence never feels safe.
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (Now >= NextSettle)
+	if (Now >= NextSettle && (!Soundscape || (Soundscape->AllowsSettles() && !Soundscape->HasHouseAtmosphere())))
 	{
 		const FVector Where = Player->GetActorLocation() + FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f).Vector() * FMath::FRandRange(500.f, 1100.f);
-		PlayCue(FString::Printf(TEXT("H_Settle_%02d"), FMath::RandRange(0, 2)), .35f, &Where);
-		NextSettle = Now + FMath::FRandRange(18.f, 40.f);
+		PlayCue(FString::Printf(TEXT("H_Settle_%02d"), FMath::RandRange(0, 2)), .5f, &Where);   // clears the calm bed (28 Oct)
+		UE_LOG(LogTemp, Display, TEXT("TALLOW_AUDIO settle %s"), *Where.ToCompactString());
+		NextSettle = Now + FMath::FRandRange(40.f, 80.f);   // rare, so a creak still means something
 	}
 }
