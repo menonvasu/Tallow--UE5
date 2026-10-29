@@ -1,8 +1,13 @@
 #include "TallowGameMode.h"
+#include "Chapter/TallowChapterSubsystem.h"
+#include "Environment/TallowHideVolume.h"
+#include "Environment/TallowWaxPickup.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Player/TallowCharacter.h"
 #include "AI/TallowCreature.h"
+#include "AI/Hunter/TallowHunterAIController.h"
 #include "Environment/TallowCandlePickup.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -14,7 +19,7 @@
 #include "Tasks/TallowFusePickup.h"
 #include "Tasks/TallowFuseBox.h"
 #include "Environment/TallowDoor.h"
-#include "Presentation/TallowEscapePoint.h"
+#include "Environment/TallowMatchbox.h"
 #include "Tasks/TallowFilmReelPickup.h"
 #include "Tasks/TallowProjector.h"
 #include "Presentation/TallowEscapePoint.h"
@@ -57,36 +62,49 @@ void ATallowGameMode::BeginPlay()
 			CachedDoors.Add(Door);
 		}
 	}
-	FilmReelPickup = Cast<ATallowFilmReelPickup>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowFilmReelPickup::StaticClass()));
-	Projector = Cast<ATallowProjector>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowProjector::StaticClass()));
-	EscapePoint = Cast<ATallowEscapePoint>(UGameplayStatics::GetActorOfClass(GetWorld(), ATallowEscapePoint::StaticClass()));
+	TArray<AActor*> FoundMatchboxes;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATallowMatchbox::StaticClass(), FoundMatchboxes);
+	for (AActor* Actor : FoundMatchboxes)
+	{
+		if (ATallowMatchbox* Matchbox = Cast<ATallowMatchbox>(Actor))
+		{
+			Matchboxes.Add(Matchbox);
+		}
+	}
+	
 }
 
 void ATallowGameMode::HandlePlayerCaptured()
 {
 	if (bCaptureInProgress) return;
+	if (const auto* Chapters = UTallowChapterSubsystem::GetActive(this); Chapters && !Chapters->AllowsCapture()) return;
+	if (Creature)
+		if (const auto* Hunter = Cast<ATallowHunterAIController>(Creature->GetController()); Hunter && !Hunter->CanCapturePlayer()) return;
 	bCaptureInProgress = true;
+	if (Player && Player->GetCurrentHideVolume()) Player->GetCurrentHideVolume()->ReleaseForCapture();
+	if (Creature) Creature->PrepareCapturePresentation();
 	float PresentationDuration = 0.f;
 	if (bShowAuthoredCapture && Creature)
 	{
-		if (const auto* Animation = Creature->FindComponentByClass<UTallowCreatureAnimationComponent>())
-		{
-			PresentationDuration = Animation->GetCaptureDuration();
-		}
+		PresentationDuration = Creature->GetCapturePresentationDuration();
 	}
-	if (PresentationDuration > 0.f && Player)
+	// No authored clip fits the V13 Keeper: its grab is procedural and still needs time on screen.
+	const bool bProceduralCapture = PresentationDuration <= 0.f;
+	if (bProceduralCapture) PresentationDuration = ProceduralCaptureDuration;
+	if (PresentationDuration > 0.f && Player && Creature)
 	{
 		if (APlayerController* PC = Cast<APlayerController>(Player->GetController()))
 		{
-			FVector FaceLocation = Creature->GetActorLocation() + FVector(0, 0, 85.f);
-			if (Creature->GetMesh()->DoesSocketExist(TEXT("head")))
-				FaceLocation = Creature->GetMesh()->GetSocketLocation(TEXT("head"));
-			PC->SetControlRotation((FaceLocation - Player->GetFirstPersonCameraComponent()->GetComponentLocation()).Rotation());
+			// The play director turns the view onto her face; snapping it here would skip the turn.
 			PC->SetIgnoreLookInput(true);
+			PC->SetIgnoreMoveInput(true);
 			bCaptureLockedLook = true;
 		}
 	}
-	const float FadeDelay = FMath::Max(0.f, PresentationDuration - FadeOutTimer);
+	// The procedural grab plays out in full before the fade starts.
+	const float FadeDelay = bProceduralCapture ? PresentationDuration : FMath::Max(0.f, PresentationDuration - FadeOutTimer);
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CAPTURE presentation=%.2f fadeout=%.2f delay=%.2f procedural=%d"),
+		PresentationDuration, FadeOutTimer, FadeDelay, bProceduralCapture ? 1 : 0);
 	if (FadeDelay > 0.f)
 		GetWorld()->GetTimerManager().SetTimer(CaptureFadeTimerHandle, this, &ATallowGameMode::BeginCaptureFade, FadeDelay, false);
 	else
@@ -97,6 +115,7 @@ void ATallowGameMode::HandlePlayerCaptured()
 		Player->GetCharacterMovement()->DisableMovement();
 	}
 
+	for (TActorIterator<ATallowProjector> It(GetWorld()); It; ++It) It->StopProjection();
 	OnCaught.Broadcast();
 	
 	if (Creature && Creature->GetCharacterMovement())
@@ -107,16 +126,26 @@ void ATallowGameMode::HandlePlayerCaptured()
 	GetWorld()->GetTimerManager().SetTimer(
 		ResetTimerHandle,
 		this,
-		&ATallowGameMode::ResetGame,
+		&ATallowGameMode::FinishCapturePresentation,
 		FadeDelay + FadeOutTimer + BlackoutTimer,
 		false
 	);
 }
 
+void ATallowGameMode::FinishCapturePresentation()
+{
+	if (OnCapturePresented.IsBound()) OnCapturePresented.Broadcast();
+	else ResetGame();
+}
+
 void ATallowGameMode::BeginCaptureFade()
 {	
-	if (CameraManager)
-		CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
+	if (!CameraManager) return;
+	bCaptureFadeHeld = true;
+	// A zero-length camera fade never updates its amount, so the hard cut is set directly;
+	// the audio follows it to silence on the next camera update.
+	if (FadeOutTimer <= 0.f) CameraManager->SetManualCameraFade(1.f, FColor::Black, true);
+	else CameraManager->StartCameraFade(0.f, 1.f, FadeOutTimer, FColor::Black, true, true);
 }
 
 void ATallowGameMode::RegisterDroppedItem(AActor* DroppedItem)
@@ -124,6 +153,30 @@ void ATallowGameMode::RegisterDroppedItem(AActor* DroppedItem)
 	// just adds dropped item to the array
 	if (!DroppedItem) { return; }
 	RuntimeDroppedItems.Add(DroppedItem);
+}
+
+void ATallowGameMode::ClearCaptureState()
+{
+	if (Player && Player->GetCurrentHideVolume()) Player->GetCurrentHideVolume()->LeaveHidingSpot(true);
+	bCaptureInProgress = false;
+	GetWorld()->GetTimerManager().ClearTimer(CaptureFadeTimerHandle);
+	GetWorld()->GetTimerManager().ClearTimer(ResetTimerHandle);
+	if (bCaptureLockedLook && Player)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(Player->GetController()))
+		{
+			PC->SetIgnoreLookInput(false);
+			PC->SetIgnoreMoveInput(false);
+		}
+	}
+	bCaptureLockedLook = false;
+	// Every way out of a capture comes through here (the retry, a chapter rebuild or its recovery): the picture
+	// and the sound come back up together with the house, rather than staying on the cut's black.
+	if (bCaptureFadeHeld && CameraManager) CameraManager->StartCameraFade(1.f, 0.f, FadeInTimer, FColor::Black, true, false);
+	bCaptureFadeHeld = false;
+	if (bCaptureLockedMovement && Player && !Player->IsTiedToChair() && Player->GetCharacterMovement())
+		Player->GetCharacterMovement()->SetMovementMode(static_cast<EMovementMode>(CaptureMovementMode), CaptureCustomMovementMode);
+	bCaptureLockedMovement = false;
 }
 
 void ATallowGameMode::ResetGame()
@@ -148,11 +201,6 @@ void ATallowGameMode::ResetGame()
 		CandlePickup->ResetPickup(Player);
 	}
 	
-	if (CameraManager)
-	{
-		CameraManager->StartCameraFade(1.0f, 0.0f, FadeInTimer, FColor::Black, false, false);
-	}
-	
 	if (FuseBox)
 	{
 		FuseBox->ResetVisual();
@@ -171,9 +219,10 @@ void ATallowGameMode::ResetGame()
 		CrowbarPickup->ResetPickup();
 	}
 	
+	for(TActorIterator<ATallowWaxPickup> It(GetWorld());It;++It)It->ResetSupply();
 	if (Player)
 	{
-		Player->ClearCarriedItem();
+		Player->ResetInventory();
 		Player->UpdateHeldItemVisual();
 	}
 	
@@ -185,6 +234,7 @@ void ATallowGameMode::ResetGame()
 		}
 	}
 	RuntimeDroppedItems.Empty();
+	for (TActorIterator<ATallowFilmReelPickup> It(GetWorld()); It; ++It) if (!It->IsActorBeingDestroyed()) It->ResetReelPickup();
 	
 	for (ATallowDoor* Door : CachedDoors)
 	{
@@ -194,18 +244,11 @@ void ATallowGameMode::ResetGame()
 		}
 	}
 	
-	if (FilmReelPickup && !(Projector && Projector->IsReelLoaded()))
+	for (ATallowMatchbox* Matchbox : Matchboxes)
 	{
-		FilmReelPickup->ResetReelPickup();
-	}
-	
-	if (Projector)
-	{
-		Projector->ResetProjector();
-	}
-	
-	if (EscapePoint)
-	{
-		EscapePoint->SetCodeVerified(false);
+		if (Matchbox)
+		{
+			Matchbox->ResetMatchbox();
+		}
 	}
 }

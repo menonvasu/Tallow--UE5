@@ -62,7 +62,14 @@ void ATallowPlayDirector::InitializeScene()
 	PauseKey.bExecuteWhenPaused = true;
 	PauseKey.bConsumeInput = false;
 	InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ATallowPlayDirector::SkipIntro).bConsumeInput = false;
-	if (PC->PlayerCameraManager) PC->PlayerCameraManager->StopCameraFade();
+	InputComponent->BindKey(EKeys::V,IE_Pressed,this,&ATallowPlayDirector::ToggleBackgroundReading);
+	InputComponent->BindKey(EKeys::BackSpace,IE_Pressed,this,&ATallowPlayDirector::SkipBackgroundReading);
+	if (Scene != ETallowPlayScene::Game && PC->PlayerCameraManager)
+	{
+		// Setting the fade puts the sound back up, in case a capture's cut was still holding it down on the way here.
+		PC->PlayerCameraManager->SetManualCameraFade(0.f, FLinearColor::Black, false);
+		PC->PlayerCameraManager->StopCameraFade();
+	}
 	bInitialized = true;
 	if (Scene == ETallowPlayScene::MainMenu)
 	{
@@ -388,9 +395,11 @@ void ATallowPlayDirector::OnCandleAcquired()
 }
 void ATallowPlayDirector::OnCandleReset()
 {
+	EndCaptureShot();
 	bCaptureTracking = false;
 	if (CaptureBaseFOV > 0.f && Player) Player->GetFirstPersonCameraComponent()->SetFieldOfView(CaptureBaseFOV);
 	if (CaptureLight) CaptureLight->SetIntensity(0.f);
+	if (auto* CandleFlame = Player ? Player->FindComponentByClass<UTallowCandleFlameComponent>() : nullptr) CandleFlame->LumensOverride = 0.f;
 	CaptureTime = 0.f;
 	ForcedClip = nullptr; bPowerRestored = false; bBoardsCleared = false; RemovedPlanks = 0; FirstPlankAt = -1.f;
 	SetPowerVisuals(false); SetKeeperAwake(false);
@@ -438,15 +447,29 @@ void ATallowPlayDirector::OnCaught()
 	ForcedClip = nullptr;
 	bCaptureTracking = true;
 	CaptureTime = 0.f;
-	// Everything hits on the variant's strike frame, not when the capture starts: the wind-up stays quiet.
+	// Everything hits on the variant's strike frame, not when the capture starts: the turn and the stare stay silent.
 	CaptureStrike = 0.f;
-	if (Keeper)
-		if (const auto* Anim = Keeper->FindComponentByClass<UTallowCreatureAnimationComponent>()) CaptureStrike = Anim->GetCaptureStrikeTime();
-	if (CaptureStrike > .05f)
-		GetWorldTimerManager().SetTimer(StingHandle, FTimerDelegate::CreateWeakLambda(this, [this] { PlayCue(TEXT("K_Capture_Sting"), .85f); }), CaptureStrike, false);
-	else PlayCue(TEXT("K_Capture_Sting"), .85f);
-	// The jumpscares are staged with the Keeper's root 1.25 m along the look line: closer and its head meets the lens,
-	// further and the maw shrinks. Stop short of any wall in between.
+	if (Keeper) CaptureStrike = Keeper->GetCaptureStrikeTime();
+	// The procedural grab (no authored clip on V13) strikes as the mask opens.
+	if (CaptureStrike <= .05f) CaptureStrike = .55f;
+	CaptureCutAt = Keeper ? FMath::Max(Keeper->GetCapturePresentationDuration(), CaptureStrike + .1f) : CaptureStrike + .54f;
+	// One hard sting, flat and on the frame: no pitch spread, nothing on top of it but her own scream.
+	// My own big stinger (FinalPass/Capture); the old creature sting stays as the fallback.
+	GetWorldTimerManager().SetTimer(StingHandle, FTimerDelegate::CreateWeakLambda(this, [this]
+	{
+		static const TCHAR* Strike = TEXT("/Game/FinalPass/Capture/K_Capture_StrikeSting.K_Capture_StrikeSting");
+		USoundBase* Sting = LoadObject<USoundBase>(nullptr, Strike, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		const float Volume = Sting ? CaptureStingVolume : .8f;
+		if (!Sting) Sting = Cue(TEXT("K_Mim_Capture_Sting"));
+		if (Sting) CaptureSting = UGameplayStatics::SpawnSound2D(this, Sting, Volume, 1.f, 0.f, nullptr, false, false);
+		UE_LOG(LogTemp, Display, TEXT("MIM_CAPTURE sting %s volume %.2f at %.3fs"), *GetNameSafe(Sting), Volume, CaptureTime);
+	}), CaptureStrike, false);
+	// Stage her on the line she caught you from, at the distance her clip is authored for. She comes the rest of
+	// the way while the view turns onto her, rather than appearing there.
+	bCaptureGlide = false;
+	bCaptureSquare = false;
+	CaptureLevelDrop = CaptureOffAxisDegrees = 0.f;
+	CaptureLensShift = FVector::ZeroVector; CaptureStareSide = CaptureStareRise = 0.f;
 	if (Keeper && Player)
 	{
 		const FVector Eye = Player->GetFirstPersonCameraComponent()->GetComponentLocation();
@@ -456,26 +479,275 @@ void ATallowPlayDirector::OnCaught()
 			float Reach = 125.f; FHitResult Hit;
 			if (const auto* Anim = Keeper->FindComponentByClass<UTallowCreatureAnimationComponent>()) Reach *= FMath::Clamp(Anim->KeeperMeshScale, .5f, 2.f);  // staged for a 1.0 scale Keeper
 			FCollisionQueryParams Params(TEXT("CaptureStage"), false, Player); Params.AddIgnoredActor(Keeper);
-			if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + Look * Reach, ECC_Visibility, Params)) Reach = FMath::Max(60.f, Hit.Distance - 40.f);
-			Keeper->SetActorLocationAndRotation(FVector(Eye.X + Look.X * Reach, Eye.Y + Look.Y * Reach, Keeper->GetActorLocation().Z), (-Look).Rotation(), false, nullptr, ETeleportType::TeleportPhysics);
+			const auto* StageCapsule = Keeper->GetCapsuleComponent();
+			// Short of a wall between you, she stays on your side of it.
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + Look * Reach, ECC_Visibility, Params))
+				Reach = FMath::Max(StageCapsule->GetScaledCapsuleRadius() + 20.f, Hit.Distance - StageCapsule->GetScaledCapsuleRadius() - 6.f);
+			const FVector Stage(Eye.X + Look.X * Reach, Eye.Y + Look.Y * Reach, Keeper->GetActorLocation().Z);
+			const FQuat StageFacing = CaptureFacing(Keeper.Get(), -Look).Quaternion();
+			// Wherever she ends up, the shot takes her straight on (UpdateCaptureShot); this is her front against her actor.
+			CaptureFrontYaw = FRotator::NormalizeAxis((-Look).Rotation().Yaw - StageFacing.Rotator().Yaw);
+			bCaptureSquare = true;
+			const auto StageShape = FCollisionShape::MakeCapsule(StageCapsule->GetScaledCapsuleRadius(), StageCapsule->GetScaledCapsuleHalfHeight());
+			// Never stage the grab inside furniture: an embedded mask reads as a
+			// broken jumpscare (and can strand her off the navmesh afterwards).
+			if (!GetWorld()->OverlapBlockingTestByProfile(Stage, StageFacing, StageCapsule->GetCollisionProfileName(), StageShape, Params))
+			{
+				FHitResult Path;
+				const bool bPathBlocked = GetWorld()->SweepSingleByProfile(Path, Keeper->GetActorLocation(), Stage, StageFacing,
+					StageCapsule->GetCollisionProfileName(), StageShape, Params);
+				if (bPathBlocked)
+					Keeper->SetActorLocationAndRotation(Stage, StageFacing.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
+				else
+				{
+					CaptureGlideFrom = Keeper->GetActorLocation(); CaptureGlideTo = Stage;
+					CaptureGlideFromRotation = Keeper->GetActorQuat(); CaptureGlideToRotation = StageFacing;
+					bCaptureGlide = true;
+				}
+				UE_LOG(LogTemp, Display, TEXT("MIM_CAPTURE stage=%.1fcm from eye glide=%d scale=%.3f strike=%.3f cut=%.3f"),
+					Reach, bCaptureGlide ? 1 : 0, Keeper->GetActorScale3D().GetAbsMin(), CaptureStrike, CaptureCutAt);
+			}
+			else
+			{
+				// No room to stage her: she stays where she is but still turns to face you (in place, so nothing can block it).
+				CaptureGlideFrom = CaptureGlideTo = Keeper->GetActorLocation();
+				CaptureGlideFromRotation = Keeper->GetActorQuat(); CaptureGlideToRotation = StageFacing;
+				bCaptureGlide = true;
+				UE_LOG(LogTemp, Warning, TEXT("MIM_CAPTURE floor stage blocked; preserving physical capsule, turning in place"));
+			}
 		}
 	}
 	if (Player)
 	{
-		CaptureBaseFOV = Player->GetFirstPersonCameraComponent()->FieldOfView;
+		auto* Camera = Player->GetFirstPersonCameraComponent();
+		CaptureBaseFOV = Camera->FieldOfView;
+        if (!bCaptureCameraBaseValid)
+        {
+            CaptureBaseCameraLocation = Camera->GetRelativeLocation();
+            CaptureBaseCameraRotation = Camera->GetRelativeRotation();
+            bCaptureCameraBaseValid = true;
+        }
+        CaptureStartRotation = CaptureAim = Camera->GetComponentQuat();
+        // The shot is taken from where the eye was when she caught you, the point her stage is measured from.
+        // The body turning round would otherwise carry the camera's forward offset up to twice its length toward her.
+        CaptureBaseEye = Camera->GetComponentLocation();
+        CaptureFloorZ = Player->GetActorLocation().Z - Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+        // Through the shot the lens is placed against the pose she is actually drawn in this frame, not the last
+        // one: her head can move several centimetres a frame in the shakes. Cameras update after every tick.
+        if (Keeper) AddTickPrerequisiteComponent(Keeper->GetMesh());
+        // The turn is quick for a glance and never slower than a third of a second for a full about-face.
+        float FaceWidth = 65.f;
+        const FVector Face = Keeper && Keeper->GetMesh()->DoesSocketExist(TEXT("head"))
+            ? CaptureFaceCenter(Keeper->GetMesh(), FaceWidth) : Camera->GetComponentLocation() + Camera->GetForwardVector() * 100.f;
+        const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Camera->GetForwardVector(),
+            (Face - Camera->GetComponentLocation()).GetSafeNormal()), -1.f, 1.f)));
+        CaptureTurnSeconds = FMath::Clamp(Angle / FMath::Max(CaptureTurnDegreesPerSecond, 1.f), CaptureTurnMinSeconds, CaptureTurnMaxSeconds);
+        bCaptureInDarkness = Player->GetCandleComponent()->GetCandleState() == ECandleState::Out;
+        CapturePullDistance = CaptureAimErrorDegrees = 0.f;
+        CaptureLensClearance = 0.f;
+        bCaptureHandsBaseValid = Presentation && Presentation->IsPresentationEnabled();
+        if (bCaptureHandsBaseValid) CaptureHandsBase = Presentation->HandsRelativeTransform;
 		if (!CaptureLight)
 		{
-			// The candle thrust up at its face: without it the opening mask is lost in the dark.
+			// The light the shot is seen by when the candle is out. It sits low and to the candle side of the
+			// lens (about 30 degrees off the axis at her face), so her face gets shape and falloff instead of flat
+			// front fill, and it never ends up inside her hands or her face at the strike.
 			CaptureLight = NewObject<UPointLightComponent>(Player, TEXT("IntegratedCaptureLight"));
-			CaptureLight->SetupAttachment(Player->GetFirstPersonCameraComponent());
-			CaptureLight->SetRelativeLocation(FVector(20.f, 18.f, -28.f));  // beside the held candle, never inside its head at the strike
+			CaptureLight->SetupAttachment(Camera);
+			CaptureLight->SetRelativeLocation(FVector(2.f, 18.f, -18.f));
 			CaptureLight->SetIntensityUnits(ELightUnits::Lumens); CaptureLight->SetIntensity(0.f);
 			CaptureLight->SetLightColor(FLinearColor(1.f, .62f, .32f)); CaptureLight->SetAttenuationRadius(250.f); CaptureLight->SetCastShadows(true);
 			Player->AddInstanceComponent(CaptureLight); CaptureLight->RegisterComponent();
 		}
+		UE_LOG(LogTemp, Display, TEXT("MIM_CAPTURE turn=%.3fs dark=%d fov=%.1f"), CaptureTurnSeconds, bCaptureInDarkness ? 1 : 0, CaptureBaseFOV);
 	}
 	if (Player)
 		if (auto* Interaction = Player->FindComponentByClass<UTallowInteractionComponent>()) Interaction->CancelInteract();
+}
+
+float ATallowPlayDirector::MeasureCaptureLensClearance(const FVector& Eye, bool bGripping) const
+{
+	if (!Keeper) return TNumericLimits<float>::Max();
+	const auto* Mesh = Keeper->GetMesh();
+	const float Rig = Mesh->GetComponentScale().GetAbsMin();
+	float Clearance = TNumericLimits<float>::Max();
+	auto Segment = [&](const FName From, const FName To, float RadiusRigCm)
+	{
+		if (!Mesh->DoesSocketExist(From) || !Mesh->DoesSocketExist(To)) return;
+		const FVector A = Mesh->GetSocketLocation(From), B = Mesh->GetSocketLocation(To);
+		Clearance = FMath::Min(Clearance, float(FMath::PointDistToSegment(Eye, A, B)) - RadiusRigCm * Rig);
+	};
+	// Bone capsules from the export (Final01/Export/mim-capsules.json, rig cm) with 16 cm of coat on every arm
+	// segment and hand; the fingers carry 5.5 cm cards. All of it scales with her.
+	static const float UpperRadius[] = {22.7f, 13.2f, 10.2f}, ForeRadius[] = {9.2f, 10.7f, 13.4f}, HandRadius[] = {7.9f, 9.1f, 11.5f};
+	constexpr float Coat = 16.f;
+	for (int32 Pair = 1; Pair <= 3; ++Pair)
+		for (const TCHAR* Side : {TEXT("l"), TEXT("r")})
+		{
+			const auto Bone = [&](const TCHAR* Part) { return FName(*FString::Printf(TEXT("arm%02d_%s_%s"), Pair, Part, Side)); };
+			Segment(Bone(TEXT("upper")), Bone(TEXT("fore")), UpperRadius[Pair - 1] + Coat);
+			// Once the four front hands hold the frame they are placed from the lens itself and keep their own
+			// distance (each lets go if it comes inside the keep-out); moving the lens away from them would only
+			// drag them after it.
+			if (bGripping && Pair < 3) continue;
+			Segment(Bone(TEXT("fore")), Bone(TEXT("hand")), ForeRadius[Pair - 1] + Coat);
+			Segment(Bone(TEXT("hand")), Bone(TEXT("hand")), HandRadius[Pair - 1] + Coat);
+			for (int32 Digit = 1; Digit <= 5; ++Digit)
+				Segment(Bone(TEXT("hand")), FName(*FString::Printf(TEXT("arm%02d_d%d_03_%s"), Pair, Digit, Side)), HandRadius[Pair - 1] * .6f + 5.5f);
+		}
+	// The face: the mask is about 20 cm proud of the eyes and the open jaw drops below it.
+	// Her nose and teeth sit 22 rig cm in front of the eyes, the dropped lower teeth 24 in front of the jaw.
+	Segment(TEXT("eye_l"), TEXT("eye_r"), 30.f);
+	Segment(TEXT("jaw"), TEXT("eye_l"), 30.f);
+	Segment(TEXT("jaw"), TEXT("eye_r"), 30.f);
+	return Clearance;
+}
+
+void ATallowPlayDirector::UpdateCaptureShot(float DeltaSeconds)
+{
+	auto* Camera = Player->GetFirstPersonCameraComponent();
+	CaptureTime += DeltaSeconds;
+	const float T = CaptureTime;
+	const float Scale = Keeper->GetActorScale3D().GetAbsMin();
+	const FVector BaseEye = CaptureBaseEye;
+	// Beats, in seconds from the capture (the clip's frames at 24 fps): the turn [0, Turn]; the dead-still stare
+	// from frame 8; the drive from frame 13 to the strike on frame 17, which takes the lens 15 S cm toward her and
+	// 10 S cm down; the hold, her hands drawing it in another 8 S cm until the cut.
+	const float StareAt = 8.f / 24.f, StrikeLead = 4.f / 24.f;
+	float FaceWidth = 65.f;
+	if (bCaptureGlide)
+	{
+		const float Glide = FMath::SmoothStep(0.f, FMath::Max(CaptureGlideSeconds, .01f), T);
+		Keeper->SetActorLocationAndRotation(FMath::Lerp(CaptureGlideFrom, CaptureGlideTo, Glide),
+			FQuat::Slerp(CaptureGlideFromRotation, CaptureGlideToRotation, Glide), false, nullptr, ETeleportType::TeleportPhysics);
+		bCaptureGlide = Glide < 1.f;
+	}
+	CaptureFaceFocus = CaptureFaceCenter(Keeper->GetMesh(), FaceWidth);
+	const float Taken = FMath::Pow(FMath::Clamp((T - (CaptureStrike - StrikeLead)) / StrikeLead, 0.f, 1.f), 2.f);
+	const float Hold = 1.f - FMath::Pow(1.f - FMath::Clamp((T - CaptureStrike) / FMath::Max(CaptureCutAt - CaptureStrike, .05f), 0.f, 1.f), 1.6f);
+	FVector Axis = (CaptureFaceFocus - BaseEye).GetSafeNormal2D();
+	if (Axis.IsNearlyZero()) Axis = Camera->GetForwardVector().GetSafeNormal2D();
+	// Rig metres to world cm: the shot keeps its proportions at any size.
+	const float RigMetre = 100.f * Scale;
+	// Straight on and level (29 Oct: "it was slightly on the side"). Her face is not on her own centre line
+	// (the clip carries the head a little to one side and the stare tilts it), and Nell's eye is 139 cm off the
+	// floor where the clips hold the face well under that at the game's size, so the view met her about 9 degrees
+	// off her front and tipped down onto her. The lens comes onto the line straight out of her front through her
+	// face, at her face's height: a few centimetres across and a sink, as if the child's knees go. Her body is not
+	// turned for it (a turn feeds her movement's lean and rocks the head). Eased in over the rise and held from the
+	// drive on: the strike is drawn round the clip's own lens, on her centre line (her four hands take the frame
+	// corners round it), so the lens goes back onto that line through the drive and keeps the stare's height.
+	// Following the face any further, this close in, only chases a head that is aiming at the lens, and took the
+	// lens down into her hood's shadow. Never lower than a child sat on the floor, never higher than onto her toes.
+	if (bCaptureSquare)
+	{
+		const FVector Front = FRotator(0.f, Keeper->GetActorRotation().Yaw + CaptureFrontYaw, 0.f).Vector();
+		const FVector Across = FVector::CrossProduct(FVector::UpVector, Front);
+		if (T < CaptureStrike - StrikeLead)
+		{
+			const float Lowest = FMath::Min(0.f, CaptureFloorZ + CaptureLevelMinEyeHeight - float(BaseEye.Z));
+			CaptureStareSide = FMath::Clamp(float(FVector::DotProduct(CaptureFaceFocus - BaseEye, Across)), -40.f * Scale, 40.f * Scale);
+			CaptureStareRise = FMath::Clamp(float(CaptureFaceFocus.Z - BaseEye.Z), Lowest, CaptureLevelMaxRise);
+		}
+		const float Side = CaptureStareSide * (1.f - Taken), Rise = CaptureStareRise;
+		const float Settle = FMath::SmoothStep(0.f, FMath::Max(StareAt, CaptureTurnSeconds), T);
+		CaptureLensShift = FMath::VInterpTo(CaptureLensShift, (Across * Side + FVector::UpVector * Rise) * Settle, DeltaSeconds, 18.f);
+		CaptureLevelDrop = CaptureLensShift.Z;
+	}
+	FVector Eye = BaseEye + CaptureLensShift
+		+ Axis * RigMetre * (.15f * Taken + .08f * Hold) - FVector::UpVector * RigMetre * (.10f * Taken + .02f * Hold);
+	FCollisionQueryParams CameraQuery(TEXT("CaptureCameraPull"), false, Player);
+	CameraQuery.AddIgnoredActor(Keeper);
+	FHitResult CameraBlock;
+	if (GetWorld()->SweepSingleByChannel(CameraBlock, BaseEye, Eye, FQuat::Identity,
+		ECC_Camera, FCollisionShape::MakeSphere(4.f), CameraQuery)) Eye = CameraBlock.Location;
+	// Her face never comes nearer the lens than 60 S cm (the teeth then stay about 40 S off): whatever her body
+	// does, the shot keeps its framing and the lens gives way smoothly rather than in jumps.
+	const float FaceFloor = 60.f * Scale;
+	if (FVector::Distance(Eye, CaptureFaceFocus) < FaceFloor)
+		Eye = CaptureFaceFocus + (Eye - CaptureFaceFocus).GetSafeNormal() * FaceFloor;
+	// Nothing of her inside the keep-out: give the lens back along its path until she clears it.
+	const bool bGripping = T >= CaptureStrike - StrikeLead;
+	CaptureLensClearance = MeasureCaptureLensClearance(Eye, bGripping);
+	for (int32 Step = 0; Step < 8 && CaptureLensClearance < CaptureLensKeepOut; ++Step)
+	{
+		const FVector Back = (Eye - CaptureFaceFocus).GetSafeNormal();
+		Eye += Back * (CaptureLensKeepOut - CaptureLensClearance + 1.f);
+		CaptureLensClearance = MeasureCaptureLensClearance(Eye, bGripping);
+	}
+	CapturePullDistance = FVector::Distance(BaseEye, Eye);
+	// The turn onto her face, then the aim stays on it with a frame of weight behind it.
+	const FQuat Target = (CaptureFaceFocus - Eye).Rotation().Quaternion();
+	if (T < CaptureTurnSeconds)
+	{
+		const float X = FMath::Clamp(T / CaptureTurnSeconds, 0.f, 1.f);
+		CaptureAim = FQuat::Slerp(CaptureStartRotation, Target, X * X * X * (X * (X * 6.f - 15.f) + 10.f));
+	}
+	else CaptureAim = FMath::QInterpTo(CaptureAim, Target, DeltaSeconds, 24.f);
+	// The horizon stays level: blending between two aims picks up roll when both pitch and yaw change.
+	FRotator Level = CaptureAim.Rotator(); Level.Roll = 0.f; CaptureAim = Level.Quaternion();
+	// The stare is dead still. The strike lands as one 3 degree jolt; the hold shakes with her head.
+	const float SinceHit = T - CaptureStrike;
+	const float Jolt = SinceHit >= 0.f ? FMath::Exp(-SinceHit * 12.f) : 0.f;
+	const float Shake = SinceHit >= 0.f ? FMath::Exp(-SinceHit * 2.2f) : 0.f;
+	const FRotator Kick(3.f * Jolt * FMath::Cos(SinceHit * 40.f),
+		.8f * Jolt * FMath::Sin(SinceHit * 71.f + 1.8f),
+		2.f * Jolt * FMath::Sin(SinceHit * 23.f + 1.f) + .35f * Shake * FMath::Sin(UE_TWO_PI * 2.6f * FMath::Max(0.f, SinceHit)));
+	const FRotator Final = (CaptureAim * Kick.Quaternion()).Rotator();
+	PC->SetControlRotation(Final);
+	Camera->SetWorldRotation(Final);
+	Camera->SetWorldLocation(Eye);
+	const FVector ActualAim = (CaptureFaceFocus - Eye).GetSafeNormal();
+	CaptureAimErrorDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(
+		FVector::DotProduct(Camera->GetForwardVector(), ActualAim), -1.f, 1.f)));
+	if (bCaptureSquare)
+		CaptureOffAxisDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Camera->GetForwardVector().GetSafeNormal2D(),
+			-FRotator(0.f, Keeper->GetActorRotation().Yaw + CaptureFrontYaw, 0.f).Vector()), -1.f, 1.f)));
+	if (CaptureBaseFOV > 0.f)
+	{
+		// 90 -> 86 creeping in through the stare, the punch to 74 on the strike, 76 at the cut (from a base of 90).
+		const float Creep = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((T - CaptureTurnSeconds) / FMath::Max(CaptureStrike - StrikeLead - CaptureTurnSeconds, .05f), 0.f, 1.f));
+		const float Fov = CaptureBaseFOV - 4.f * Creep - 12.f * Taken + 2.f * Hold;
+		Camera->SetFieldOfView(FMath::Clamp(Fov, 60.f, 100.f));
+	}
+	// Candle out: no light at all until the strike, then a 6 lm flash that settles to 2.
+	if (CaptureLight) CaptureLight->SetIntensity(bCaptureInDarkness && SinceHit >= 0.f
+		? 2.f + 4.f * FMath::Exp(-SinceHit / .15f) : 0.f);
+	// Her face comes closer than the held candle: keep the flame's light in front of the lens, and with the candle
+	// lit give it the same few lumens (6 into the strike, settling to 2), so her face is candle-lit, not blown out.
+	if (auto* CandleFlame = Player->FindComponentByClass<UTallowCandleFlameComponent>())
+	{
+		const bool bAtLens = T >= CaptureStrike - StrikeLead;
+		CandleFlame->ViewHoldDistance = bAtLens ? 16.f : 0.f;
+		CandleFlame->LumensOverride = bCaptureInDarkness || !bAtLens ? 0.f : SinceHit >= 0.f ? 2.f + 4.f * FMath::Exp(-SinceHit / .15f) : 6.f;
+	}
+	// Nell's hands drop out of the shot as she is turned round.
+	if (bCaptureHandsBaseValid && Presentation)
+	{
+		const float Drop = FMath::SmoothStep(0.f, CaptureTurnSeconds + .05f, T);
+		FTransform Hands = CaptureHandsBase;
+		Hands.AddToTranslation(FVector(-12.f, 0.f, -38.f) * Drop);
+		Presentation->UpdateHandsTransform(Hands);
+	}
+	UpdatePlayerAnimation();
+}
+
+float ATallowPlayDirector::GetScreenFade() const
+{
+	const auto* Camera = PC ? PC->PlayerCameraManager.Get() : nullptr;
+	return Camera && Camera->bEnableFading ? Camera->FadeAmount : 0.f;
+}
+
+void ATallowPlayDirector::EndCaptureShot()
+{
+	if (Keeper) RemoveTickPrerequisiteComponent(Keeper->GetMesh());
+	GetWorldTimerManager().ClearTimer(StingHandle);
+	if (CaptureSting) { CaptureSting->Stop(); CaptureSting = nullptr; }
+	bCaptureGlide = false;
+	if (bCaptureHandsBaseValid && Presentation) Presentation->UpdateHandsTransform(CaptureHandsBase);
+	bCaptureHandsBaseValid = false;
+	if (Player)
+		if (auto* CandleFlame = Player->FindComponentByClass<UTallowCandleFlameComponent>()) CandleFlame->ViewHoldDistance = 0.f;
 }
 
 void ATallowPlayDirector::UpdateLessons(float DeltaSeconds)
@@ -541,6 +813,8 @@ void ATallowPlayDirector::UpdatePlayerAnimation()
 	else if (Candle->IsAcquired())
 	{
 		Clip = HoldClip;
+		// The idle hand sway ran too fast for me: half speed.
+		Rate = .5f;
 		if (Player->GetCarriedItem() != ECarriedItemType::None && ToolHoldClip) Clip = ToolHoldClip;
 		else if (Player->bIsCrouched && CrouchClip) Clip = CrouchClip;
 		else if (Player->GetVelocity().Size2D() > 300.f && SprintClip) Clip = SprintClip;
@@ -582,24 +856,10 @@ void ATallowPlayDirector::Tick(float DeltaSeconds)
 	const bool bTied = Player->IsTiedToChair();
 	if (bWasTied && !bTied) OnChairEscaped();
 	bWasTied = bTied;
-	// The new reveal lowers and opens the head. Follow the evaluated head pose while
-	// the existing game mode owns the capture input lock, fade and reset timing.
+	// The capture shot: the game mode owns the input lock, the cut and the reset timing.
 	if (bCaptureTracking && Keeper && PC && Keeper->GetMesh()->DoesSocketExist(TEXT("head")))
 	{
-		const FVector Face = Keeper->GetMesh()->GetSocketLocation(TEXT("head"));
-		const FRotator Aim = (Face - Player->GetFirstPersonCameraComponent()->GetComponentLocation()).Rotation();
-		// The view tightens as it lunges, a tremor builds as it closes, and the candle is thrust up into its face.
-		CaptureTime += DeltaSeconds;
-		// Creeping tension up to the strike, then a snap on it: tighter view, a jolt, the candle thrust at its face.
-		const float Approach = FMath::Clamp(CaptureTime / FMath::Max(CaptureStrike, .01f), 0.f, 1.f);
-		const float Hit = FMath::InterpEaseOut(0.f, 1.f, FMath::Clamp((CaptureTime - CaptureStrike) / .08f, 0.f, 1.f), 3.f);
-		const float Jolt = Hit * FMath::Exp(-FMath::Max(0.f, CaptureTime - CaptureStrike) * 6.f);
-		const float Tremor = .5f * Approach + .6f * Hit + 2.2f * Jolt;
-		const FRotator Jitter(FMath::PerlinNoise1D(CaptureTime * 21.f) * Tremor, FMath::PerlinNoise1D(CaptureTime * 17.f + 5.f) * Tremor, 0.f);
-		PC->SetControlRotation(FMath::RInterpTo(PC->GetControlRotation(), Aim, DeltaSeconds, 16.f) + Jitter);
-		if (CaptureBaseFOV > 0.f) Player->GetFirstPersonCameraComponent()->SetFieldOfView(CaptureBaseFOV - 6.f * Approach - 16.f * Hit);
-		if (CaptureLight) CaptureLight->SetIntensity((12.f * Approach + 23.f * Hit) * (.85f + .15f * FMath::PerlinNoise1D(CaptureTime * 30.f)));
-		UpdatePlayerAnimation();
+		UpdateCaptureShot(DeltaSeconds);
 		return;
 	}
 	UpdateSound(); UpdateLessons(DeltaSeconds); UpdatePlayerAnimation();

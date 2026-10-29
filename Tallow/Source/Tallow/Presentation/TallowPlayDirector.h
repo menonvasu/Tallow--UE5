@@ -82,7 +82,25 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Route") int32 ActiveRunSeed = 0;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Route") bool bPowerRestored = false;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Route") bool bBoardsCleared = false;
-	UFUNCTION(BlueprintPure, Category="Flow") bool CanEscape() const { return bPowerRestored && bBoardsCleared && !bLeaving && !bCaptureTracking; }
+	UFUNCTION(BlueprintPure, Category="Flow") bool CanApproachExit() const { return bPowerRestored && bBoardsCleared && !bLeaving && !bCaptureTracking; }
+	UFUNCTION(BlueprintPure, Category="Flow") bool CanEscape() const;
+	/** One wrist reach for insertion, repeated short pulls for manual threading. */
+	void PlayProjectorGesture(bool bInserting);
+    UFUNCTION(BlueprintPure, Category="Capture") FVector GetCaptureFaceFocus() const { return CaptureFaceFocus; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCapturePullDistance() const { return CapturePullDistance; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureAimErrorDegrees() const { return CaptureAimErrorDegrees; }
+    /** Review telemetry: how far (deg) the view is off her own front, and how far (cm) the lens rose (+) or sank to her face. */
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureOffAxisDegrees() const { return CaptureOffAxisDegrees; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureLevelDrop() const { return CaptureLevelDrop; }
+    /** Review telemetry: how far the screen is faded to black (0 clear, 1 black). */
+    UFUNCTION(BlueprintPure, Category="Capture") float GetScreenFade() const;
+    /** Review telemetry: the turn's length, the lens's clearance from her arms and face (cm, from bone capsules
+     *  including fur), and the moment the shot cuts to black, in seconds from the capture. */
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureTurnSeconds() const { return CaptureTurnSeconds; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureLensClearance() const { return CaptureLensClearance; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureCutTime() const { return CaptureCutAt; }
+    UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureTime() const { return CaptureTime; }
+    UFUNCTION(BlueprintPure, Category="Capture") bool IsCaptureTracking() const { return bCaptureTracking; }
 	UFUNCTION(BlueprintCallable, Category="Flow") void FinishRun();
 	UFUNCTION(BlueprintPure, Category="Flow") FText GetObjective() const;
 	UFUNCTION(BlueprintPure, Category="Flow") bool IsMenuOpen() const { return Menu && Menu->IsInViewport(); }
@@ -137,6 +155,37 @@ private:
 	float CaptureBaseFOV = 0.f;
 	float CaptureStrike = 0.f;
 	FTimerHandle StingHandle;
+	/** 28 Oct: the view is turned onto her face first, she holds dead still, then the strike. */
+	void UpdateCaptureShot(float DeltaSeconds);
+	/** Smallest distance (cm) from Eye to her arms and face, as fur-padded bone capsules; while gripping, without the four holding hands. */
+	float MeasureCaptureLensClearance(const FVector& Eye, bool bGripping) const;
+	void EndCaptureShot();
+	UPROPERTY(Transient) TObjectPtr<UAudioComponent> CaptureSting;
+	FQuat CaptureStartRotation = FQuat::Identity, CaptureAim = FQuat::Identity;
+	FVector CaptureBaseEye = FVector::ZeroVector;
+	FVector CaptureGlideFrom = FVector::ZeroVector, CaptureGlideTo = FVector::ZeroVector;
+	FQuat CaptureGlideFromRotation = FQuat::Identity, CaptureGlideToRotation = FQuat::Identity;
+	FTransform CaptureHandsBase = FTransform::Identity;
+	float CaptureTurnSeconds = .3f, CaptureCutAt = 0.f, CaptureLensClearance = 0.f;
+	bool bCaptureGlide = false, bCaptureHandsBaseValid = false;
+	/** Taking her straight on: her front's yaw against her actor's, and the lens's move onto her face line. */
+	bool bCaptureSquare = false;
+	FVector CaptureLensShift = FVector::ZeroVector;
+	float CaptureFrontYaw = 0.f, CaptureFloorZ = 0.f, CaptureLevelDrop = 0.f, CaptureOffAxisDegrees = 0.f, CaptureStareSide = 0.f, CaptureStareRise = 0.f;
+	/** The lens sinks to the height of her face for the stare, but never lower than this off the floor (cm, a child
+	 *  sat down) and rises at most this much (cm, on her toes). */
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureLevelMinEyeHeight = 55.f;
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureLevelMaxRise = 8.f;
+	/** Seconds she takes to come from where she caught you to her stage, while the view turns. */
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureGlideSeconds = .25f;
+	/** The turn onto her face runs at this rate, between the two limits (s). */
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureTurnDegreesPerSecond = 600.f;
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureTurnMinSeconds = .12f;
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureTurnMaxSeconds = .30f;
+	/** Nothing of her may come nearer the lens than this (cm). The near plane is 1 cm. */
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureLensKeepOut = 8.f;
+	/** The strike sting plays flat at full level (its first 300 ms measure -7.9 dBFS RMS, over her scream's -14.4). */
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureStingVolume = 1.f;
 	UPROPERTY(Transient) TObjectPtr<APlayerController> PC;
 	UPROPERTY(Transient) TObjectPtr<ATallowCharacter> Player;
 	UPROPERTY(Transient) TObjectPtr<ATallowCreature> Keeper;

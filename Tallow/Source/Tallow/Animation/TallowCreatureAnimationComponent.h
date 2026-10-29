@@ -137,6 +137,7 @@ public:
 	void PlayCaptureAnimation();
 	/** The game mode asks for the duration before it broadcasts the capture, so the variant is chosen there once. */
 	UAnimSequence* ChooseCaptureAnimation() const;
+	bool CanPlayCapture(const UAnimSequence* Capture) const;
 	mutable UAnimSequence* ChosenCapture = nullptr;
 	mutable UAnimSequence* LastCapture = nullptr;
 
