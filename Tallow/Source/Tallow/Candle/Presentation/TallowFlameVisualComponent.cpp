@@ -1,4 +1,5 @@
 #include "Candle/Presentation/TallowFlameVisualComponent.h"
+#include "Player/TallowCharacter.h"
 #include "Candle/Presentation/TallowFlameVisualState.h"
 #include "Candle/TallowCandleFlameComponent.h"
 #include "Components/SceneComponent.h"
@@ -77,17 +78,56 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	if (!bStandalone)
 	{
 		TargetExposure = CandleSource->IsGuttering() ? 1.f : (CandleSource->IsInDraft() ? .85f : 0.f);
+		TargetExposure=FMath::Max(TargetExposure,FMath::Clamp((.2f-CandleSource->GetWaxFraction())/.2f,0.f,1.f)*.92f);
 		if (IsValid(GutterSource)) TargetExposure = FMath::Max(TargetExposure, GutterSource->GetGutterAmount());
 	}
 	Exposure = FMath::FInterpTo(Exposure, FMath::Clamp(TargetExposure * (1.f - .55f * Calm), 0.f, 1.f), Dt, 8.f);
 	IgnitionRemaining = FMath::Max(0.f, IgnitionRemaining - Dt);
-	const auto Shape = TallowFlameVisual::Evaluate(Elapsed + PhaseOffset, Exposure, State == ECandleState::Cupped, IgnitionRemaining / .25f);
-	const float Height = FMath::Clamp(HeightCm, .1f, 20.f);
-	Material->SetScalarParameterValue(TEXT("HeightCm"), Height * Shape.Height);
+	auto Shape = TallowFlameVisual::Evaluate(Elapsed + PhaseOffset, Exposure, State == ECandleState::Cupped, IgnitionRemaining / .25f);
+	Shape.BendX *= 1.f - .75f * Calm; Shape.BendY *= 1.f - .75f * Calm;
+	const float WaxStrength=bStandalone ? 1.f : FMath::Lerp(.48f,1.f,FMath::Clamp(CandleSource->GetWaxFraction()/.35f,0.f,1.f));
+	const float Height = FMath::Clamp(HeightCm, .1f, 20.f)*WaxStrength;
+	// Seen (25 Oct: you could not tell): at its call the flame bows hard toward the Keeper and shrinks, then stays
+	// restless while it keeps looking. Cosmetic only; the light's reach for the Keeper is unchanged.
+	float SeenHeight = 1.f, SeenEmission = 1.f; FVector2D SeenBend = FVector2D::ZeroVector;
+	if (const auto* Seer = Cast<ATallowCharacter>(GetOwner()); Seer && !bStandalone)
+	{
+		const float Call = FMath::Exp(-FMath::Max(0.f, GetWorld()->GetTimeSeconds() - Seer->SeenCallAt) / .3f);
+		const float Watched = FMath::Clamp(Seer->KeeperSight, 0.f, 1.f);
+		const FVector Toward = WickAnchor->GetComponentTransform().InverseTransformVectorNoScale(
+			(Seer->KeeperSeenFrom - WickAnchor->GetComponentLocation()).GetSafeNormal());
+		const float Restless = Watched * (.35f + .25f * FMath::PerlinNoise1D(Elapsed * 9.f));
+		SeenBend = FVector2D(Toward.X, Toward.Y).GetSafeNormal() * (.9f * Call + Restless);
+		// The draught: a slow lean toward where the house wants her next (Player->GuideTarget, the next corner of her
+		// walk to it), drawn in long soft pulls like air moving through the house. The sudden, hard, cold bow above is
+		// being seen; the two must never read alike (28 Oct), so the draught swells and eases every few seconds and
+		// never goes blue or small. 29 Oct: readable at a glance, and harder the closer she is: a plain lean across
+		// the house, a strong one from about 2.5 m out. Her cupped hand keeps most of it off.
+		if (!Seer->GuideTarget.IsZero() && Watched < .1f && Call < .05f
+			&& FVector::Dist2D(Seer->GuideTarget, WickAnchor->GetComponentLocation()) > 40.f)
+		{
+			const FVector Way = WickAnchor->GetComponentTransform().InverseTransformVectorNoScale(
+				(Seer->GuideTarget - WickAnchor->GetComponentLocation()).GetSafeNormal2D());
+			const float Pull = FMath::Square(.5f + .5f * FMath::Sin(GetWorld()->GetTimeSeconds() * 1.7f));
+			const float Near = 1.f - FMath::Clamp((Seer->GuideWalk - 250.f) / 2250.f, 0.f, 1.f);
+			const float Lean = (.18f + .22f * Near + (.07f + .05f * Near) * Pull) * (1.f + .6f * FMath::Clamp(Seer->GuideEmphasis, 0.f, 1.f))
+				* (1.f - .6f * Calm) * (State == ECandleState::Cupped ? .35f : 1.f);
+			DraughtBend = FMath::Vector2DInterpTo(DraughtBend, FVector2D(Way.X, Way.Y).GetSafeNormal() * Lean, GetWorld()->GetDeltaSeconds(), 1.6f);
+		}
+		else DraughtBend = FMath::Vector2DInterpTo(DraughtBend, FVector2D::ZeroVector, GetWorld()->GetDeltaSeconds(), 3.f);
+		SeenBend += DraughtBend;
+		// Holding her breath too long: the flame trembles with her hand.
+		const float Strain = Seer->GetHeldStrain();
+		const float Now = GetWorld()->GetTimeSeconds();
+		SeenBend += FVector2D(FMath::PerlinNoise1D(Now * 31.f), FMath::PerlinNoise1D(Now * 27.f + 3.f)) * .14f * Strain;
+		SeenHeight = 1.f - .6f * Call - .2f * Watched;
+		SeenEmission = 1.f - .3f * FMath::Max(Call, Watched);
+	}
+	Material->SetScalarParameterValue(TEXT("HeightCm"), Height * Shape.Height * SeenHeight);
 	Material->SetScalarParameterValue(TEXT("WidthCm"), FMath::Clamp(WidthCm, .05f, 10.f) * Shape.Width);
-	Material->SetScalarParameterValue(TEXT("BendX"), Shape.BendX * Height);
-	Material->SetScalarParameterValue(TEXT("BendY"), Shape.BendY * Height);
-	Material->SetScalarParameterValue(TEXT("Emission"), 4.f * Shape.Emission);
+	Material->SetScalarParameterValue(TEXT("BendX"), (Shape.BendX + SeenBend.X) * Height);
+	Material->SetScalarParameterValue(TEXT("BendY"), (Shape.BendY + SeenBend.Y) * Height);
+	Material->SetScalarParameterValue(TEXT("Emission"), 4.f * Shape.Emission * SeenEmission);
 }
 
 void UTallowFlameVisualComponent::EndPlay(const EEndPlayReason::Type Reason)

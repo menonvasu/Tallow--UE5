@@ -26,6 +26,14 @@ public:
 	
 protected:
 	virtual void NativeConstruct() override;
+	/** Drawn in native code in the handmade style (TallowPaper): the WBP's designer widgets stay bound but unseen. */
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	FText Label;
+	bool bHold = false;
+	bool bCanAct = true;
+	float Progress = 0.f;
 	
 	/** Text to show */
 	UPROPERTY(meta = (BindWidget))

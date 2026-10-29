@@ -11,10 +11,10 @@ class UFont;
 class UTexture2D;
 
 UENUM(BlueprintType)
-enum class ETallowMenuMode : uint8 { Main, Pause, Outro };
+enum class ETallowMenuMode : uint8 { Main, Pause, Outro, Caught };
 
 UENUM(BlueprintType)
-enum class ETallowMenuPage : uint8 { Home, Controls, Credits, Confirm };
+enum class ETallowMenuPage : uint8 { Home, Controls, Credits, Confirm, Settings };
 
 UENUM(BlueprintType)
 enum class ETallowMenuAction : uint8 { Start, Resume, Restart, MainMenu, Quit, Continue };
@@ -77,6 +77,9 @@ public:
 	ETallowMenuMode GetMenuMode() const { return State.Mode; }
 	UFUNCTION(BlueprintPure, Category="Tallow|Menu")
 	bool IsAwaitingAction() const { return State.bAwaitingAction; }
+	/** Real seconds since the last key, click or hover change, so the menu's picture never acts on the player's input. */
+	UFUNCTION(BlueprintPure, Category="Tallow|Menu")
+	float GetSecondsSinceInput() const { return float(FPlatformTime::Seconds() - LastInputSeconds); }
 
 	UPROPERTY(BlueprintAssignable, Category="Tallow|Menu")
 	FTallowMenuActionRequested OnActionRequested;
@@ -86,10 +89,10 @@ public:
 	/** Extend with the final asset/music credits before release. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tallow|Menu", meta=(MultiLine=true))
 	FText CreditsText;
-	/** Bundled serif used for the title fallback and menu choices. */
+	/** Kept for Blueprint compatibility; the menu sets its type through TallowPaper. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tallow|Menu")
 	TObjectPtr<UFont> TitleFont;
-	/** Original transparent hand-cut title, referenced for cooking and GC. */
+	/** The engraved wordmark (/Game/FinalPass/UI/T_Wordmark), held for GC once loaded. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tallow|Menu")
 	TObjectPtr<UTexture2D> TitleArtwork;
 
@@ -103,6 +106,8 @@ private:
 	UPROPERTY(Transient)
 	FSlateBrush TitleBrush;
 	FTallowMenuState State;
+	double LastInputSeconds = 0.0;
+	void NoteInput() { LastInputSeconds = FPlatformTime::Seconds(); }
 	TSharedPtr<SVerticalBox> Content;
 	TSharedPtr<SScrollBox> ReadingScroll;
 	void Refresh();
@@ -110,4 +115,14 @@ private:
 	FText Heading() const;
 	FText Body() const;
 	FText Label(ETallowMenuCommand Command) const;
+	/** A setting's current value in words ("on", "off"), or empty for a slider. */
+	FText Value(ETallowMenuCommand Command) const;
+	/** One quiet line about the chosen setting. */
+	FText SettingNote(ETallowMenuCommand Command) const;
+	/** Left/right on a slider row: nudges it a twentieth. Returns false if the row has no slider. */
+	bool Adjust(ETallowMenuCommand Command, float Delta);
+	TSharedRef<class SWidget> MakeItem(int32 Index, ETallowMenuCommand Command, int32 FontSize);
+	TSharedRef<class SWidget> MakeControls() const;
+	TSharedRef<class SWidget> MakeCredits() const;
+	FString FooterKeys() const;
 };

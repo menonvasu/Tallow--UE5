@@ -36,6 +36,8 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/TallowCreatureAnimationComponent.h"
 #include "Audio/TallowFootstepComponent.h"
+#include "Audio/TallowSoundscapeComponent.h"
+#include "Audio/TallowOpeningMusicSubsystem.h"
 #include "Components/AudioComponent.h"
 #include "Environment/TallowDoor.h"
 #include "Presentation/TallowRouteGate.h"

@@ -104,6 +104,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Flow") void FinishRun();
 	UFUNCTION(BlueprintPure, Category="Flow") FText GetObjective() const;
 	UFUNCTION(BlueprintPure, Category="Flow") bool IsMenuOpen() const { return Menu && Menu->IsInViewport(); }
+	UFUNCTION(BlueprintPure, Category="Flow") UTallowMenuWidget* GetMenuWidget() const { return Menu; }
 	UFUNCTION(BlueprintCallable, Category="Flow") void TogglePause();
 	UFUNCTION(BlueprintCallable, Category="Flow") void OpenInventory();
 	/** Ends an open lockpick session (capture, pause, inventory, map). True if one was open. */

@@ -65,5 +65,8 @@ private:
 	float Elapsed = 0.f;
 	float Exposure = 0.f;
 	float IgnitionRemaining = 0.f;
+	FVector2D DraughtBend = FVector2D::ZeroVector;
+	/** Holding her breath the flame stands still in a still hand (28 Oct); 0 breathing, 1 held. */
+	float Calm = 0.f;
 	bool bWasVisible = false;
 };
