@@ -117,6 +117,12 @@ void UTallowBreathFeedbackComponent::TickComponent(float DeltaTime, ELevelTick T
 		const FVector Shake(FMath::PerlinNoise1D(Time * 23.f), FMath::PerlinNoise1D(Time * 19.f + 5.f), FMath::PerlinNoise1D(Time * 29.f + 9.f));
 		Candle->SetRelativeLocation(CandleBase + Shake * .32f * Strain);
 	}
+	// Out of breath after a run: she hears herself pant (the Keeper hears it too, close by: ATallowCharacter).
+	if (!bHolding && Player->IsPanting() && Time >= NextPant)
+	{
+		NextPant = Time + FMath::FRandRange(.8f, 1.1f);
+		Play(Sound(FMath::RandBool() ? TEXT("/Game/Audio/VO/VO_Nell_Effort_07.VO_Nell_Effort_07") : TEXT("/Game/Audio/VO/VO_Nell_Effort_08.VO_Nell_Effort_08")), ExhaleVolume * .8f);
+	}
 	if (!bHolding) return;
 	NearestDuringHold = FMath::Min(NearestDuringHold, MimDistance());
 	if (Strain > .35f && !bStrainSounded)

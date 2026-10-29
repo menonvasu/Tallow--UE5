@@ -5,6 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Player/TallowCharacter.h"
 #include "AI/TallowCreature.h"
+#include "Audio/TallowKeeperVoiceComponent.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 
@@ -23,8 +24,14 @@ void UTallowFootstepComponent::BeginPlay()
 	Attenuation->Attenuation.AttenuationShapeExtents = FVector(100.f);
 	Attenuation->Attenuation.FalloffDistance = FalloffCm;
 	Attenuation->Attenuation.bEnableOcclusion=true;
-	Attenuation->Attenuation.OcclusionLowPassFilterFrequency=1800.f;
-	Attenuation->Attenuation.OcclusionVolumeAttenuation=.55f;
+	Attenuation->Attenuation.OcclusionLowPassFilterFrequency=bNaturalFalloff?900.f:1800.f;
+	Attenuation->Attenuation.OcclusionVolumeAttenuation=bNaturalFalloff?.5f:.55f;
+	if (bNaturalFalloff)
+	{
+		Attenuation->Attenuation.DistanceAlgorithm=EAttenuationDistanceModel::NaturalSound;
+		Attenuation->Attenuation.dBAttenuationAtMax=-40.f;
+		Attenuation->Attenuation.OcclusionInterpolationTime=.2f;
+	}
 	Attenuation->Attenuation.bAttenuateWithLPF=true;
 	Attenuation->Attenuation.LPFRadiusMin=250.f;
 	Attenuation->Attenuation.LPFRadiusMax=FalloffCm;
@@ -53,6 +60,9 @@ void UTallowFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	LastStep = Index;
 	const float Gain = FMath::GetMappedRangeValueClamped(FVector2D(60.f, 400.f), FVector2D(.5f, 1.3f), Speed) * (Character->bIsCrouched ? .45f : 1.f);
 	// Breath held: the Keeper hears nothing (TallowFootstepNoiseComponent), and you hear yourself creep.
+	// Creeping, the Keeper puts her hands down without a sound: nothing to hear her by.
+	const auto* CreepVoice = bCreature ? Character->FindComponentByClass<UTallowKeeperVoiceComponent>() : nullptr;
+	if (CreepVoice && CreepVoice->IsCreeping()) return;
 	const float HeldGain = Cast<ATallowCharacter>(Character) && Cast<ATallowCharacter>(Character)->IsHoldingStill() ? .25f : 1.f;
 	const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, bGrounded?Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight():0.f);
 	Play(Steps[Index], Feet, Volume * Gain * HeldGain);

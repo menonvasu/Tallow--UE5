@@ -5,6 +5,7 @@
 #include "TallowOptionalBoards.generated.h"
 
 class UStaticMeshComponent;
+class ATallowPlank;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnOptionalBoardsOpened, bool, bByMim);
 
 /** Route variation deliberately separate from the required workshop plank counter. */
@@ -41,8 +42,18 @@ public:
     /** Keep boarded doors blocked unless an authored breach is explicitly enabled. */
     UPROPERTY(EditAnywhere, Category="House|Route") bool bAllowMimBreach = false;
     UPROPERTY(EditAnywhere, Category="House|Route") float MimBreachSeconds = 5.f;
+    /** Plank actor class for the barricade. Set, the set is built from separate planks pried one per hold; unset, one board mesh comes off in a single hold. */
+    UPROPERTY(EditAnywhere, Category="House|Route") TSubclassOf<ATallowPlank> PlankClass;
+    UPROPERTY(EditAnywhere, Category="House|Route") int32 PlankCount = 3;
+    const TArray<TObjectPtr<ATallowPlank>>& GetPlanks() const { return Planks; }
+    int32 RemainingPlanks() const;
 private:
     void RemoveBoards(bool bByMim, AActor* Responsible);
+    void SpawnPlanks();
+    UFUNCTION() void HandlePlankDestroyed(bool bBroken);
+    void SetWobble(float RollDegrees);
+    UPROPERTY(Transient) TArray<TObjectPtr<ATallowPlank>> Planks;
+    FQuat AuthoredRotation = FQuat::Identity;
     void SetBoardVisibility();
     bool bChapterControlled = false;
     bool bInitialized = false;

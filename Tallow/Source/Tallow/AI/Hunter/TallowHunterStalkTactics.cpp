@@ -63,12 +63,15 @@ bool ATallowHunterAIController::FindWatchPost(const FVector& Area, float MinPath
             Candidates.Add({AreaFloor.Location + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * FMath::Lerp(MinPath, MaxPath, (Ring + .5f) / 3.f), -10.f});
         }
     CacheDoors();
+    // Chapter two is the stalking chapter (29 Oct): there it all but always takes a doorway when one will do.
+    const UTallowHunterDirector* Pacing = GetHuntDirector();
+    const float DoorBonus = Pacing && Pacing->GetAct() == ETallowStoryAct::FuseHunt ? 240.f : 120.f;
     for (const FDoorWatch& Watch : Doors)
     {
         if (!Watch.Door.IsValid() || IsBarred(Watch.Door.Get()) || DoorOpenness(Watch) < .5f) continue;
         // Framed in a doorway, just through it on the far side from her: the oldest shape in the house.
         const FVector Away = (Watch.Center - AreaFloor.Location).GetSafeNormal2D();
-        for (const float Depth : {70.f, 150.f}) Candidates.Add({Watch.Center + Away * Depth, 120.f});
+        for (const float Depth : {70.f, 150.f}) Candidates.Add({Watch.Center + Away * Depth, DoorBonus});
     }
     float BestScore = -MAX_flt;
     // Why a search finds no post, for the log (each test that turned candidates down).

@@ -20,8 +20,15 @@ public:
 	void NoteKey(const FKey& Key);
 	/** Analog values above .3 on a gamepad axis flip to Gamepad; other axes are ignored. */
 	void NoteAnalog(const FKey& Key, float Value);
-	/** Cursor travel in pixels; more than 4 within a moment flips to KeyboardMouse. */
-	void NoteMouseDelta(const FVector2D& Delta);
+	/** Cursor travel in pixels. Only sustained travel (MouseSwitchDistance px inside MouseSwitchWindow seconds, over at least
+	 *  MouseSwitchMinSpan seconds) flips to KeyboardMouse, so a brush of the DualSense touchpad (which Linux exposes as a mouse) does not. */
+	void NoteMouseDelta(const FVector2D& Delta) { NoteMouseDeltaAt(Delta, FPlatformTime::Seconds()); }
+	void NoteMouseDeltaAt(const FVector2D& Delta, double Now);
+	static constexpr float MouseSwitchDistance = 250.f;
+	static constexpr double MouseSwitchWindow = 0.6;
+	static constexpr double MouseSwitchMinSpan = 0.12;
+	/** True while the pad owns the game: mouse motion must not turn the camera and the hidden cursor stays put. */
+	bool ShouldSwallowMouseMotion() const { return Device == ETallowInputDevice::Gamepad; }
 	FTallowInputDeviceChanged OnDeviceChanged;
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -32,4 +39,5 @@ protected:
 	TSharedPtr<IInputProcessor> Processor;
 	float MouseTravel = 0.f;
 	double LastMouseTime = 0.0;
+	double MouseWindowStart = 0.0;
 };

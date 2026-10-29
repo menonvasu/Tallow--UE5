@@ -6,6 +6,7 @@
 
 class ATallowBloodWriting;
 class ATallowCharacter;
+class ATallowDoor;
 class UAudioComponent;
 class UMaterialInstanceDynamic;
 class UPointLightComponent;
@@ -28,11 +29,25 @@ public:
     virtual bool IsTickableWhenPaused() const override { return true; }
     ETallowChapterBeat GetStagedBeat() const { return Beat; }
     ATallowBloodWriting* GetWriting() const { return Writing; }
+    /** The doors of a room: the house graph's doors on its edges, and any other door standing in its walls. */
+    static void FindRoomDoors(const UWorld* World, FName Room, TArray<ATallowDoor*>& OutDoors);
+    /** The writing beat, for tests: the doors it threw shut, whether it holds her view, the red lamp. */
+    TArray<ATallowDoor*> GetSlammedDoors() const;
+    bool IsHoldingView() const { return Beat == ETallowChapterBeat::BloodWriting && !bInputReleased && !bViewFree; }
+    bool IsViewTurned() const;
+    UPointLightComponent* GetStrobe() const { return Strobe; }
 private:
     UFUNCTION() void OnBeatRequested(ETallowChapterBeat InBeat, const FTallowBeatContext& Context);
     UFUNCTION() void OnRoundReset(int32 ChapterIndex, ETallowRestartReason Reason);
     void BeginWriting();
     void StageWriting(float T);
+    /** Every open door of her room thrown shut at once. Returns how many. */
+    int32 SlamRoomDoors(const FVector& Words);
+    /** Her view taken round onto the words and held there while they form. */
+    void HoldView(float T);
+    /** A failing red lamp in the room while the words form: irregular, never a steady beat. */
+    void LightStrobe(const FVector& Words, const FVector& Normal);
+    void StageStrobe(float T, float DeltaTime);
     void StageRestraint(float T);
     void StageRelease(float T);
     void StageFuse(float T);
@@ -56,10 +71,11 @@ private:
     /** -TallowBeatsRehearse: plays chapter one's beats in order from its start (debug runs only). -TallowBeatsFilm=<dir>
      *  writes a frame every quarter second while a beat plays. */
     void Rehearse();
+    void StageListening(const AActor* Story, const FVector& Anchor, bool bOpenDoors);
     void Film();
     int32 RehearseStep = -1;
     int32 WordsChapter = -1;
-    double RehearseAt = 0.0, NextFrame = 0.0, FilmUntil = 0.0;
+    double RehearseAt = 0.0, NextFrame = 0.0, FilmUntil = 0.0, FilmStep = .25;
     int32 Frames = 0;
     FString FilmDir;
 #endif
@@ -78,6 +94,21 @@ private:
     double LidsAt = 0.0;
     FVector MimWas = FVector::ZeroVector;
     FVector FuseAt = FVector::ZeroVector;
+    // The writing: when the words start forming, how long the turn onto them takes, the slam's jolt.
+    float WordsDelay = 0.f, WordsWhole = 0.f, TurnSeconds = 0.f, SlamJolt = 0.f, StrobeLevel = 0.f;
+    FQuat TurnFrom = FQuat::Identity;
+    FVector WordsAt = FVector::ZeroVector;
+    bool bViewFree = false;
+    /** (seconds, level) steps of the lamp, each held until the next. */
+    TArray<FVector2f> StrobeKeys;
+    TArray<TWeakObjectPtr<ATallowDoor>> Slammed;
+    UPROPERTY(Transient) TObjectPtr<UPointLightComponent> Strobe;
+    /** Loaded with the world so the decal's shaders are ready long before the first writing. */
+    UPROPERTY(Transient) TObjectPtr<class UMaterialInterface> BloodMaterial;
+    /** A centimetre of the blood drawn in the air in front of her eyes at the start (see PrimeBlood). */
+    UPROPERTY(Transient) TObjectPtr<class UDecalComponent> Primer;
+    double PrimedAt = -1.0;
+    void PrimeBlood();
     UPROPERTY(Transient) TObjectPtr<ATallowBloodWriting> Writing;
     UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> Lids;
     UPROPERTY(Transient) TObjectPtr<USoundMix> Muffle;

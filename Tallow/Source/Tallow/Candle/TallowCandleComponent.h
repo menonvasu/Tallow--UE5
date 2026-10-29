@@ -28,6 +28,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAcquireCandle);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCandleReset);
 /** Matches in the box changed (picked up a box, struck one), or a strike failed with none left. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMatchesChanged, int32, Count, bool, bTriedWithNone);
+/** A gust took the flame (Mim came too close): fired after the state has gone Out. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCandleGustedOut);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TALLOW_API UTallowCandleComponent : public UActorComponent
@@ -117,6 +119,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Candle")
 	int32 GetMatchCount() const { return MatchCount; }
 
+	/** Your candle betrays you (29 Oct): a gust as Mim comes right up takes an open flame. Only a lit candle in an
+	 *  open hand goes; a cupped one, one mid-strike or one already out is left as it is. Returns true if it went out. */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	bool GustOut();
+
+	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
+	FOnCandleGustedOut OnCandleGustedOut;
+
+	/** A struck match flares brighter than the candle it lights: 1 at the strike, easing to a steady burn, gone soon
+	 *  after the wick takes. Mim sees a flare like a lit flame, and further. 0 when no match is burning. */
+	UFUNCTION(BlueprintPure, Category = "Candle")
+	float GetMatchFlare() const;
+
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnMatchesChanged OnMatchesChanged;
 
@@ -182,6 +197,13 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
 	float RelightDuration = 1.2f;
+
+	/** How long a struck match's flare lasts (s): from the strike until a little after the wick takes. */
+	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
+	float MatchFlareSeconds = 1.6f;
+
+	/** World time the last match was struck. */
+	double MatchStruckAt = -100.0;
 
 	FTimerHandle RelightTimerHandle;
 

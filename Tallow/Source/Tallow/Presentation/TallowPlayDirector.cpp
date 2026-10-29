@@ -25,6 +25,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
+#include "AI/Hunter/TallowHunterCreature.h"
 #include "AI/Hunter/TallowHunterDirector.h"
 #include "GameMode/TallowGameMode.h"
 #include "Interactable/TallowInteractionComponent.h"
@@ -50,6 +51,7 @@
 #include "UI/Presentation/TallowCandleStatusWidget.h"
 #include "UI/Presentation/TallowSlidesWidget.h"
 #include "Audio/TallowCorruptedVoice.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/Presentation/TallowPresentationAnimInstance.h"
 #include "Animation/TallowCreatureAnimationComponent.h"
@@ -780,7 +782,7 @@ void ATallowPlayDirector::OnCaught()
 	{
 		static const TCHAR* Strike = TEXT("/Game/FinalPass/Capture/K_Capture_StrikeSting.K_Capture_StrikeSting");
 		USoundBase* Sting = LoadObject<USoundBase>(nullptr, Strike, nullptr, LOAD_NoWarn | LOAD_Quiet);
-		const float Volume = Sting ? CaptureStingVolume : .8f;
+		const float Volume = Sting ? CaptureStingVolume : .2f;
 		if (!Sting) Sting = Cue(TEXT("K_Mim_Capture_Sting"));
 		if (Sting) CaptureSting = UGameplayStatics::SpawnSound2D(this, Sting, Volume, 1.f, 0.f, nullptr, false, false);
 		UE_LOG(LogTemp, Display, TEXT("MIM_CAPTURE sting %s volume %.2f at %.3fs"), *GetNameSafe(Sting), Volume, CaptureTime);
@@ -961,7 +963,9 @@ void ATallowPlayDirector::UpdateCaptureShot(float DeltaSeconds)
 	auto* Camera = Player->GetFirstPersonCameraComponent();
 	CaptureTime += DeltaSeconds;
 	const float T = CaptureTime;
-	const float Scale = Keeper->GetActorScale3D().GetAbsMin();
+	// Her drawn size (she is drawn larger than the body her movement plans for).
+	const auto* Hunter = Cast<ATallowHunterCreature>(Keeper.Get());
+	const float Scale = Hunter ? Hunter->GetVisibleBodyScale() : Keeper->GetActorScale3D().GetAbsMin();
 	const FVector BaseEye = CaptureBaseEye;
 	// Beats, in seconds from the capture (the clip's frames at 24 fps): the turn [0, Turn]; the dead-still stare
 	// from frame 8; the drive from frame 13 to the strike on frame 17, which takes the lens 15 S cm toward her and
@@ -1271,6 +1275,7 @@ float ATallowPlayDirector::SayAt(const FString& Name, const FString& Fallback, c
 	if (!Line && !Fallback.IsEmpty()) Line = Load(Fallback, TEXT("Creature"));
 	if (!Line) return 0.f;
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s"), *Line->GetName());
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Line->GetFName(), Line->GetDuration(), ETallowSubtitleVoice::Mim);
 	UGameplayStatics::PlaySoundAtLocation(this, Line, Where, Volume, 1.f, 0.f, CueAttenuation);
 	return Line->GetDuration();
 }
@@ -1442,6 +1447,7 @@ void ATallowPlayDirector::TryNellLine(int32 Number)
 		NellVoice->bIsUISound = false;
 		NellVoice->Play();
 		NellSaidLines |= Bit;
+		if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(*Name, Sound->GetDuration(), ETallowSubtitleVoice::Nell);
 		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE Nell %s"), *Name);
 	}
 }
@@ -1492,7 +1498,7 @@ void ATallowPlayDirector::AddFootsteps()
 		auto* Heavy = NewObject<UTallowFootstepComponent>(Keeper, TEXT("IntegratedKeeperFootsteps"));
 		for (int32 I = 0; I < 6; ++I) Heavy->Steps.Add(Creature(FString::Printf(TEXT("C_Pat_%02d"), I)));
 		for (int32 I = 0; I < 3; ++I) Heavy->Extras.Add(Creature(FString::Printf(TEXT("C_Drag_%02d"), I)));
-		Heavy->StrideCm = 60.f; Heavy->Volume = .5f; Heavy->ExtraChance = .3f; Heavy->ExtraVolume = .35f; Heavy->FalloffCm = 1800.f;   // track it by ear through the house
+		Heavy->StrideCm = 60.f; Heavy->Volume = .7f; Heavy->ExtraChance = .3f; Heavy->ExtraVolume = .45f; Heavy->FalloffCm = 3000.f; Heavy->bNaturalFalloff = true;   // track it by ear through the house
 		Keeper->AddInstanceComponent(Heavy); Heavy->RegisterComponent();
 	}
 	// Vasu's doors own their state; the director only listens to their hinges (and the route gates') swinging.
@@ -1591,6 +1597,8 @@ void ATallowPlayDirector::UpdateSound()
 		if (!Hinges[I]) continue;
 		const float Yaw = FMath::Abs(Hinges[I]->GetRelativeRotation().Yaw);
 		const float Delta = Yaw - HingeYaw[I];
+		// A door the house moves itself (a minor scare) brings its own creak and latch, not the hand-opened sound.
+		if (const auto* Door = Cast<ATallowDoor>(Hinges[I]->GetOwner()); Door && Door->IsDrifting()) { HingeYaw[I] = Yaw; continue; }
 		if (!HingeMoving[I] && FMath::Abs(Delta) > .15f)
 		{
 			HingeMoving[I] = true;

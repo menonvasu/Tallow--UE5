@@ -28,6 +28,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Footsteps") float ExtraVolume = .3f;
 	/** Distance (cm) at which the steps fade out; 0 = the listener's own feet, not spatialised */
 	UPROPERTY(EditAnywhere, Category = "Footsteps") float FalloffCm = 0.f;
+	/** Natural (dB-linear) distance falloff and heavier occlusion, so steps through floors and walls stay audible but dull. */
+	UPROPERTY(EditAnywhere, Category = "Footsteps") bool bNaturalFalloff = false;
 
 private:
 	void Play(USoundBase* Sound, const FVector& Where, float Gain) const;

@@ -46,10 +46,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Door|Lock")
 	void SetLocked(bool bLocked);
 	void ApplyChapterState(ETallowDoorState State);
+	/** A bolted door answers a try with a short rattle and one of Nell's notes. */
+	void RattleBolted(ATallowCharacter* Player);
 	bool bChapterSealed = false;
+	double LastRattleTime = -100.0;
 	bool IsOpenForChapter() const { return bIsOpen; }
 	bool HasChapterBarricade() const { return IsBarricaded(); }
 	bool HasAuthoredPlanks() const { return !InitialPlanks.IsEmpty(); }
+	const TArray<TObjectPtr<ATallowPlank>>& GetAuthoredPlanks() const { return InitialPlanks; }
+	/** Shuts an open leaf hard, as if something on the far side threw it (the blood writing's slam). Lock, seal and
+	 *  boards are left as they are, so it opens again as before. False if the leaf was already shut. */
+	bool SlamShut();
+	/** How far the leaf stands open, in degrees from shut. */
+	float GetLeafAngle() const;
 	
 	/** Overlap function */
 	UFUNCTION()
@@ -63,6 +72,10 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float DoorCloseLoudness = 0.5f;
+
+	/** The rattle of a chapter-sealed (bolted) door: quiet, and not often. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
+	float BoltedRattleLoudness = 0.2f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Tunables")
 	float OpenAngle = 90.0f;
@@ -90,6 +103,18 @@ public:
 
 	/** Whether this actor stands on the room side of the door. */
 	bool IsInside(const AActor* Actor) const;
+
+	/** The house's own hand on the door (a minor scare): a shut, free door comes off its latch and creaks open by
+	 *  Fraction of its swing, or an open one eases shut. Either way it is an ordinary door again the moment it rests. */
+	bool CanDrift() const;
+	bool DriftAjar(float Fraction, float PlayRate);
+	bool DriftShut(float PlayRate);
+	bool IsDrifting() const { return bDrifting; }
+	/** How long a full swing takes at this play rate. */
+	float GetSwingSeconds(float PlayRate) const;
+	FVector GetLeafCentre() const;
+	FVector GetHingeLocation() const;
+	float GetLeafWidth() const;
 	
 	FOnTimelineFloat TimelineProgress;
 	
@@ -129,6 +154,11 @@ protected:
 	TObjectPtr<UCurveFloat> DoorTimelineCurve;
 	
 	bool bIsOpen = false ;
+
+	bool bDrifting = false;
+	/** While drifting open: where on the timeline's curve the leaf stops (0: drifting shut). */
+	float DriftStop = 0.f;
+	void EndDrift();
 	
 	bool IsBarricaded() const { return BarricadePlanks.Num() > 0; }
 	void UpdateNavigationBarrier();

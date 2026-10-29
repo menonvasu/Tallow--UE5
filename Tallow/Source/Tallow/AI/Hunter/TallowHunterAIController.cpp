@@ -33,6 +33,7 @@
 #include "Tasks/TallowFuseBox.h"
 #include "Tasks/TallowFusePickup.h"
 #include "HAL/IConsoleManager.h"
+#include "House/TallowHouseRooms.h"
 
 namespace
 {
@@ -103,7 +104,9 @@ void ATallowHunterAIController::Rush(const FVector& Where, float Seconds)
 {
     if (!Creature || HuntMode == ETallowHuntMode::Captured) return;
     CancelSpiderPlans();
+    EndCreep();
     const float Now = GetWorld()->GetTimeSeconds();
+    const bool bFreshRush = Now >= RushUntil;
     RushUntil = FMath::Max(RushUntil, Now + Seconds);
     Observe(Player ? Player->GetActorLocation() : Where, 1.f, false);
     LastHeardAt = Now;
@@ -116,11 +119,12 @@ void ATallowHunterAIController::Rush(const FVector& Where, float Seconds)
     Creature->HunterMotion->LookAt(EvidenceLocation + FVector(0, 0, 55), .4f);
     // Its call, the cold bow of the flame and her gasp mean one thing: it can see her. A rush on a sound (her
     // running, a landing, out of an ambush) is answered by its chase voice instead, so the call never lies.
+    // Not every rush says so: half of them come at her without a word (29 Oct: "never a surprise").
     if (bVisible) AlertPlayer();
-    else
+    else if (bFreshRush)
     {
         FireEvent(ETallowKeeperEvent::Heard);
-        if (Creature->Voice) Creature->Voice->Say(ETallowKeeperLine::Chase, true);
+        if (Creature->Voice && Random.FRand() < .5f) Creature->Voice->Say(ETallowKeeperLine::Chase, true);
     }
 }
 
@@ -195,20 +199,28 @@ void ATallowHunterAIController::SetPace(float Scale, float Seconds)
     PaceUntil = GetWorld()->GetTimeSeconds() + Seconds;
 }
 
-ETallowNoiseResponse ATallowHunterAIController::ChooseNoiseResponse(const FVector& Where, bool bPry)
+ETallowNoiseResponse ATallowHunterAIController::ChooseNoiseResponse(const FVector& Where, bool bPry, bool bLoud)
 {
     if (ForcedNoiseResponse != ETallowNoiseResponse::None) return ForcedNoiseResponse;
-    // Weights: hunt it, stalk it, flank it, ambush the way out, lurk near it, rush it, watch it from the dark.
-    // Final pass: more waiting and hiding, fewer straight walks at the sound ("stalk and ambush and hide more").
-    float W[8] = {0.f, .15f, .25f, .15f, .25f, .2f, 0.f, .2f};
+    // Weights: hunt it, creep in on it, flank it, ambush the way out, lurk near it, rush it, watch it from the dark.
+    // 29 Oct ("once it loses sight you're basically fine", "she made herself known every time"): it comes for a
+    // sound far more often than it waits for one, and when it does not come straight it comes silently.
+    // The waits (ambush, lurk) keep a share so the ceiling drop and the crawl mouth still happen, but a smaller one.
+    float W[8] = {0.f, .3f, .22f, .12f, .12f, .12f, 0.f, .12f};
     const auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>();
     const ETallowTensionPhase Phase = Overseer && bUseDirector ? Overseer->GetPhase() : ETallowTensionPhase::Build;
     switch (Phase)
     {
-    case ETallowTensionPhase::Quiet: W[1] = .2f;  W[2] = .35f; W[3] = .15f; W[4] = .15f; W[5] = .15f; W[7] = .2f; break;
-    case ETallowTensionPhase::Peak:  W[1] = .25f; W[2] = .1f;  W[3] = .15f; W[4] = .2f;  W[5] = .2f;  W[6] = .1f; W[7] = 0.f; break;
-    case ETallowTensionPhase::Relax: W[1] = .4f;  W[2] = .6f;  W[3] = 0.f;  W[4] = 0.f;  W[5] = 0.f;  W[7] = 0.f; break;
+    case ETallowTensionPhase::Quiet: W[1] = .28f; W[2] = .28f; W[3] = .12f; W[4] = .1f;  W[5] = .1f;  W[7] = .12f; break;
+    case ETallowTensionPhase::Peak:  W[1] = .38f; W[2] = .14f; W[3] = .14f; W[4] = .1f;  W[5] = .1f;  W[6] = .14f; W[7] = 0.f; break;
+    case ETallowTensionPhase::Relax: W[1] = .45f; W[2] = .55f; W[3] = 0.f;  W[4] = 0.f;  W[5] = 0.f;  W[7] = 0.f; break;
     default: break;
+    }
+    // Her running, a landing, a door she slammed: it comes, straight or round the other way, never sits and waits.
+    if (bLoud && !bPry)
+    {
+        W[1] = .55f; W[2] = .1f; W[3] = .2f; W[4] = W[5] = W[7] = 0.f;
+        W[6] = Phase == ETallowTensionPhase::Build || Phase == ETallowTensionPhase::Peak ? .25f : 0.f;
     }
     if (!Overseer || !bUseDirector || !Overseer->CanWatchFromNoise()) W[7] = 0.f;
     // The first board: answer it from the far end of the hall, not with a charge at the door (every logged first
@@ -234,12 +246,17 @@ ETallowNoiseResponse ATallowHunterAIController::ChooseNoiseResponse(const FVecto
     return ETallowNoiseResponse::Hunt;
 }
 
-void ATallowHunterAIController::RespondToNoise(const FVector& Where, bool bPry)
+void ATallowHunterAIController::RespondToNoise(const FVector& Where, bool bPry, bool bLoud)
 {
     const float Now = GetWorld()->GetTimeSeconds();
-    const ETallowNoiseResponse Response = ChooseNoiseResponse(Where, bPry);
+    const ETallowNoiseResponse Response = ChooseNoiseResponse(Where, bPry, bLoud);
     LastNoiseResponse = Response;
-    FireEvent(ETallowKeeperEvent::Heard);
+    LastNoiseResponseAt = Now;
+    // Creeping in, watching, waiting, and a third of the straight hunts give nothing away: no head-snap beat, no line.
+    bListenSilent = Response == ETallowNoiseResponse::Stalk || Response == ETallowNoiseResponse::Watch
+        || Response == ETallowNoiseResponse::Ambush || Response == ETallowNoiseResponse::Lurk
+        || (Response == ETallowNoiseResponse::Hunt && !bLoud && Random.FRand() < .35f);
+    if (!bListenSilent) FireEvent(ETallowKeeperEvent::Heard);
     Observe(Where, .9f, false);
     SearchUntil = Now + (bSecondPhase ? 28.f : 21.f);
     Creature->HunterMotion->LookAt(Where + FVector(0, 0, 55), 1.5f);
@@ -250,9 +267,11 @@ void ATallowHunterAIController::RespondToNoise(const FVector& Where, bool bPry)
         Rush(Where, 3.f);
         return;
     }
-    // Always the listening beat first: it freezes and turns its head, then commits.
+    // The listening beat first: it freezes and turns its head, then commits. Short: it used to stand 1.3 to 2 s on
+    // every sound and start again on the next one, which read as dithering. A loud sound gets only a flinch.
     ListenOutcome = Response;
-    BeginListening(Random.FRandRange(1.3f, 2.f));
+    BeginListening(bLoud ? Random.FRandRange(.4f, .7f) : bListenSilent ? Random.FRandRange(.5f, .9f) : Random.FRandRange(.7f, 1.2f),
+        !bListenSilent);
     static const TCHAR* Names[] = {TEXT("None"), TEXT("Heard it: will hunt"), TEXT("Heard it: will stalk"), TEXT("Heard it: will flank"),
         TEXT("Heard it: will ambush the way out"), TEXT("Heard it: will lurk"), TEXT("Rush"), TEXT("Heard it: will watch from the dark")};
     LastDecision = Names[static_cast<int32>(Response)];
@@ -269,14 +288,15 @@ void ATallowHunterAIController::FinishListening(float Now)
     {
     case ETallowNoiseResponse::Watch:
         if (TryWatch(Now, ListenedTo, true)) return;
-        SetPace(.65f, 30.f);
         EnterMode(ETallowHuntMode::Investigate);
+        BeginCreep(14.f, .55f);
         SetGoalNearest(EvidenceLocation);
         LastDecision = TEXT("Stalk: creeping in on the sound");
         return;
     case ETallowNoiseResponse::Stalk:
-        SetPace(.65f, 30.f);
+        // Slow and silent (it used to creep at .65 for half a minute whatever she did next).
         EnterMode(ETallowHuntMode::Investigate);
+        BeginCreep(14.f, .55f);
         SetGoalNearest(EvidenceLocation);
         LastDecision = TEXT("Stalk: creeping in on the sound");
         return;
@@ -294,8 +314,56 @@ void ATallowHunterAIController::FinishListening(float Now)
     default: break;
     }
     EnterMode(ETallowHuntMode::Investigate);
+    // A silent hunt: straight at it at full pace, but without a sound.
+    if (bListenSilent) BeginCreep(10.f, 1.f);
     SetGoalNearest(EvidenceLocation);
-    LastDecision = TEXT("Hunt: straight at the sound");
+    LastDecision = bListenSilent ? TEXT("Hunt: straight at the sound, silently") : TEXT("Hunt: straight at the sound");
+}
+
+void ATallowHunterAIController::BeginCreep(float Seconds, float Pace)
+{
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (!bCreeping || Now >= CreepUntil) ++Creeps;
+    bCreeping = true;
+    CreepUntil = Now + Seconds;
+    SetPace(Pace, Seconds);
+    if (Creature && Creature->Voice) { Creature->Voice->SetLurking(true); Creature->Voice->SetCreeping(true); }
+}
+
+void ATallowHunterAIController::EndCreep()
+{
+    if (!bCreeping) return;
+    bCreeping = false;
+    if (GetWorld() && GetWorld()->GetTimeSeconds() < PaceUntil && PaceScale < 1.f) PaceUntil = 0.f;
+}
+
+bool ATallowHunterAIController::IsCreeping() const
+{
+    return bCreeping && GetWorld() && GetWorld()->GetTimeSeconds() < CreepUntil && !bVisible
+        && (HuntMode == ETallowHuntMode::Investigate || HuntMode == ETallowHuntMode::Search
+            || HuntMode == ETallowHuntMode::Inspect || HuntMode == ETallowHuntMode::Listen);
+}
+
+bool ATallowHunterAIController::IsOnTrail(float Now) const
+{
+    return (HuntMode == ETallowHuntMode::Investigate || HuntMode == ETallowHuntMode::Search
+            || HuntMode == ETallowHuntMode::Inspect)
+        && Now - FMath::Max(LastSeenAt, LastNoiseResponseAt) < 30.f;
+}
+
+void ATallowHunterAIController::CloseInOn(const FVector& Where, bool bLoud)
+{
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (bCloseCall) EndCloseCall(Now, false, TEXT("CloseCall: heard her"));
+    if (bLoud) EndCreep();
+    LastNoiseResponseAt = Now;
+    InspectionSpot = nullptr; SearchAnchor = nullptr;
+    bTravellingToAmbush = false; AmbushUntil = 0.f; InspectUntil = 0.f;
+    SearchUntil = FMath::Max(SearchUntil, Now + (bSecondPhase ? 28.f : 21.f));
+    EnterMode(ETallowHuntMode::Investigate);
+    SetGoalNearest(Where);
+    Creature->HunterMotion->LookAt(Where + FVector(0, 0, 55), .8f);
+    LastDecision = bLoud ? TEXT("Heard her run: closing in") : TEXT("Heard more: closing in");
 }
 
 bool ATallowHunterAIController::FlankTo(const FVector& Where)
@@ -527,6 +595,8 @@ void ATallowHunterAIController::ResetHunt()
     ListenUntil = AmbushUntil = NextAmbushAt = NextNoiseReaction = SearchStartedAt = 0.f;
     PaceUntil = SpotFreezeUntil = StalkSightUntil = 0.f; LastSeenAt = -1000.f;
     ListenOutcome = ETallowNoiseResponse::Hunt;
+    bListenSilent = bCreeping = false; CreepUntil = 0.f; LastNoiseResponseAt = -1000.f;
+    bCloseCall = bCloseCallPausing = false; CloseCallPoints.Reset(); CloseCallSpots.Reset(); NextCloseCallTry = 0.f;
     bBooPending = false; BooRevealAt = -1.f;
     AttackStartedAt = -1.f;
     AttackWindupAlpha = EvidenceStrength = ContinuousPursuit = 0.f;
@@ -622,7 +692,11 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
     if (Player && Creature && !Player->IsTiedToChair() && !Player->IsHiddenInSpot())
     {
         const ECandleState Light = Player->GetCandleComponent()->GetCandleState();
-        if (Light != ECandleState::Out)
+        // A struck match flares brighter than the candle it lights: for that moment she is as plain as an open flame,
+        // and further (29 Oct: relighting near it is a gamble).
+        const float Flare = Player->GetCandleComponent()->GetMatchFlare();
+        const bool bOpenFlame = Light == ECandleState::Lit || Flare > .05f;
+        if (Light != ECandleState::Out || Flare > .05f)
         {
             FVector Eye; FRotator Facing;
             Creature->GetActorEyesViewPoint(Eye, Facing);
@@ -630,14 +704,14 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
             const FVector Target = Player->GetPawnViewLocation();
             const FVector ToPlayer = Target - Eye;
             const auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>();
-            float Range = (Light == ECandleState::Lit ? LitSightRange : CuppedSightRange)
+            float Range = (bOpenFlame ? LitSightRange : CuppedSightRange) * (1.f + .3f * Flare)
                 * (Overseer ? Overseer->GetSightMultiplier() : 1.f);
             // Only the candle gives you away (25 Oct): holding your breath silences you, it doesn't hide you.
             const float ViewDot = FVector::DotProduct(ToPlayer.GetSafeNormal(), Facing.Vector());
             // Once it has you it keeps you: the cone no longer matters, it simply turns to look.
             const bool bTracking = bHadVisible;
             if (ToPlayer.SizeSquared() < FMath::Square(Range) && (bTracking || ViewDot > .34f
-                || (Light == ECandleState::Lit && ViewDot > -.3f && ToPlayer.SizeSquared() < FMath::Square(700.f))))
+                || (bOpenFlame && ViewDot > -.3f && ToPlayer.SizeSquared() < FMath::Square(700.f))))
             {
                 // Head, body or legs: a chair or a rail in the way does not break contact.
                 const FVector Body = Player->GetActorLocation(), Legs = Body - FVector(0, 0, 70.f);
@@ -652,7 +726,7 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
             {
                 SightConfidence = 1.f;
             }
-            const float Gain = Light == ECandleState::Lit ? 7.f : 1.7f;
+            const float Gain = bOpenFlame ? 7.f * (1.f + Flare) : 1.7f;
             SightConfidence = FMath::Clamp(SightConfidence + DeltaSeconds * (bSense ? Gain : -3.f), 0.f, 1.f);
         }
         else SightConfidence = FMath::Max(0.f, SightConfidence - DeltaSeconds * 3.f);
@@ -690,6 +764,9 @@ void ATallowHunterAIController::HearNoise(const FTallowNoiseEvent& Event)
     }
     const bool bGiveaway = Event.Type == ETallowNoiseType::RunStep || Event.Type == ETallowNoiseType::Land;
     const bool bPry = Event.Type == ETallowNoiseType::Pry;
+    // A door she slammed or something she knocked over is a lead it follows like her running.
+    const bool bLoud = bGiveaway || (Player && Event.Instigator == Player
+        && (Event.Type == ETallowNoiseType::DoorSlam || Event.Type == ETallowNoiseType::PropFall));
     // Running, jumping and prying carry through walls.
     const float Perceived = Noise ? Noise->GetLoudnessAt(Heard, Ear, !(bGiveaway || bPry)) : 0.f;
     if (Perceived < .025f) return;
@@ -736,7 +813,7 @@ void ATallowHunterAIController::HearNoise(const FTallowNoiseEvent& Event)
     // Lying in wait it still answers every sound, but one coming its way is her walking into it. Every ambush now
     // holds for that (it used to be only the heap and the holds: a footstep ended every other wait on the spot).
     if ((bDisguisePending || PlannedHold != EHold::None || HuntMode == ETallowHuntMode::Ambush)
-        && HandleNoiseInAmbush(Event.Location, Perceived)) return;
+        && HandleNoiseInAmbush(Event.Location, Perceived, bLoud)) return;
     const float NowHeard = GetWorld()->GetTimeSeconds();
     if (bPry && NowHeard >= NextPryReaction)
     {
@@ -747,20 +824,24 @@ void ATallowHunterAIController::HearNoise(const FTallowNoiseEvent& Event)
     if (bGiveaway)
     {
         // Running gives her away, but in the quiet and the relief it is a noise to answer, not a charge across the
-        // house (a sprint that summons it at full speed from anywhere felt cheap).
+        // house (a sprint that summons it at full speed from anywhere felt cheap). It is always answered straight,
+        // though (29 Oct: "I was running a lot and it was barely able to find me"): on the trail it closes in
+        // at once; otherwise a flinch of a listen and it comes, never a wait or a slow creep.
         const auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>();
         const ETallowTensionPhase Phase = Overseer && bUseDirector ? Overseer->GetPhase() : ETallowTensionPhase::Peak;
         if ((Phase == ETallowTensionPhase::Quiet || Phase == ETallowTensionPhase::Relax) && HuntMode != ETallowHuntMode::Pursue
             && Perceived < .5f)
         {
-            if (HuntMode != ETallowHuntMode::Listen && NowHeard >= NextNoiseReaction)
+            if (IsOnTrail(NowHeard)) CloseInOn(Event.Location, true);
+            else if (HuntMode != ETallowHuntMode::Listen && NowHeard >= NextNoiseReaction)
             {
                 NextNoiseReaction = NowHeard + 2.4f;
                 ListenedLoudness = Perceived;
-                RespondToNoise(Event.Location, false);
+                RespondToNoise(Event.Location, false, true);
             }
             return;
         }
+        if (bCloseCall) EndCloseCall(NowHeard, false, TEXT("CloseCall: she ran"));
         Rush(Event.Location, 3.5f);
         return;
     }
@@ -788,12 +869,15 @@ void ATallowHunterAIController::HearNoise(const FTallowNoiseEvent& Event)
         EnterMode(ETallowHuntMode::Investigate);
         SetGoal(EvidenceLocation);
     }
+    // Already on her trail (a sighting, or a sound it answered, in the last half minute; or searching her room): it
+    // follows the new sound at once instead of stopping to listen and choosing a new plan on every footstep.
+    else if (bCloseCall || IsOnTrail(LastHeardAt)) CloseInOn(EvidenceLocation, bLoud);
     else if (HuntMode != ETallowHuntMode::Listen && LastHeardAt >= NextNoiseReaction
         && HuntMode != ETallowHuntMode::Ambush)
     {
         NextNoiseReaction = LastHeardAt + 2.4f;
         ListenedLoudness = Perceived;
-        RespondToNoise(HeardPoint, false);
+        RespondToNoise(HeardPoint, false, bLoud);
     }
     else if (HuntMode == ETallowHuntMode::Investigate || HuntMode == ETallowHuntMode::Search)
     {
@@ -845,13 +929,14 @@ float ATallowHunterAIController::FamiliarityAt(const FVector& Point) const
     return Count ? float(*Count) : 0.f;
 }
 
-void ATallowHunterAIController::BeginListening(float Duration)
+void ATallowHunterAIController::BeginListening(float Duration, bool bVoice)
 {
     StopMovement();
     bHasGoal = false;
     ListenUntil = GetWorld()->GetTimeSeconds() + Duration;
     EnterMode(ETallowHuntMode::Listen);
-    if (Creature && Creature->Voice) Creature->Voice->Say(ETallowKeeperLine::Heard);
+    // Its "shh" only some of the time, never when it is coming silently: every sound used to announce it.
+    if (bVoice && Creature && Creature->Voice && Random.FRand() < .45f) Creature->Voice->Say(ETallowKeeperLine::Heard);
     ++ListeningPauses;
     LastDecision = TEXT("ListenToEvidence");
 }
@@ -860,6 +945,8 @@ void ATallowHunterAIController::EnterMode(ETallowHuntMode Mode)
 {
     if (HuntMode == Mode) return;
     if (HuntMode == ETallowHuntMode::Ambush) DropPendingPlans();
+    if (Mode == ETallowHuntMode::Pursue || Mode == ETallowHuntMode::Roam || Mode == ETallowHuntMode::Withdraw
+        || Mode == ETallowHuntMode::Captured || Mode == ETallowHuntMode::Ambush) bCreeping = false;
     if (Mode == ETallowHuntMode::Roam || Mode == ETallowHuntMode::Withdraw || Mode == ETallowHuntMode::Captured)
     {
         bRecoveryDetour = bRecoveryTraversal = bRecoveryWaiting = false;
@@ -902,7 +989,8 @@ bool ATallowHunterAIController::IsLurking() const
 {
     const bool bHolding = Creature && Creature->HunterTraversal && Creature->HunterTraversal->IsHolding();
     return bDisguised || bWatching || (bHolding && (PlannedHold != EHold::None || bCornerAmbush))
-        || (HuntMode == ETallowHuntMode::Ambush && !bTravellingToAmbush && AttackStartedAt < 0.f && !bLeaveBoardsAfterStare);
+        || (HuntMode == ETallowHuntMode::Ambush && !bTravellingToAmbush && AttackStartedAt < 0.f && !bLeaveBoardsAfterStare)
+        || IsCreeping();
 }
 
 bool ATallowHunterAIController::IsReachable(const FVector& Location, FVector& Projected, float* OutPathLength) const
@@ -1300,7 +1388,9 @@ bool ATallowHunterAIController::ChooseSearchPoint()
         if (Visit && Now - *Visit < 40.f) continue;
         FVector Projected;
         if (!IsReachable(P, Projected)) continue;
-        const float Score = 450.f - FVector::Dist2D(P, EvidenceLocation) * .5f + Random.FRandRange(0.f, 160.f);
+        // The places along the way she was going come first (where a fleeing child would duck in).
+        const float Direction = FVector::DotProduct((P - EvidenceLocation).GetSafeNormal2D(), EvidenceHeading);
+        const float Score = 450.f - FVector::Dist2D(P, EvidenceLocation) * .5f + Direction * 120.f + Random.FRandRange(0.f, 160.f);
         if (Score > BestScore) { BestScore = Score; Best = Projected; BestSpot = *It; BestAnchor = nullptr; }
     }
     // Where would the kid go from there? Out of the room (a door it can use), or toward what she needs (the fuses).
@@ -1315,7 +1405,8 @@ bool ATallowHunterAIController::ChooseSearchPoint()
         if (Visit && Now - *Visit < 30.f) continue;
         FVector Projected;
         if (!IsReachable(Watch.Center, Projected)) continue;
-        const float Score = 380.f - D * .3f + Random.FRandRange(0.f, 120.f);
+        const float Direction = FVector::DotProduct((Watch.Center - EvidenceLocation).GetSafeNormal2D(), EvidenceHeading);
+        const float Score = 380.f - D * .3f + Direction * 120.f + Random.FRandRange(0.f, 120.f);
         if (Score > BestScore) { BestScore = Score; Best = Projected; BestSpot = nullptr; BestAnchor = nullptr; Reason = TEXT("CheckExit: where would it go"); ReasonDoor = Watch.Door.Get(); }
     }
     {
@@ -1478,9 +1569,15 @@ bool ATallowHunterAIController::IsDark() const
     return Player && Player->GetCandleComponent() && Player->GetCandleComponent()->GetCandleState() == ECandleState::Out;
 }
 
+float ATallowHunterAIController::BreathRadius() const
+{
+    // Panting after a run carries further than her breathing (TallowCharacter::IsPanting); a held breath, nothing.
+    return BreathHearing * (Player && Player->IsPanting() ? 1.6f : 1.f);
+}
+
 bool ATallowHunterAIController::HearsBreathing(float Distance) const
 {
-    return Creature && Player && Distance < BreathHearing && !Player->IsHoldingStill()
+    return Creature && Player && Distance < BreathRadius() && !Player->IsHoldingStill()
         && (HasClearTrace(HeadLocation(), Player->GetPawnViewLocation())
             || HasClearTrace(HeadLocation(), Player->GetActorLocation()));
 }
@@ -2211,7 +2308,7 @@ void ATallowHunterAIController::RevealBoo(float Now)
         const FVector To = Creature->GetActorLocation() + FVector(0, 0, 80) - Eye;
         if (To.Size() < 1000.f && FVector::DotProduct(To.GetSafeNormal(), PC->PlayerCameraManager->GetActorForwardVector()) > .45f)
             if (USoundBase* Sting = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/Creature/K_Mim_Capture_Sting.K_Mim_Capture_Sting")))
-                UGameplayStatics::PlaySound2D(this, Sting, .55f);
+                UGameplayStatics::PlaySound2D(this, Sting, .12f);
     }
     bTravellingToAmbush = false; AmbushUntil = 0.f;
     SetPace(1.6f, 1.2f);
@@ -2350,13 +2447,16 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
     Player->KeeperSight = SightConfidence;
     Player->bSeenByKeeper = bVisible;
     if (Creature) Player->KeeperSeenFrom = HeadLocation();
+    // Her held breath runs out faster with it this close (ATallowCharacter::UpdateHeldBreath).
+    Player->KeeperDistance = FVector::Dist(Creature->GetActorLocation(), Player->GetActorLocation());
+    Player->KeeperDistanceAt = Now;
     ContinuousPursuit = bVisible ? ContinuousPursuit + DeltaSeconds
         : FMath::Max(0.f, ContinuousPursuit - DeltaSeconds * .6f);
     if (!bVisible) EvidenceStrength = FMath::Max(0.f, EvidenceStrength - DeltaSeconds * .018f);
     // A watcher that has her in its eyes but has not committed is still dread, not the peak.
     if (auto* Director = GetWorld()->GetSubsystem<UTallowHunterDirector>())
         if (bUseDirector) Director->UpdatePressure(DeltaSeconds, Creature, Player, bVisible && !bWatching && Now >= WatchSlipUntil);
-    if (Creature->Voice) Creature->Voice->SetLurking(IsLurking());
+    if (Creature->Voice) { Creature->Voice->SetLurking(IsLurking()); Creature->Voice->SetCreeping(IsCreeping()); }
     if (Creature->HunterTraversal && Creature->HunterTraversal->IsTraversing() && !Creature->HunterTraversal->IsHolding()
         && Creature->GetActorUpVector().Z < .5f && Now >= NextScratch && Creature->Voice)
     {
@@ -2441,12 +2541,16 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
             if (auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>()) Overseer->NotePursuitLost();
             FireEvent(ETallowKeeperEvent::Lost);
         }
-        SearchUntil = Now + (bSecondPhase ? 40.f : 30.f);
+        // 29 Oct: "once it loses sight you're basically fine". It hunts hard for most of a minute now: the last
+        // sighting, then on along her heading, then the doors and hiding places that way, and any sound in that time
+        // brings it straight back (IsOnTrail).
+        SearchUntil = Now + (bSecondPhase ? 50.f : 40.f);
         EnterMode(ETallowHuntMode::Investigate);
         // Keep running the way the player was going instead of stopping at the last sighting.
-        // Players who have already slipped it get cut off instead of followed.
+        // Players who have slipped it before are sometimes cut off instead of followed (it used to wait at an exit
+        // instead of following 40 to 90% of the time, which is what made a broken line of sight safe).
         const auto* Learned = GetWorld()->GetSubsystem<UTallowHunterDirector>();
-        const float AmbushChance = FMath::Clamp(.4f + .2f * (Learned ? Learned->Escapes : 0), 0.f, .9f);
+        const float AmbushChance = FMath::Clamp(.15f + .1f * (Learned ? Learned->Escapes : 0), 0.f, .45f);
         if (bUseAmbushes && Random.FRand() < AmbushChance && RequestAmbushFromEvidence()) return;
         FVector Ahead = EvidenceLocation + EvidenceHeading * 380.f;
         FVector Projected;
@@ -2496,11 +2600,14 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
             // Listening for her in the dark. It is soft now: no clicks, just its breath, which is still the
             // player's cue that it is hunting by sound, close.
             const FVector Head = HeadLocation();
-            if (Creature->Voice) Creature->Voice->Say(ETallowKeeperLine::Breath);
+            // Not every time, and never while it comes silently: the breath used to mark every listen.
+            if (Creature->Voice && !IsCreeping() && Random.FRand() < .5f) Creature->Voice->Say(ETallowKeeperLine::Breath);
             const bool bSilent = Player->IsHoldingStill() && Player->GetVelocity().Size2D() < 140.f;
             const float Distance = FVector::Dist(Head, Player->GetActorLocation());
-            if (!bSilent && Distance < EchoRange
-                && (Distance < EchoRange * .5f || HasClearTrace(Head, Player->GetPawnViewLocation())))
+            // Moving she is found the whole echo range; standing breathing, only as far as it hears breath.
+            const float Reach = Player->GetVelocity().Size2D() > 30.f ? EchoRange : FMath::Min(EchoRange, BreathRadius());
+            if (!bSilent && Distance < Reach
+                && (Distance < Reach * .5f || HasClearTrace(Head, Player->GetPawnViewLocation())))
             {
                 const float Angle = Random.FRandRange(0.f, 2.f * PI);
                 const FVector Echo = Player->GetActorLocation()
@@ -2511,20 +2618,27 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
                 SetGoalNearest(Echo);
                 Creature->HunterMotion->LookAt(Echo + FVector(0, 0, 55), 1.2f);
                 LastDecision = TEXT("Echolocated");
-                if (Creature->Voice) Creature->Voice->Say(ETallowKeeperLine::Heard);
+                if (bCloseCall) EndCloseCall(Now, false, TEXT("CloseCall: echolocated her"));
+                if (Creature->Voice && !IsCreeping() && Random.FRand() < .5f) Creature->Voice->Say(ETallowKeeperLine::Heard);
             }
         }
     }
-    // Close in the dark, breathing: it hears exactly where you are and comes straight at it.
-    if (IsDark() && !Player->IsHiddenInSpot() && HuntMode != ETallowHuntMode::Captured && Now >= NextBreathGoal)
+    // Close in the dark, breathing: it hears exactly where you are and comes straight at it. A shielded candle is
+    // dark enough to breathe in too (it sees a cupped flame only close and in front of it).
+    const bool bDim = IsDark() || (Player->GetCandleComponent() && Player->GetCandleComponent()->GetCandleState() == ECandleState::Cupped);
+    if (bDim && !Player->IsHiddenInSpot() && HuntMode != ETallowHuntMode::Captured && Now >= NextBreathGoal)
     {
         // From its head, not its middle: climbing a wall, its middle sits inside the plaster and every trace failed
         // (the Keeper Lab's B, 25 Oct). Within 3 m breathing is heard through a door frame or a chair.
         const FVector Ear = HeadLocation();
         const float Distance = FVector::Dist(Ear, Player->GetActorLocation());
-        if (HearsBreathing(Distance) && !BoardsBetween(Ear, Player->GetPawnViewLocation()) && (Distance < 300.f
+        // Right beside it even a held-breath creep is felt (a board gives, the air moves): still is safe, moving is not.
+        const bool bFelt = Distance < 200.f && Player->GetVelocity().Size2D() > 40.f;
+        if ((HearsBreathing(Distance) || bFelt) && !BoardsBetween(Ear, Player->GetPawnViewLocation()) && (Distance < 300.f
             || HasClearTrace(Ear, Player->GetPawnViewLocation()) || HasClearTrace(Ear, Player->GetActorLocation())))
         {
+            if (bCloseCall) EndCloseCall(Now, false, bFelt && !HearsBreathing(Distance) ? TEXT("CloseCall: felt her move") : TEXT("CloseCall: heard her breathe"));
+            EndCreep();
             NextBreathGoal = Now + .5f;
             Observe(Player->GetActorLocation(), .95f, false);
             LastHeardAt = Now;
@@ -2537,6 +2651,8 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
     }
     UpdateAttack(Now);
     if (HuntMode == ETallowHuntMode::Captured) return;
+    if (bCloseCall && UpdateCloseCall(Now)) { UpdateMove(Now); return; }
+    if (!bCloseCall && !bVisible && Now >= NextCloseCallTry && TryCloseCall(Now)) { UpdateMove(Now); return; }
     if (HuntMode == ETallowHuntMode::Listen)
     {
         if (Now < ListenUntil) return;
@@ -2615,7 +2731,9 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
         StopMovement();
         EnterMode(ETallowHuntMode::Roam);
     }
-    if (bUseDirector && bHasEvidence && !bVisible && Now - FMath::Max(LastSeenAt, LastHeardAt) > 7.f)
+    // The breather pulls it away, but only once the trail has gone cold for a while (it used to go 7 s after the
+    // last sound, so the relief that followed losing her came while it should still have been hunting).
+    if (bUseDirector && bHasEvidence && !bVisible && Now - FMath::Max(LastSeenAt, LastHeardAt) > 12.f)
         if (const auto* Director = GetHuntDirector(); Director && Director->bBreather)
         {
             bHasEvidence = false; bHasGoal = false; InspectionSpot = nullptr; SearchAnchor = nullptr;
@@ -2695,4 +2813,173 @@ void ATallowHunterAIController::TickBrain(float DeltaSeconds)
         }
     }
     UpdateMove(Now);
+}
+
+/**
+ * The close call (29 Oct). She keeps dark, still and holding her breath; the director chooses that it search the
+ * room she is in (TakeCloseCallRoom: the room, never a point in it) and it does, for real: in at the door, a few
+ * points spread over the floor and the hiding places there, a pause at each to sniff and turn its head, then out.
+ * Nothing here knows where she stands. The ordinary senses run every tick while it searches: her breath, her
+ * footsteps, a creep felt right beside it, her candle. Any of them ends the close call and the hunt takes over.
+ */
+bool ATallowHunterAIController::TryCloseCall(float Now)
+{
+    NextCloseCallTry = Now + 1.f;
+    if (!Creature || !Player || !bUseDirector || AttackStartedAt >= 0.f
+        || HuntMode == ETallowHuntMode::Pursue || HuntMode == ETallowHuntMode::Listen || HuntMode == ETallowHuntMode::Captured
+        || bDisguised || bDisguisePending || bHoldPending || PlannedHold != EHold::None || bWatching || bWatchPending
+        || bBooPending || bCornerAmbush || bOnLink || PendingLink != INDEX_NONE || TacticalPhase != NAME_None
+        || bRecoveryDetour || bRecoveryTraversal || bRecoveryWaiting
+        || (Creature->HunterTraversal && Creature->HunterTraversal->IsTraversing())) return false;
+    // Not straight after it has had a trace of her: that is a hunt, not a search of a quiet room.
+    if (Now - FMath::Max(LastSeenAt, LastHeardAt) < 6.f) return false;
+    auto* Director = GetHuntDirector();
+    FName Room;
+    if (!Director || !Director->WantsCloseCall(Player) || !Director->TakeCloseCallRoom(Player, Room)) return false;
+    const FTallowRoomDef* Def = TallowHouseRooms::Find(Room);
+    if (!Def) return false;
+    // The room as a room: two points across its floor (opposite quarters, so the walk between them crosses it), and a
+    // hiding place in it. Short on purpose: her held breath is the clock, and a full sweep outlasted any breath.
+    const float FloorZ = TallowHouseRooms::FloorZ(Def->Floor);
+    const FVector2D Size = Def->Max - Def->Min;
+    TArray<FVector> Points; TArray<TWeakObjectPtr<ATallowHideVolume>> Spots;
+    float FirstPath = MAX_flt;
+    const bool bFlip = Random.FRand() < .5f;
+    for (const float F : {.27f, .73f})
+    {
+        const FVector Want(Def->Min.X + Size.X * F, Def->Min.Y + Size.Y * (bFlip ? 1.f - F : F), FloorZ + 50.f);
+        FVector Projected; float PathLength = 0.f;
+        if (!IsReachable(Want, Projected, &PathLength) || !Def->Contains(Projected) || FMath::Abs(Projected.Z - FloorZ) > 150.f) continue;
+        Points.Add(Projected); Spots.Add(nullptr);
+        FirstPath = FMath::Min(FirstPath, PathLength);
+    }
+    TArray<ATallowHideVolume*> RoomSpots;
+    for (TActorIterator<ATallowHideVolume> It(GetWorld()); It; ++It)
+    {
+        const FVector Exit = It->GetExitPoint() ? It->GetExitPoint()->GetComponentLocation() : It->GetActorLocation();
+        if (Def->Contains(Exit) && TallowHouseRooms::FloorAt(Exit.Z) == Def->Floor) RoomSpots.Add(*It);
+    }
+    if (RoomSpots.Num())
+    {
+        ATallowHideVolume* Spot = RoomSpots[Random.RandRange(0, RoomSpots.Num() - 1)];
+        FVector Projected;
+        if (IsReachable(Spot->GetExitPoint() ? Spot->GetExitPoint()->GetComponentLocation() : Spot->GetActorLocation(), Projected))
+        { Points.Add(Projected); Spots.Add(Spot); }
+    }
+    // It has to come, and soon: a room on the far side of the house is not a close call, it is a long walk.
+    if (Points.Num() < 2 || FirstPath > 1500.f) return false;
+    // In from where it is, then round the room the short way (nearest next), so it sweeps it rather than criss-crossing.
+    CloseCallPoints.Reset(); CloseCallSpots.Reset();
+    FVector From = Creature->GetActorLocation();
+    while (Points.Num())
+    {
+        int32 Best = 0; float BestDistance = MAX_flt;
+        for (int32 I = 0; I < Points.Num(); ++I)
+            if (FVector::DistSquared2D(From, Points[I]) < BestDistance) { BestDistance = FVector::DistSquared2D(From, Points[I]); Best = I; }
+        CloseCallPoints.Add(Points[Best]); CloseCallSpots.Add(Spots[Best]);
+        From = Points[Best];
+        Points.RemoveAt(Best); Spots.RemoveAt(Best);
+    }
+    Director->NoteCloseCall();
+    CancelSpiderPlans(); DropPendingPlans(); EndCreep();
+    bCloseCall = true; bCloseCallPausing = false; CloseCallRoom = Room;
+    CloseCallStartedAt = Now; CloseCallClosest = MAX_flt; CloseCallLookSwapAt = -1.f;
+    // Searching her room counts as being on her trail: a sound in it is followed at once (IsOnTrail).
+    LastNoiseResponseAt = Now;
+    bHasEvidence = false; bHasGoal = false; InspectionSpot = nullptr; SearchAnchor = nullptr;
+    StopMovement();
+    EnterMode(ETallowHuntMode::Search);
+    ++CloseCallsStarted;
+    LastDecision = TEXT("CloseCall: searching the room she keeps still in");
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CLOSECALL start room=%s points=%d path=%.0f hunt=%d"),
+        *Room.ToString(), CloseCallPoints.Num(), FirstPath, Director->GetHuntNumber());
+    return true;
+}
+
+bool ATallowHunterAIController::UpdateCloseCall(float Now)
+{
+    if (!bCloseCall || !Creature || !Player) return false;
+    CloseCallClosest = FMath::Min(CloseCallClosest, float(FVector::Dist(Creature->GetActorLocation(), Player->GetActorLocation())));
+    // Something of her reached its senses (the cases that end it say which): the ordinary hunt has her from here.
+    if (bVisible || bHasEvidence || HuntMode == ETallowHuntMode::Pursue || HuntMode == ETallowHuntMode::Investigate)
+    {
+        EndCloseCall(Now, false, TEXT("CloseCall: found a trace of her"));
+        return false;
+    }
+    if (Now - CloseCallStartedAt > 45.f) { EndCloseCall(Now, true, TEXT("CloseCall: gave up the room")); return false; }
+    if (HuntMode == ETallowHuntMode::Inspect)
+    {
+        if (!bCloseCallPausing)
+        {
+            // At each point: still, head low to sniff, then a slow turn one way and the other. Short pauses (the
+            // ordinary search lingers longer): her held breath is the clock.
+            bCloseCallPausing = true;
+            const bool bSpot = InspectionSpot != nullptr;
+            InspectUntil = Now + (bSpot ? Random.FRandRange(1.6f, 2.f) : Random.FRandRange(.9f, 1.4f));
+            const FVector Here = Creature->GetActorLocation();
+            const FVector Forward = Creature->GetActorForwardVector().GetSafeNormal2D();
+            const FVector Side = FVector::CrossProduct(FVector::UpVector, Forward) * (Random.FRand() < .5f ? 1.f : -1.f);
+            const FVector Look = bSpot ? InspectionSpot->GetActorLocation() + FVector(0, 0, 50)
+                : Here + (Forward * .6f + Side).GetSafeNormal() * 260.f - FVector(0, 0, 40);
+            CloseCallLookB = Here + (Forward * .6f - Side).GetSafeNormal() * 260.f + FVector(0, 0, 20);
+            CloseCallLookSwapAt = Now + (InspectUntil - Now) * .5f;
+            Creature->HunterMotion->LookAt(Look, InspectUntil - Now);
+        }
+        else if (CloseCallLookSwapAt > 0.f && Now >= CloseCallLookSwapAt)
+        {
+            CloseCallLookSwapAt = -1.f;
+            Creature->HunterMotion->LookAt(CloseCallLookB, FMath::Max(.3f, InspectUntil - Now));
+        }
+        if (Now < InspectUntil) { StopMovement(); return true; }
+        bCloseCallPausing = false;
+        EnterMode(ETallowHuntMode::Search);
+    }
+    if (bHasGoal) return true;
+    // Arrived (UpdateMove's arrival turned it into a pause) or just begun: on to the next point, or out.
+    while (CloseCallPoints.Num())
+    {
+        const FVector Next = CloseCallPoints[0];
+        ATallowHideVolume* Spot = CloseCallSpots[0].Get();
+        CloseCallPoints.RemoveAt(0); CloseCallSpots.RemoveAt(0);
+        InspectionSpot = Spot;
+        if (SetGoal(Next))
+        {
+            // Slower inside the room than on the way to it.
+            SetPace(TallowHouseRooms::RoomAt(Creature->GetActorLocation()) == CloseCallRoom ? .85f : 1.f, 6.f);
+            LastDecision = Spot ? TEXT("CloseCall: checking the hiding place") : TEXT("CloseCall: searching the room");
+            return true;
+        }
+    }
+    EndCloseCall(Now, true, TEXT("CloseCall: nothing here, leaving"));
+    return false;
+}
+
+void ATallowHunterAIController::EndCloseCall(float Now, bool bLeave, const TCHAR* Why)
+{
+    if (!bCloseCall) return;
+    bCloseCall = bCloseCallPausing = false;
+    CloseCallPoints.Reset(); CloseCallSpots.Reset();
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CLOSECALL end room=%s left=%d closest=%.0f after=%.1fs %s"),
+        *CloseCallRoom.ToString(), bLeave ? 1 : 0, CloseCallClosest, Now - CloseCallStartedAt, Why);
+    LastDecision = Why;
+    if (!bLeave) return;
+    ++CloseCallsLeft;
+    // It goes, and the evening lets go for a breath: she held on and earned it.
+    if (auto* Director = GetHuntDirector()) Director->NoteNearMiss();
+    InspectionSpot = nullptr; SearchAnchor = nullptr; bHasGoal = false; bHasEvidence = false;
+    StopMovement();
+    const FTallowRoomDef* Def = TallowHouseRooms::Find(CloseCallRoom);
+    const FVector Room = Def ? Def->Anchor() : Creature->GetActorLocation();
+    // Quiet sounds from that room do not pull it straight back while it goes (only a loud one does).
+    QuietAreaCenter = Room; QuietUntil = Now + 10.f;
+    FVector Far = FVector::ZeroVector; float FarDistance = 0.f;
+    for (TActorIterator<ATallowPatrolPoint> It(GetWorld()); It; ++It)
+    {
+        const float D = FVector::Dist(It->GetActorLocation(), Room);
+        FVector Projected;
+        if (D > FarDistance && D < 1800.f && IsReachable(It->GetActorLocation(), Projected)) { FarDistance = D; Far = Projected; }
+    }
+    EnterMode(ETallowHuntMode::Withdraw);
+    if (FarDistance > 0.f) SetGoal(Far);
+    NextDecision = Now + 8.f;
 }

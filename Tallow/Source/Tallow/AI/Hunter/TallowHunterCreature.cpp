@@ -4,6 +4,7 @@
 #include "AI/Hunter/TallowHunterMotionComponent.h"
 #include "AI/Hunter/TallowHunterTraversalComponent.h"
 #include "AI/Hunter/TallowMimAnimInstance.h"
+#include "AI/Hunter/TallowMimVisualScaleComponent.h"
 #include "AI/Traversal/TallowSurfaceTraversalComponent.h"
 #include "Animation/TallowCreatureAnimationComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -16,6 +17,7 @@ ATallowHunterCreature::ATallowHunterCreature(const FObjectInitializer& ObjectIni
     AIControllerClass = ATallowHunterAIController::StaticClass();
     HunterMotion = CreateDefaultSubobject<UTallowHunterMotionComponent>(TEXT("HunterMotion"));
     HunterTraversal = CreateDefaultSubobject<UTallowHunterTraversalComponent>(TEXT("HunterTraversal"));
+    MimVisual = CreateDefaultSubobject<UTallowMimVisualScaleComponent>(TEXT("MimVisual"));
     // Mim (25 Oct) is huge, but only its body is: collision stays what the navmesh can path (the runtime agent is
     // the engine default, radius 35) and well under the 1.9 m door frames. The body fits itself round the world
     // (HunterMotion's fit layer); the capsule flattens further to squeeze through crawls.
@@ -73,9 +75,15 @@ float ATallowHunterCreature::GetCaptureStrikeTime() const
 float ATallowHunterCreature::GetCaptureStagingDistance() const
 {
     // The floor and dark grabs are authored with the root 2.25 rig metres in front of the eye, which puts her
-    // teeth 1.5 rig metres from it in the stare; the ceiling drop keeps its original staging. Both scale with the body.
+    // teeth 1.5 rig metres from it in the stare; the ceiling drop keeps its original staging. Both scale with the
+    // body she is drawn at, so the shot keeps its framing at the lens.
     if (!HunterMotion || !HunterMotion->UsesMim()) return Super::GetCaptureStagingDistance();
-    return (IsCeilingCapturePresentation() ? 223.f : 225.f) * GetActorScale3D().GetAbsMin();
+    return (IsCeilingCapturePresentation() ? 223.f : 225.f) * GetVisibleBodyScale();
+}
+
+float ATallowHunterCreature::GetVisibleBodyScale() const
+{
+    return GetActorScale3D().GetAbsMin() * (MimVisual ? MimVisual->GetVisualScale() : 1.f);
 }
 
 bool ATallowHunterCreature::IsCeilingCapturePresentation() const

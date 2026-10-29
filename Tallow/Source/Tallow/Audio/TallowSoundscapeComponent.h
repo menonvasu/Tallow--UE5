@@ -45,7 +45,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Audio")
 	ETallowTension GetTension() const { return Tension; }
 	UFUNCTION(BlueprintPure, Category="Audio|Review") bool HasDistractionPlaying() const;
-	UFUNCTION(BlueprintPure, Category="Audio|Review") float GetHouseGain() const { return BedGain; }
+	UFUNCTION(BlueprintPure, Category="Audio|Review") float GetHouseGain() const { return BedGain * HushGain; }
 	/** Earned recovery after a search or escape; a fresh detection still takes priority. */
 	UPROPERTY(EditAnywhere, Category="Audio|Pacing", meta=(ClampMin="8", ClampMax="45"))
 	float ReliefSeconds = 22.f;
@@ -122,6 +122,14 @@ private:
 	TArray<FString> RecentLies;
 	ETallowTension Tension = ETallowTension::Calm;
 	ETallowTension LastLevel = ETallowTension::Calm;
+	/** The house goes quiet when the Keeper is about to enter Nell's room. */
+	UPROPERTY(EditAnywhere, Category="Audio|Hush") float HushNearCm = 600.f;
+	UPROPERTY(EditAnywhere, Category="Audio|Hush") float HushDepth = .06f;
+	UPROPERTY(EditAnywhere, Category="Audio|Hush") float HushHoldSeconds = 4.f;
+	void UpdateHush(float DeltaTime);
+		UPROPERTY(EditAnywhere, Category="Audio|Hush", meta=(ClampMin="0", ClampMax="1")) float HushChance = .33f;
+	bool bWasEntering = false, bHushThisEntry = false;
+	float HushGain = 1.f, HushUntil = 0.f, LastKeeperDistance = -1.f;
 	float BedGain = 1.f, DarkGain = 0.f, BassGain = 0.f, HorrorGain = 0.f;
 	float NextLie = 0.f, NoLiesUntil = 0.f, LastShriek = -1000.f, AfterUntil = 0.f;
 	float LastBreath = -10.f, LastGasp = -10.f, NextSightCheck = 0.f, LastRoomTell = -100.f, ListenGain = 1.f;

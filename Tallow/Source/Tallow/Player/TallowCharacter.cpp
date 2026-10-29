@@ -544,6 +544,7 @@ void ATallowCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateHeldBreath(DeltaSeconds);
+	UpdatePanting(DeltaSeconds);
 	UpdateCrouchEye(DeltaSeconds);
 	UpdateWalkBob(DeltaSeconds);
 }
@@ -598,7 +599,10 @@ void ATallowCharacter::UpdateHeldBreath(float DeltaSeconds)
 		if (BreathRecovery <= 0.f) HeldAir = FMath::Min(1.f, HeldAir + DeltaSeconds / FMath::Max(BreathRecoverSeconds, .5f));
 		return;
 	}
-	HeldAir = FMath::Max(0.f, HeldAir - DeltaSeconds / FMath::Max(BreathHoldSeconds, 1.f));
+	// Mim within a few metres: her chest burns sooner (29 Oct: a close call should be a real struggle).
+	const bool bKeeperFresh = GetWorld() && GetWorld()->GetTimeSeconds() - KeeperDistanceAt < .5;
+	const float Close = bKeeperFresh ? FMath::GetMappedRangeValueClamped(FVector2D(150.f, 450.f), FVector2D(1.f, 0.f), KeeperDistance) : 0.f;
+	HeldAir = FMath::Max(0.f, HeldAir - DeltaSeconds * FMath::Lerp(1.f, BreathCloseDrain, Close) / FMath::Max(BreathHoldSeconds, 1.f));
 	// Shielding the candle resets her pace; holding her breath she only ever creeps.
 	GetCharacterMovement()->MaxWalkSpeed = FMath::Min(GetCharacterMovement()->MaxWalkSpeed, HeldBreathCreepSpeed);
 	if (HeldAir > 0.f) return;
@@ -607,6 +611,31 @@ void ATallowCharacter::UpdateHeldBreath(float DeltaSeconds)
 		Noise->EmitCustomNoise(FirstPersonCameraComponent->GetComponentLocation(), this, BreathGaspLoudness, BreathGaspRange);
 	bBreathForced = true;
 	DoStillnessEnd();
+}
+
+void ATallowCharacter::UpdatePanting(float DeltaSeconds)
+{
+	if (IsTiedToChair()) { SprintedSeconds = 0.f; PantUntil = -100.0; return; }
+	const double Now = GetWorld()->GetTimeSeconds();
+	const bool bSprinting = GetCharacterMovement()->IsMovingOnGround() && GetVelocity().Size2D() > 350.f;
+	if (bSprinting) SprintedSeconds += DeltaSeconds;
+	else if (SprintedSeconds > 0.f)
+	{
+		// A real run (not a two-step burst) leaves her out of breath for a little longer the longer she ran.
+		if (SprintedSeconds >= PantAfterSprintSeconds) PantUntil = FMath::Max(PantUntil, Now + FMath::Clamp(SprintedSeconds * .6f, 3.f, 7.f));
+		SprintedSeconds = FMath::Max(0.f, SprintedSeconds - DeltaSeconds * 4.f);
+	}
+	if (!IsPanting() || Now < NextPantNoise) return;
+	// Each gulp of air is a real sound, about as loud as a step, heard only close by and dulled by the walls.
+	NextPantNoise = Now + FMath::FRandRange(.8f, 1.1f);
+	if (auto* Noise = UTallowNoiseSubsystem::Get(this))
+		Noise->EmitCustomNoise(FirstPersonCameraComponent->GetComponentLocation(), this, PantLoudness, PantRange);
+}
+
+bool ATallowCharacter::IsPanting() const
+{
+	return !bIsHoldingStill && GetWorld() && GetWorld()->GetTimeSeconds() < PantUntil
+		&& GetVelocity().Size2D() < 350.f;
 }
 
 float ATallowCharacter::GetHeldSeconds() const

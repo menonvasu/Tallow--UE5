@@ -13,7 +13,14 @@ namespace
 		virtual void Tick(const float, FSlateApplication&, TSharedRef<ICursor>) override {}
 		virtual bool HandleKeyDownEvent(FSlateApplication&, const FKeyEvent& E) override { if (Owner.IsValid()) Owner->NoteKey(E.GetKey()); return false; }
 		virtual bool HandleAnalogInputEvent(FSlateApplication&, const FAnalogInputEvent& E) override { if (Owner.IsValid()) Owner->NoteAnalog(E.GetKey(), E.GetAnalogValue()); return false; }
-		virtual bool HandleMouseMoveEvent(FSlateApplication&, const FPointerEvent& E) override { if (Owner.IsValid()) Owner->NoteMouseDelta(E.GetCursorDelta()); return false; }
+		virtual bool HandleMouseMoveEvent(FSlateApplication& App, const FPointerEvent& E) override
+		{
+			if (!Owner.IsValid()) return false;
+			Owner->NoteMouseDelta(E.GetCursorDelta());
+			// On the pad with the cursor hidden (in game, not a menu) the mouse must not look around: eat the motion.
+			if (Owner->ShouldSwallowMouseMotion() && App.GetPlatformCursor().IsValid() && App.GetPlatformCursor()->GetType() == EMouseCursor::None) return true;
+			return false;
+		}
 		virtual bool HandleMouseButtonDownEvent(FSlateApplication&, const FPointerEvent& E) override { if (Owner.IsValid()) Owner->NoteKey(E.GetEffectingButton()); return false; }
 		virtual const TCHAR* GetDebugName() const override { return TEXT("TallowDeviceProcessor"); }
 	private:
@@ -65,11 +72,12 @@ void UTallowInputDeviceSubsystem::NoteAnalog(const FKey& Key, float Value)
 {
 	if (Key.IsGamepadKey() && FMath::Abs(Value) > .3f) SetDevice(ETallowInputDevice::Gamepad);
 }
-void UTallowInputDeviceSubsystem::NoteMouseDelta(const FVector2D& Delta)
+void UTallowInputDeviceSubsystem::NoteMouseDeltaAt(const FVector2D& Delta, double Now)
 {
-	const double Now = FPlatformTime::Seconds();
-	if (Now - LastMouseTime > .25) MouseTravel = 0.f;
+	if (Device == ETallowInputDevice::KeyboardMouse) { MouseTravel = 0.f; LastMouseTime = Now; return; }
+	// A window opens at the first move and closes after MouseSwitchWindow, or at once after a pause.
+	if (MouseTravel <= 0.f || Now - LastMouseTime > .25 || Now - MouseWindowStart > MouseSwitchWindow) { MouseTravel = 0.f; MouseWindowStart = Now; }
 	LastMouseTime = Now;
 	MouseTravel += Delta.Size();
-	if (MouseTravel > 4.f) { MouseTravel = 0.f; SetDevice(ETallowInputDevice::KeyboardMouse); }
+	if (MouseTravel >= MouseSwitchDistance && Now - MouseWindowStart >= MouseSwitchMinSpan) { MouseTravel = 0.f; SetDevice(ETallowInputDevice::KeyboardMouse); }
 }

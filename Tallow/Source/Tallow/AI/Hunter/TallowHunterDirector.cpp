@@ -7,6 +7,8 @@
 #include "NavigationPath.h"
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
+#include "Candle/TallowCandleComponent.h"
+#include "House/TallowHouseRooms.h"
 
 FTallowArcTuning UTallowHunterDirector::TuningForAct(ETallowStoryAct InAct)
 {
@@ -23,42 +25,50 @@ FTallowArcTuning UTallowHunterDirector::TuningForAct(ETallowStoryAct InAct)
         break;
     // Final pass (28 Oct: "a playthrough is only 20-30 mins... I want to see Mim stalk and ambush and hide more"):
     // the quiet and the relief are shorter, the build (where the stalk lives) is longer, and the tricks come sooner.
+    // 29 Oct ("Mim is really slow... running was dominant", "she's not too scary"): every hunt starts higher and
+    // its quiet is shorter, and each chapter has its own character. One: she is heard far more than she is seen (one
+    // watch a build, glimpses rare). Two: she stalks and watches from the doorways, often. Three: aggressive and fast.
+    // The last chapter (the reel and the run out): relentless. The close call joins from chapter two.
     case ETallowStoryAct::FirstContact:
-        T.QuietMin = 30.f; T.QuietMax = 45.f; T.BuildSeconds = 60.f; T.PeakSeconds = 40.f; T.RelaxMin = 25.f; T.RelaxMax = 35.f;
-        T.AggressionFloor = .15f; T.AggressionCap = .40f; T.AggressionRate = .0008f; T.BuildDwellBeforePeak = 30.f;
-        T.ScareCooldownMin = 180.f; T.ScareCooldownMax = 240.f; T.PassByMin = 30.f; T.PassByMax = 45.f;
-        T.WatchMin = 18.f; T.WatchMax = 30.f;
-        T.bAllowScare = false; T.bAllowDisguise = false;   // first contact is a glimpse and a watcher, then a hunt: no tricks yet
+        T.QuietMin = 24.f; T.QuietMax = 36.f; T.BuildSeconds = 60.f; T.PeakSeconds = 45.f; T.RelaxMin = 22.f; T.RelaxMax = 30.f;
+        T.AggressionFloor = .30f; T.AggressionCap = .50f; T.AggressionRate = .0009f; T.BuildDwellBeforePeak = 28.f;
+        T.ScareCooldownMin = 180.f; T.ScareCooldownMax = 240.f; T.PassByMin = 70.f; T.PassByMax = 100.f;
+        T.WatchMin = 30.f; T.WatchMax = 45.f; T.WatchesPerBuild = 1;
+        T.bAllowScare = false; T.bAllowDisguise = false;   // first contact is heard, a glimpse and one watcher, then a hunt: no tricks yet
         T.LieGapScale = 1.3f;
         break;
     case ETallowStoryAct::FuseHunt:
-        T.QuietMin = 25.f; T.QuietMax = 40.f; T.BuildSeconds = 90.f; T.PeakSeconds = 50.f; T.RelaxMin = 22.f; T.RelaxMax = 30.f;
-        T.AggressionFloor = .30f; T.AggressionCap = .60f; T.AggressionRate = .0010f; T.BuildDwellBeforePeak = 25.f;
+        T.QuietMin = 20.f; T.QuietMax = 32.f; T.BuildSeconds = 100.f; T.PeakSeconds = 50.f; T.RelaxMin = 22.f; T.RelaxMax = 30.f;
+        T.AggressionFloor = .40f; T.AggressionCap = .65f; T.AggressionRate = .0012f; T.BuildDwellBeforePeak = 24.f;
         T.ScareCooldownMin = 100.f; T.ScareCooldownMax = 140.f; T.PassByMin = 30.f; T.PassByMax = 45.f;
         // The heap now joins the fuse hunt (it is most of the evening), held back for its first two minutes.
         T.DisguiseCooldownMin = 150.f; T.DisguiseCooldownMax = 210.f; T.DisguiseDebutSeconds = 150.f;
-        T.WatchMin = 18.f; T.WatchMax = 30.f;
+        // The stalking chapter: the watcher comes back about twice as often, three times a build.
+        T.WatchMin = 12.f; T.WatchMax = 20.f;
+        T.bAllowCloseCall = true;
         break;
     case ETallowStoryAct::HouseWakes:
-        T.QuietMin = 20.f; T.QuietMax = 32.f; T.BuildSeconds = 85.f; T.PeakSeconds = 55.f; T.RelaxMin = 20.f; T.RelaxMax = 28.f;
-        T.AggressionFloor = .45f; T.AggressionCap = .75f; T.AggressionRate = .0012f; T.BuildDwellBeforePeak = 18.f;
-        T.ScareCooldownMin = 90.f; T.ScareCooldownMax = 130.f;
+        T.QuietMin = 14.f; T.QuietMax = 24.f; T.BuildSeconds = 70.f; T.PeakSeconds = 70.f; T.RelaxMin = 20.f; T.RelaxMax = 26.f;
+        T.AggressionFloor = .55f; T.AggressionCap = .80f; T.AggressionRate = .0013f; T.BuildDwellBeforePeak = 14.f;
+        T.ScareCooldownMin = 75.f; T.ScareCooldownMax = 110.f;
         T.DisguiseCooldownMin = 110.f; T.DisguiseCooldownMax = 160.f; T.PassByMin = 30.f; T.PassByMax = 45.f;
-        T.WatchMin = 18.f; T.WatchMax = 30.f;
+        T.WatchMin = 18.f; T.WatchMax = 30.f; T.WatchesPerBuild = 2;
         T.LieGapScale = .9f;
+        T.bAllowCloseCall = true;
         break;
     case ETallowStoryAct::Reel:
-        T.QuietMin = 18.f; T.QuietMax = 28.f; T.BuildSeconds = 70.f; T.PeakSeconds = 60.f; T.RelaxMin = 20.f; T.RelaxMax = 26.f;
-        T.AggressionFloor = .55f; T.AggressionCap = .88f; T.AggressionRate = .0014f; T.BuildDwellBeforePeak = 14.f;
-        T.ScareCooldownMin = 80.f; T.ScareCooldownMax = 120.f;
+        T.QuietMin = 12.f; T.QuietMax = 20.f; T.BuildSeconds = 60.f; T.PeakSeconds = 80.f; T.RelaxMin = 20.f; T.RelaxMax = 24.f;
+        T.AggressionFloor = .65f; T.AggressionCap = .90f; T.AggressionRate = .0013f; T.BuildDwellBeforePeak = 12.f;
+        T.ScareCooldownMin = 70.f; T.ScareCooldownMax = 100.f;
         T.DisguiseCooldownMin = 100.f; T.DisguiseCooldownMax = 150.f; T.PassByMin = 28.f; T.PassByMax = 40.f;
-        T.WatchMin = 18.f; T.WatchMax = 30.f;
+        T.WatchMin = 18.f; T.WatchMax = 30.f; T.WatchesPerBuild = 2;
         T.LieGapScale = .8f;
+        T.bAllowCloseCall = true;
         break;
     case ETallowStoryAct::EndRun:
-        T.QuietMin = 15.f; T.QuietMax = 24.f; T.BuildSeconds = 45.f; T.PeakSeconds = 85.f; T.RelaxMin = 20.f; T.RelaxMax = 28.f;
-        T.AggressionFloor = .65f; T.AggressionCap = 1.f; T.AggressionRate = .0018f; T.BuildDwellBeforePeak = 8.f;
-        T.ScareCooldownMin = 70.f; T.ScareCooldownMax = 100.f; T.PassByMin = 35.f; T.PassByMax = 55.f;
+        T.QuietMin = 8.f; T.QuietMax = 14.f; T.BuildSeconds = 40.f; T.PeakSeconds = 110.f; T.RelaxMin = 20.f; T.RelaxMax = 24.f;
+        T.AggressionFloor = .75f; T.AggressionCap = 1.f; T.AggressionRate = .0013f; T.BuildDwellBeforePeak = 8.f;
+        T.ScareCooldownMin = 60.f; T.ScareCooldownMax = 90.f; T.PassByMin = 35.f; T.PassByMax = 55.f;
         T.WatchMin = 16.f; T.WatchMax = 24.f; T.WatchesPerBuild = 2;   // a watcher is true: it is really there
         T.bAllowDisguise = false; T.bAllowHouseEvents = false; T.bAllowLies = false;  // every cue on the run out is the truth
         break;
@@ -82,6 +92,7 @@ void UTallowHunterDirector::SetStoryAct(ETallowStoryAct NewAct)
 {
     if (NewAct == Act || !GetWorld() || bActPinned) return;
     const bool bRising = static_cast<uint8>(NewAct) > static_cast<uint8>(Act);
+    if (Act == ETallowStoryAct::Dormant && bRising) ++HuntNumber;
     Act = NewAct;
     const float Now = GetWorld()->GetTimeSeconds();
     const FTallowArcTuning T = Tuning();
@@ -107,9 +118,10 @@ void UTallowHunterDirector::SetStoryAct(ETallowStoryAct NewAct)
         NextDisguise = FMath::Max(NextDisguise, Now + T.DisguiseDebutSeconds);
         break;
     case ETallowStoryAct::HouseWakes:
-        // False calm: the hum comes on, the house holds its breath for 25 s, then the disguise debuts.
+        // False calm: the hum comes on, the house holds its breath for 15 s (it was 25: chapter three is the fast
+        // one), then the disguise debuts.
         SetPhase(ETallowTensionPhase::Quiet, Now);
-        PhaseUntil = Now + 25.f;
+        PhaseUntil = Now + 15.f;
         NextDisguise = FMath::Min(NextDisguise, Now + 50.f);
         NextPassBy = Now + 30.f;
         NextWatch = Now + 30.f;
@@ -223,8 +235,38 @@ void UTallowHunterDirector::NotePursuitLost()
 {
     Aggression = ClampAggression(Aggression + .05f);
     ++Escapes;
-    // A short hunt for her first, then the breather: losing her is a win the player should get to feel.
-    if (Phase != ETallowTensionPhase::Relax) PendingRelaxAt = GetWorld()->GetTimeSeconds() + 8.f;
+    // A real hunt for her first, then the breather: losing her is a win the player should get to feel, but only once
+    // she has got away from the search too (it used to be 8 s, so a broken line of sight was nearly a free escape).
+    if (Phase != ETallowTensionPhase::Relax) PendingRelaxAt = GetWorld()->GetTimeSeconds() + 30.f;
+}
+
+bool UTallowHunterDirector::WantsCloseCall(const ATallowCharacter* Player) const
+{
+    if (!Player || !GetWorld() || !Tuning().bAllowCloseCall || IsProtected()) return false;
+    if (HuntNumber == LastCloseCallHunt || HuntNumber == LastCloseCallHunt + 1) return false;
+    if (Phase != ETallowTensionPhase::Build && !(Phase == ETallowTensionPhase::Quiet && GetPhaseAge() > 10.f)) return false;
+    if (Player->IsHiddenInSpot() || Player->IsTiedToChair()) return false;
+    const auto* Candle = Player->GetCandleComponent();
+    const bool bDark = !Candle || Candle->GetCandleState() != ECandleState::Lit;
+    // A fresh hold, so she still has most of her breath when it arrives (a hold already near its end made every close
+    // call a capture: the probe's first runs).
+    return bDark && Player->IsHoldingStill() && Player->GetHeldSeconds() > 1.f && Player->GetHeldSeconds() < 3.f
+        && Player->GetHeldAir() > .7f && Player->GetVelocity().Size2D() < 30.f;
+}
+
+bool UTallowHunterDirector::TakeCloseCallRoom(const ATallowCharacter* Player, FName& OutRoom) const
+{
+    // Which room, as an area hint is which part of the house: never a point in it.
+    if (!Player) return false;
+    OutRoom = TallowHouseRooms::RoomAt(Player->GetActorLocation());
+    return !OutRoom.IsNone();
+}
+
+void UTallowHunterDirector::NoteCloseCall()
+{
+    LastCloseCallHunt = HuntNumber;
+    ++CloseCalls;
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_PACING close call (hunt %d)"), HuntNumber);
 }
 
 void UTallowHunterDirector::NoteCaught()
@@ -363,7 +405,9 @@ void UTallowHunterDirector::UpdatePressure(float DeltaTime, ATallowCreature* Kee
     if (!bReviewPinned) Aggression = ClampAggression(Aggression + DeltaTime * T.AggressionRate * (bSeen ? 2.f : 1.f));
     const bool bNear = WalkingDistance < 800.f;
     if (bNear || bSeen) LastNearby = Now;
-    const float Rate = bBreather && !bSeen ? -.07f : bSeen ? .042f : bNear ? .022f : -.034f;
+    // Closeness alone fills the valve more slowly now that it closes in on her more often (.022 relieved every hunt
+    // that stayed near for 40 s).
+    const float Rate = bBreather && !bSeen ? -.07f : bSeen ? .042f : bNear ? .016f : -.034f;
     Menace = FMath::Clamp(Menace + Rate * DeltaTime, 0.f, 1.f);
     // The tension cycle. Quiet runs out into a build; the build turns into a peak when it gets close or sees her;
     // a peak ends in relief (lost her, a near miss, or simply too long), and relief settles back into quiet.

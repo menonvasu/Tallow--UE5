@@ -2,10 +2,14 @@
 
 #include "AI/TallowCreature.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Components/SceneComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Player/TallowCharacter.h"
 #include "Noise/TallowNoiseSubsystem.h"
+#include "Presentation/TallowNellNotes.h"
+#include "Presentation/TallowPlayDirector.h"
+#include "Kismet/GameplayStatics.h"
 #include "Tasks/TallowPlank.h"
 #include "Components/BoxComponent.h"
 #include "Tasks/TallowLockpickGame.h"
@@ -61,15 +65,15 @@ void ATallowDoor::BeginPlay()
 
 bool ATallowDoor::CanInteract_Implementation(AActor* Interactor) const
 {
-	// if door has planks 
-	if (bChapterSealed || IsBarricaded()) { return false; }
+	// A sealed door still answers the player (it rattles); only planks refuse outright.
+	if (!bChapterSealed && IsBarricaded()) { return false; }
 	
 	return true;
 }
 
 FText ATallowDoor::GetInteractionPromptText_Implementation(AActor* Interactor) const
 {
-	if (bChapterSealed) return FText::FromString(TEXT("WON'T OPEN"));
+	if (bChapterSealed) return FText::FromString(TEXT("BOLTED"));
 	if (IsBarricaded()) { return FText::FromString("BARRICADED"); }
 	
 	if (bIsLocked && bOpensFromInside && IsInside(Interactor)) { return FText::FromString("UNBOLT"); }
@@ -113,9 +117,14 @@ void ATallowDoor::SetLocked(bool bLocked)
 
 void ATallowDoor::OnInteract_Implementation(AActor* Interactor)
 {
-	if (!Interactor || bChapterSealed) { return; }
+	if (!Interactor) { return; }
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
+	if (bChapterSealed)
+	{
+		RattleBolted(Player);
+		return;
+	}
 	
 	if (bIsLocked && bOpensFromInside && IsInside(Player))
 	{
@@ -174,6 +183,27 @@ bool ATallowDoor::IsInside(const AActor* Actor) const
 	return FVector::DotProduct(Actor->GetActorLocation() - GetActorLocation(), Inward) > 0.f;
 }
 
+void ATallowDoor::RattleBolted(ATallowCharacter* Player)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastRattleTime < 1.0) { return; }
+	LastRattleTime = Now;
+	
+	const FVector Where = GetActorLocation();
+	if (ATallowPlayDirector* Director = Cast<ATallowPlayDirector>(UGameplayStatics::GetActorOfClass(this, ATallowPlayDirector::StaticClass())))
+	{
+		Director->PlayChapterCue(TEXT("P_Latch"), 0.25f, &Where);
+	}
+	if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
+	{
+		NoiseSubsystem->EmitNoise(ETallowNoiseType::DoorClose, Where, Player, BoltedRattleLoudness, true);
+	}
+	if (UTallowNellNotesComponent* Notes = UTallowNellNotesComponent::Find(this))
+	{
+		Notes->NoticeBolted();
+	}
+}
+
 void ATallowDoor::OnInteractComplete_Implementation(AActor* Interactor)
 {
 	if (!Interactor || bChapterSealed) { return; }
@@ -191,11 +221,60 @@ void ATallowDoor::UpdateDoorRotation(float OutputValue)
 	float CurrentYaw = FMath::Lerp(0.0f, OpenAngle, OutputValue);
 	HingePivot->SetRelativeRotation(FRotator(0.0f, CurrentYaw, 0.0f));
 	UpdateLeafNavigation(bIsOpen && OutputValue >= .98f);
+	// A drift ends where it was meant to: a hand's width open (the timeline stops there and can carry on from it), or shut.
+	if (bDrifting && DriftStop > 0.f && OutputValue >= DriftStop) { if (DoorTimeline) DoorTimeline->Stop(); EndDrift(); }
+	else if (bDrifting && DriftStop <= 0.f && OutputValue <= .002f) EndDrift();
+}
+
+void ATallowDoor::EndDrift()
+{
+	bDrifting = false; DriftStop = 0.f;
+	if (DoorTimeline) DoorTimeline->SetPlayRate(1.f);
+}
+
+bool ATallowDoor::CanDrift() const
+{
+	return !bDrifting && !bChapterSealed && !bIsLocked && !IsBarricaded() && !IsHidden() && DoorTimeline && DoorTimelineCurve && !DoorTimeline->IsPlaying();
+}
+
+bool ATallowDoor::DriftAjar(float Fraction, float PlayRate)
+{
+	if (!CanDrift() || bIsOpen || DoorTimeline->GetPlaybackPosition() > KINDA_SMALL_NUMBER) return false;
+	bDrifting = true; DriftStop = FMath::Clamp(Fraction, .02f, .5f);
+	DoorTimeline->SetPlayRate(FMath::Max(PlayRate, .05f));
+	DoorTimeline->Play();
+	return true;
+}
+
+bool ATallowDoor::DriftShut(float PlayRate)
+{
+	if (!CanDrift() || !bIsOpen) return false;
+	bDrifting = true; DriftStop = 0.f;
+	DoorTimeline->SetPlayRate(FMath::Max(PlayRate, .05f));
+	DoorTimeline->Reverse();
+	bIsOpen = false;
+	UpdateLeafNavigation(false);
+	return true;
+}
+
+float ATallowDoor::GetSwingSeconds(float PlayRate) const
+{
+	return (DoorTimeline ? DoorTimeline->GetTimelineLength() : 1.f) / FMath::Max(PlayRate, .05f);
+}
+
+FVector ATallowDoor::GetLeafCentre() const { return DoorMesh ? DoorMesh->Bounds.Origin : GetActorLocation(); }
+FVector ATallowDoor::GetHingeLocation() const { return HingePivot ? HingePivot->GetComponentLocation() : GetActorLocation(); }
+float ATallowDoor::GetLeafWidth() const
+{
+	if (!DoorMesh || !DoorMesh->GetStaticMesh()) return 100.f;
+	const FVector Extent = DoorMesh->GetStaticMesh()->GetBounds().BoxExtent * DoorMesh->GetComponentScale().GetAbs();
+	return 2.f * FMath::Max(Extent.X, Extent.Y);
 }
 
 void ATallowDoor::ToggleDoor(ATallowCharacter* Player)
 {
 	if (!Player || !DoorTimeline) return;
+	if (bDrifting) EndDrift();
 	
 	if (!bIsOpen)
 	{
@@ -215,10 +294,31 @@ void ATallowDoor::ToggleDoor(ATallowCharacter* Player)
 	if (!bIsOpen) UpdateLeafNavigation(false);
 }
 
+bool ATallowDoor::SlamShut()
+{
+	if (!bIsOpen) return false;
+	bIsOpen = false;
+	UpdateLeafNavigation(false);
+	if (DoorTimeline && DoorTimelineCurve)
+	{
+		// Faster than a running child slams it open: it is thrown, not pushed.
+		DoorTimeline->SetPlayRate(DoorSlamPlayRate * 1.5f);
+		DoorTimeline->Reverse();
+	}
+	else UpdateDoorRotation(0.f);
+	return true;
+}
+
+float ATallowDoor::GetLeafAngle() const
+{
+	return HingePivot ? FMath::Abs(HingePivot->GetRelativeRotation().Yaw) : 0.f;
+}
+
 void ATallowDoor::ResetDoor()
 {
 	// reset meshes and states.
 	bChapterSealed = false;
+	EndDrift();
 	if (DoorTimeline)
 	{
 		DoorTimeline->Stop();
@@ -251,7 +351,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	
 	if (!bIsOpen)
 	{
-		
+		if (bDrifting) EndDrift();
 		if (const bool bIsChasing = (Creature->CurrentState == ETallowCreatureState::Chasing))
 		{
 			DoorTimeline->SetPlayRate(DoorSlamPlayRate);
@@ -279,6 +379,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 
 void ATallowDoor::ApplyChapterState(ETallowDoorState State)
 {
+    EndDrift();
     bChapterSealed = State == ETallowDoorState::StoryGated;
     bIsLocked = State == ETallowDoorState::Lockpick;
     bIsOpen = State == ETallowDoorState::Open;

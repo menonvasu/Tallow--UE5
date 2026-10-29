@@ -16,7 +16,7 @@ UENUM()
 enum class ETallowNote : uint8
 {
 	Journal, Candle, Guide, Glimpse, Seen, Lost, Close, Listen, HeldPast, Hide, HideClose, Draught, Sprint, Dark,
-	NoMatches, Wax, Board, Snap, Omen, Trick, Fuse, LastFuse, Power, Reel, Projector, Code, Open, Retry, Map, Count
+	NoMatches, Wax, Board, Snap, Omen, Trick, Fuse, LastFuse, Power, Reel, Projector, Code, Open, Retry, Map, Bolted, Hiss, Follow, Count
 };
 
 /** 28 Oct: "I should understand aspects of the game... what certain small triggers, like it looking at you,
@@ -43,6 +43,9 @@ public:
 	FText GetSummary() const;
 	/** Her notebook: what she has to do (ticked off as she goes), then what she knows. */
 	UFUNCTION(BlueprintPure, Category="Notes") TArray<FText> GetNotebookPages() const;
+
+	/** A bolted door was tried: Nell mutters, but not twice within a few seconds. */
+	void NoticeBolted();
 
 	/** Switch the first-time notes off (the notebook stays). */
 	UPROPERTY(EditAnywhere, Category="Notes") bool bShowNotes = true;
@@ -75,6 +78,7 @@ private:
 	ETallowNote Pending = ETallowNote::Count, Showing = ETallowNote::Count;
 	float PendingFrom = 0.f, PendingUntil = 0.f, ShownUntil = 0.f, NextCheck = 0.f;
 	float CandleSince = -1.f, OutSince = -1.f, ThreatAt = -100.f, SeenCall = -100.f, GuideUntil = 0.f;
-	int32 HouseEvents = 0;
+	int32 HouseEvents = 0, BoltedVariant = 0;
+	float BoltedAt = -100.f, FollowAt = -1000.f, BestWalk = 0.f, BestWalkAt = 0.f;
 	bool bCaught = false, bWasTied = true, bWasDistraction = false;
 };

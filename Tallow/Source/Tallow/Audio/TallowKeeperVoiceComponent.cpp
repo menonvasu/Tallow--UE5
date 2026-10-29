@@ -1,4 +1,5 @@
 #include "Audio/TallowKeeperVoiceComponent.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "AI/TallowCreature.h"
 #include "Player/TallowCharacter.h"
 #include "TimerManager.h"
@@ -17,17 +18,30 @@ namespace
 	// My lines (SourceAssets/Audio/Recording/Creature/Lines/lines.json), by what it is doing.
 	struct FLines { ETallowKeeperLine Line; const TCHAR* Names[8]; float Gap, Volume; };
 	const FLines KeeperLines[] = {
-		{ETallowKeeperLine::Lure,    {TEXT("00"), TEXT("01"), TEXT("02"), TEXT("04"), TEXT("05"), TEXT("06"), TEXT("20")}, 24.f, .42f},
-		{ETallowKeeperLine::Murmur,  {TEXT("24"), TEXT("26"), TEXT("10")}, 85.f, .38f},
-		{ETallowKeeperLine::Heard,   {TEXT("13"), TEXT("14"), TEXT("11")}, 20.f, .5f},
-		{ETallowKeeperLine::Search,  {TEXT("12"), TEXT("16"), TEXT("18"), TEXT("15"), TEXT("VO_Mim_Hide"), TEXT("VO_Mim_ComeOut"), TEXT("VO_Mim_WontLetGo")}, 24.f, .5f},
-		{ETallowKeeperLine::Seen,    {TEXT("07"), TEXT("09"), TEXT("17"), TEXT("19")}, 4.f, .6f},
-		{ETallowKeeperLine::Chase,   {TEXT("22a"), TEXT("22b"), TEXT("22c"), TEXT("03")}, 12.f, .6f},
-		{ETallowKeeperLine::Lost,    {TEXT("08"), TEXT("25")}, 35.f, .5f},
+		{ETallowKeeperLine::Lure,    {TEXT("00"), TEXT("01"), TEXT("02"), TEXT("04"), TEXT("05"), TEXT("06"), TEXT("20")}, 90.f, .42f},
+		{ETallowKeeperLine::Murmur,  {TEXT("24"), TEXT("26"), TEXT("10")}, 180.f, .38f},
+		{ETallowKeeperLine::Heard,   {TEXT("13"), TEXT("14"), TEXT("11")}, 90.f, .5f},
+		{ETallowKeeperLine::Search,  {TEXT("12"), TEXT("16"), TEXT("18"), TEXT("15"), TEXT("VO_Mim_Hide"), TEXT("VO_Mim_ComeOut"), TEXT("VO_Mim_WontLetGo")}, 75.f, .5f},
+		{ETallowKeeperLine::Seen,    {TEXT("07"), TEXT("09"), TEXT("17"), TEXT("19")}, 30.f, .6f},
+		{ETallowKeeperLine::Chase,   {TEXT("22a"), TEXT("22b"), TEXT("22c"), TEXT("03")}, 60.f, .6f},
+		{ETallowKeeperLine::Lost,    {TEXT("08"), TEXT("25")}, 60.f, .5f},
 		{ETallowKeeperLine::Capture, {TEXT("23"), TEXT("27")}, 0.f, .7f},
-		{ETallowKeeperLine::Breath,  {TEXT("28"), TEXT("29"), TEXT("30"), TEXT("31"), TEXT("32")}, 7.f, .35f},
-		{ETallowKeeperLine::Giggle,  {TEXT("VO_Mim_Giggle_00"), TEXT("VO_Mim_Giggle_01"), TEXT("VO_Mim_Giggle_02")}, 18.f, .55f},
+		{ETallowKeeperLine::Breath,  {TEXT("28"), TEXT("29"), TEXT("30"), TEXT("31"), TEXT("32")}, 60.f, .35f},
+		{ETallowKeeperLine::Giggle,  {TEXT("VO_Mim_Giggle_00"), TEXT("VO_Mim_Giggle_01"), TEXT("VO_Mim_Giggle_02")}, 120.f, .55f},
 	};
+
+	// Ordinary lines (murmur, lure, heard, search, chase begging, breath, giggle) share one slow clock, so she speaks
+	// rarely. Only the sight call, losing you and the capture are exempt: those are the moments worth a line.
+	constexpr float OrdinaryGap = 75.f;
+	// The same recording is never heard twice inside this many seconds.
+	constexpr float RepeatBlock = 300.f;
+	// She only calls out a search when you are within earshot of the room she is searching.
+	constexpr float SearchCallRange = 1200.f;
+
+	bool IsMoment(ETallowKeeperLine Line)
+	{
+		return Line == ETallowKeeperLine::Seen || Line == ETallowKeeperLine::Lost || Line == ETallowKeeperLine::Capture;
+	}
 
 	bool IsSearching(ETallowCreatureState State)
 	{
@@ -128,6 +142,8 @@ void UTallowKeeperVoiceComponent::ResetVoice()
 	CaptureEndsAt = QuietUntil = 0.f;
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	NextAny = Now + 5.f;
+	NextOrdinary = Now + 20.f;
+	PlayedAt.Reset();
 	NextFoley = NextFoleyAllowed = Now + 4.f;
 	ChaseStarted = -100.f;
 	AggressiveUntil = 0.f;
@@ -142,6 +158,14 @@ void UTallowKeeperVoiceComponent::SetAwake(bool bOn)
 	ResetVoice();
 	bAwake = bOn;
 	if (bOn && GetWorld()) NextAny = GetWorld()->GetTimeSeconds() + FMath::FRandRange(3.f, 6.f);
+}
+
+void UTallowKeeperVoiceComponent::CaptionLine(USoundBase* Cue)
+{
+	// Only what she could hear: its voice fades out at HearingDistance. Sounds with no words in them have no caption.
+	const AActor* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!Cue || !Player || !GetOwner() || FVector::Dist(Player->GetActorLocation(), GetOwner()->GetActorLocation()) > HearingDistance) return;
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Cue->GetFName(), Cue->GetDuration(), ETallowSubtitleVoice::Mim);
 }
 
 bool UTallowKeeperVoiceComponent::Speak(USoundBase* Cue, float Volume, float Pitch)
@@ -163,10 +187,12 @@ bool UTallowKeeperVoiceComponent::Speak(USoundBase* Cue, float Volume, float Pit
 				Speaking->SoundClassOverride=Class;
 			Speaking->Play();
 		}
+		CaptionLine(Cue);
 		return Speaking!=nullptr;
 	}
 	Speaking = UGameplayStatics::SpawnSoundAttached(Cue, GetOwner()->GetRootComponent(), NAME_None, FVector(0, 0, 60),
 		EAttachLocation::KeepRelativeOffset, false, Volume, Pitch, 0.f, Attenuation);
+	if (Speaking) CaptionLine(Cue);
 	return Speaking != nullptr;
 }
 
@@ -213,8 +239,10 @@ bool UTallowKeeperVoiceComponent::Say(ETallowKeeperLine Line, bool bForce)
 	const float Now = GetWorld()->GetTimeSeconds();
 	FPool* Pool = Pools.Find(Line);
 	if (!Pool || !bAwake || bCapturing || Now < QuietUntil || Now < Pool->Ready) return false;
+	if (bCreeping && !IsMoment(Line)) return false;
 	const bool bTalking = Speaking && Speaking->IsPlaying();
 	if (!bForce && (bTalking || Now < NextAny)) return false;
+	if (!bForce && !IsMoment(Line) && Now < NextOrdinary) return false;
 	// Aggression brings the low voice out. About two in five eligible phrases,
 	// with a short gap; calm wandering, lures and quiet breathing stay sweet.
 	const auto* Keeper = Cast<ATallowCreature>(GetOwner());
@@ -224,13 +252,23 @@ bool UTallowKeeperVoiceComponent::Say(ETallowKeeperLine Line, bool bForce)
 	const bool bDemon = bEligible && !bForce && !DemonPool.Names.IsEmpty()
 		&& Now >= NextDemon && FMath::FRand() < DemonChance;
 	USoundBase* Cue = bDemon ? Draw(DemonPool) : Next(Line);
+	// Never the same recording close together, even when the shuffled bag turns over.
+	for (int32 Tries = 0; Cue && Tries < 3; ++Tries)
+	{
+		const float* Last = PlayedAt.Find(Cue->GetFName());
+		if (!Last || Now - *Last > RepeatBlock) break;
+		Cue = bDemon ? Draw(DemonPool) : Next(Line);
+	}
 	if (!Cue) return false;
+	if (const float* Last = PlayedAt.Find(Cue->GetFName())) if (Now - *Last <= RepeatBlock) return false;
 	if (!Speak(Cue, Pool->Volume, FMath::FRandRange(.985f, 1.015f))) return false;
 	if (bDemon) NextDemon = Now + Cue->GetDuration() + DemonCooldown;
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE %s %s"), *UEnum::GetValueAsString(Line), *Cue->GetName());
+	PlayedAt.Add(Cue->GetFName(), Now);
 	Pool->Ready = Now + Pool->Gap * FMath::FRandRange(.8f, 1.4f);
+	if (!IsMoment(Line)) NextOrdinary = Now + OrdinaryGap * FMath::FRandRange(1.f, 1.5f);
 	const bool bUrgent = Line == ETallowKeeperLine::Seen || Line == ETallowKeeperLine::Chase;
-	NextAny = Now + Cue->GetDuration() + (bUrgent ? FMath::FRandRange(2.f, 4.f) : FMath::FRandRange(6.f, 11.f));
+	NextAny = Now + Cue->GetDuration() + (bUrgent ? FMath::FRandRange(8.f, 14.f) : FMath::FRandRange(15.f, 25.f));
 	return Speaking != nullptr;
 }
 
@@ -249,7 +287,7 @@ bool UTallowKeeperVoiceComponent::SayLine(const FString& Name, const FString& Fa
 void UTallowKeeperVoiceComponent::Foley(bool bKnock, float Volume)
 {
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (!bAwake || bCapturing || Now < QuietUntil || Now < NextFoleyAllowed
+	if (!bAwake || bCapturing || bCreeping || Now < QuietUntil || Now < NextFoleyAllowed
 		|| (FoleyPlaying && FoleyPlaying->IsPlaying())) return;
 	int32& Last = bKnock ? LastKnock : LastScratch;
 	const int32 Count = bKnock ? 3 : 4;
@@ -292,7 +330,7 @@ void UTallowKeeperVoiceComponent::UpdateVoice(float Now)
 	if (State != Previous)
 	{
 		if (State == ETallowCreatureState::Chasing) ChaseStarted = Now;
-		if (State == ETallowCreatureState::Investigating && FMath::FRand() < .7f) Say(ETallowKeeperLine::Heard);
+		if (State == ETallowCreatureState::Investigating && FMath::FRand() < .35f) Say(ETallowKeeperLine::Heard);
 		if (Previous == ETallowCreatureState::Chasing) { AggressiveUntil = Now + 25.f; Say(ETallowKeeperLine::Lost); }
 	}
 
@@ -308,7 +346,7 @@ void UTallowKeeperVoiceComponent::UpdateVoice(float Now)
 	{
 		// The soft heap talks to you only when you are close enough to come and see. (It sits in the same low state
 		// as a search, so this has to come first: it used to say "come out" and scratch the boards instead.)
-		if (Distance < 700.f) Say(ETallowKeeperLine::Lure);
+		if (Distance < 500.f) Say(ETallowKeeperLine::Lure);
 	}
 	else if (bLurking)
 	{
@@ -316,7 +354,7 @@ void UTallowKeeperVoiceComponent::UpdateVoice(float Now)
 	}
 	else if (IsSearching(State))
 	{
-		Say(ETallowKeeperLine::Search);
+		if (Distance < SearchCallRange) Say(ETallowKeeperLine::Search);
 		// Its many hands feeling along the boards: the honest tell of where it is looking.
 		if (Now >= NextFoley)
 		{
@@ -326,10 +364,10 @@ void UTallowKeeperVoiceComponent::UpdateVoice(float Now)
 	}
 	else if (State == ETallowCreatureState::Patrol || State == ETallowCreatureState::SuspiciousIdle)
 	{
-		if (Distance < 2200.f) Say(ETallowKeeperLine::Murmur);
+		if (Distance < 1500.f) Say(ETallowKeeperLine::Murmur);
 	}
 	// Right beside you and not saying anything: a held breath, a hiss.
-	if (!bDisguised && State != ETallowCreatureState::Chasing && Distance < 300.f) Say(ETallowKeeperLine::Breath);
+	if (!bDisguised && State != ETallowCreatureState::Chasing && Distance < 250.f) Say(ETallowKeeperLine::Breath);
 }
 
 void UTallowKeeperVoiceComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -356,7 +394,7 @@ void UTallowKeeperVoiceComponent::PlayCapture()
 	{
 		if(!bCapturing)return;
 		USoundBase* Scream = Sound(TEXT("K_Mim_Capture_Scream"));
-		if (Scream) Speak(Scream, 1.f);
+		if (Scream) Speak(Scream, .25f);
 		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE CaptureStrike %s lead %.2fs class %s"), *GetNameSafe(Scream), ScreamLeadSeconds,
 			Speaking ? *GetNameSafe(Speaking->SoundClassOverride) : TEXT("none (no audio device)"));
 		// Let the impact and scream end in silence. A spoken punchline or

@@ -45,6 +45,7 @@
 #include "Scare/TallowScareDirector.h"
 #include "Tasks/TallowChairEscape.h"
 #include "Tasks/TallowCrowbarPickup.h"
+#include "Tasks/TallowFilmReelPickup.h"
 #include "Tasks/TallowFuseBox.h"
 #include "Tasks/TallowLockpickGame.h"
 #include "Tasks/TallowProjector.h"
@@ -294,6 +295,17 @@ bool UTallowChapterSubsystem::BuildRound(ETallowRestartReason Reason)
     else if (Plush) Plush->Retire();
     Director->ResetPresentationForChapter();
     for (TActorIterator<ATallowProjector> It(GetWorld()); It; ++It) It->ResetProjector();
+    // The reel belongs to the final chapter: out of reach during the battery rounds, back on its shelf when the final one begins or is restored.
+    {
+        const auto* Projector=One<ATallowProjector>(this);
+        const bool bCarrying=Player && Player->GetInventoryCount(ECarriedItemType::FilmReel)>0;
+        const bool bWanted=Def->Kind==ETallowChapterKind::Final && !bCarrying && !(Projector && Projector->IsReelLoaded());
+        for (TActorIterator<ATallowFilmReelPickup> It(GetWorld()); It; ++It)
+        {
+            if (bWanted) It->ResetReelPickup();
+            else { It->SetActorHiddenInGame(true); It->SetActorEnableCollision(false); }
+        }
+    }
     for (TActorIterator<ATallowEscapePoint> It(GetWorld()); It; ++It) It->SetCodeVerified(false);
     Director->ActiveRunSeed = Campaign.ChapterSeed; Director->bBoardsCleared = true;
     const auto* Box = One<ATallowFuseBox>(this);
@@ -661,6 +673,7 @@ void UTallowChapterSubsystem::CompleteChapter()
     PersistDiscoveries();
     const auto* Def=GetChapterDefinition(); Campaign.CompletedChapters.AddUnique(Def->ChapterId);
     if (!Def->StoryFlag.IsNone()) Campaign.StoryFlags.AddUnique(Def->StoryFlag);
+    if (!Layout.CrowbarSpot.IsNone()) Campaign.History.UsedCrowbarSpots.AddUnique(Layout.CrowbarSpot);
     Campaign.History.UsedBatterySpots.AddUnique(Layout.BatterySpot); Campaign.History.UsedChairRooms.AddUnique(Layout.ChairRoom); Campaign.History.UsedStoryObjects.AddUnique(Layout.StoryObject);
     Campaign.History.PreviousDoors=Layout.Doors;
     Campaign.History.PreviousDoors.Sort([](const FTallowDoorAssignment& A,const FTallowDoorAssignment& B){return A.Edge.LexicalLess(B.Edge);});

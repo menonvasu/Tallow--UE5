@@ -87,6 +87,7 @@ private:
 	FName SpeakerKey;
 	FTallowReadingPlayback Playback;
 	int32 CorruptSession = 0;
+	int32 SubtitleTrack = 0;
 	TWeakObjectPtr<class ATallowCreature> Keeper;
 	UPROPERTY(Transient) TObjectPtr<class UAudioComponent> Narration;
 	TWeakObjectPtr<class UTallowSoundscapeComponent> AudioFocus;

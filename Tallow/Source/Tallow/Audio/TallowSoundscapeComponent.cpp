@@ -47,8 +47,8 @@ namespace
 		{TEXT("T_Knock_Wall"), .47f, false, false}, {TEXT("T_Scratch_Door_Frantic"), .4f, false, false},
 		{TEXT("T_Scratch_Wall_00"), .47f, false, false}, {TEXT("T_Scratch_Wall_01"), .47f, false, false},
 		{TEXT("T_Scratch_Wall_02"), .47f, false, false}, {TEXT("T_Scratch_Wall_03"), .47f, false, false},
-		{TEXT("T_Kid_Cry_Distant_00"), .95f, true, false}, {TEXT("T_Kid_Cry_Distant_01"), .95f, true, false},
-		{TEXT("T_Kid_Cry_Distant_02"), .95f, true, false},
+		{TEXT("T_Kid_Cry_Distant_00"), .5f, true, false}, {TEXT("T_Kid_Cry_Distant_01"), .5f, true, false},
+		{TEXT("T_Kid_Cry_Distant_02"), .5f, true, false},
 		{TEXT("T_Toy_Musicbox"), .47f, false, false},
 		{TEXT("T_Candle_Memory_00"), .41f, true, false},
 		{TEXT("T_Candle_Memory_01"), .41f, true, false},
@@ -419,12 +419,13 @@ void UTallowSoundscapeComponent::UpdateMix(float DeltaTime)
 	Channel(TEXT("Narration"),1.f);Channel(TEXT("Distractions"),Profile.Distractions);
 
 	auto Approach = [DeltaTime](float& Value, float Target, float FadeSeconds) { Value = FMath::FInterpConstantTo(Value, Target, DeltaTime, 1.f / FadeSeconds); };
+	UpdateHush(DeltaTime);
 	Approach(BedGain, Bed, Tension == ETallowTension::Caught ? .05f : Tension == ETallowTension::After ? 6.f : Player->IsHoldingStill() ? .4f : 2.f);
 	Approach(DarkGain, Dark, Seconds);
 	Approach(BassGain, Bass, Seconds);
 	Approach(HorrorGain, Horror, Tension == ETallowTension::Caught ? .05f : 8.f);
 	for (int32 I = 0; I < Beds.Num(); ++I)
-		if (Beds[I]) Beds[I]->SetVolumeMultiplier(FMath::Max(BedBase[I] * BedGain, .001f));
+		if (Beds[I]) Beds[I]->SetVolumeMultiplier(FMath::Max(BedBase[I] * BedGain * HushGain, .001f));
 	auto Drive = [](UAudioComponent* Loop, float Gain)
 	{
 		if (!Loop) return;
@@ -432,7 +433,34 @@ void UTallowSoundscapeComponent::UpdateMix(float DeltaTime)
 		if (!Loop->IsPlaying()) Loop->Play();
 		Loop->SetVolumeMultiplier(FMath::Max(Gain, .001f));
 	};
-	Drive(DarkDrone, DarkGain); Drive(BassDrone, BassGain); Drive(HorrorBed, HorrorGain);
+	Drive(DarkDrone, DarkGain * HushGain); Drive(BassDrone, BassGain * HushGain); Drive(HorrorBed, HorrorGain * HushGain);
+}
+
+void UTallowSoundscapeComponent::UpdateHush(float DeltaTime)
+{
+	// The house goes quiet around her: when she is about to come into Nell's room (a few metres off and closing, or
+	// right on top of her) the bed, atmosphere and drones sink to near silence, so her own sounds are all there is.
+	const float Now = GetWorld()->GetTimeSeconds();
+	const bool bFree = Keeper.IsValid() && bKeeperAwake && Player.IsValid() && Tension != ETallowTension::Caught && Tension != ETallowTension::Chase && Tension != ETallowTension::After;
+	if (bFree)
+	{
+		const float Distance = FVector::Dist(Keeper->GetActorLocation(), Player->GetActorLocation());
+		const float Closing = LastKeeperDistance > 0.f && DeltaTime > KINDA_SMALL_NUMBER ? (LastKeeperDistance - Distance) / DeltaTime : 0.f;
+		LastKeeperDistance = Distance;
+		const bool bSameStorey = FMath::Abs(Keeper->GetActorLocation().Z - Player->GetActorLocation().Z) < 220.f;
+		const bool bEntering = bSameStorey && (Distance < HushNearCm * .5f || (Distance < HushNearCm && Closing > 25.f));
+		// Only about a third of her entries hush the house, and never a creeping one: always going quiet would itself be a tell.
+		if (bEntering && !bWasEntering)
+		{
+			const auto* Voice = Keeper->FindComponentByClass<UTallowKeeperVoiceComponent>();
+			bHushThisEntry = !(Voice && Voice->IsCreeping()) && FMath::FRand() < HushChance;
+		}
+		bWasEntering = bEntering;
+		if (bEntering && bHushThisEntry) HushUntil = Now + HushHoldSeconds;
+	}
+	else { LastKeeperDistance = -1.f; bWasEntering = false; }
+	const bool bOn = Now < HushUntil && bFree;
+	HushGain = FMath::FInterpConstantTo(HushGain, bOn ? HushDepth : 1.f, DeltaTime, bOn ? (1.f - HushDepth) / 1.2f : (1.f - HushDepth) / 3.f);
 }
 
 void UTallowSoundscapeComponent::UpdateLies(float Now)

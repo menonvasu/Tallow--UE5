@@ -2,19 +2,24 @@
 #include "Chapter/Presentation/TallowBloodWriting.h"
 #include "Chapter/TallowChapterSubsystem.h"
 #include "Chapter/TallowChairSpot.h"
+#include "Chapter/TallowStoryObject.h"
 #include "AI/TallowCreature.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/AudioComponent.h"
+#include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Environment/TallowCandlePickup.h"
 #include "Environment/TallowDoor.h"
 #include "GameFramework/PlayerController.h"
+#include "House/TallowHouseGraph.h"
 #include "House/TallowHouseRooms.h"
+#include "Input/TallowHaptics.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -47,6 +52,7 @@ namespace
     const FVector2f ReleaseLids[] = {{0.f, 0.f}, {2.9f, 0.f}, {3.f, .3f}, {3.1f, 1.f}, {3.38f, 1.f}, {3.62f, 0.f}};
     constexpr float ReleaseCut = 3.2f, ReleaseEnd = 7.4f;
     constexpr float WritingEnd = 7.6f;
+    constexpr float StrobeLumens = 140.f;
     constexpr float FuseBlow = 2.72f, FuseCut = 2.86f, FuseEnd = 5.3f;
     constexpr float ResetSlam = 1.3f, ResetCut = 1.55f, ResetEnd = 6.6f;
     const TCHAR* const Stings = TEXT("/Game/FinalPass/Beats/Audio/");
@@ -75,10 +81,13 @@ void UTallowBeatPresenter::OnWorldBeginPlay(UWorld& InWorld)
             FSoundClassAdjuster Gone; Gone.SoundClassObject = Class; Gone.VolumeAdjuster = .02f;
             Silence->SoundClassEffects.Add(Gone);
         }
+    // Loaded now, not at the first writing: a decal drawn before its shaders are ready shows as a black box.
+    BloodMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatBloodWriting.M_BeatBloodWriting"));
 #if !UE_BUILD_SHIPPING
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsRehearse"))) RehearseStep = 0;
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsWords"))) { RehearseStep = 0; WordsChapter = 0; }
     FParse::Value(FCommandLine::Get(), TEXT("TallowBeatsFilm="), FilmDir);
+    FParse::Value(FCommandLine::Get(), TEXT("TallowBeatsFilmStep="), FilmStep);
 #endif
 }
 void UTallowBeatPresenter::Deinitialize() { Clear(); Super::Deinitialize(); }
@@ -146,6 +155,9 @@ void UTallowBeatPresenter::OnRoundReset(int32, ETallowRestartReason)
 void UTallowBeatPresenter::BeginWriting()
 {
     auto* Player = GetPlayer();
+#if !UE_BUILD_SHIPPING
+    if (RehearseStep >= 0 && WordsChapter < 0) StageListening(Context.Subject.Get(), Context.Where.GetLocation(), false);
+#endif
     FVector Point, Normal;
     if (!ATallowBloodWriting::FindWall(GetWorld(), Context.Where, Context.Subject, Point, Normal))
     {
@@ -155,26 +167,177 @@ void UTallowBeatPresenter::BeginWriting()
         if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + View.Vector() * 900.f, ECC_Visibility, Params)) { Point = Hit.ImpactPoint; Normal = Hit.ImpactNormal; }
         else { Point = Context.Where.GetLocation(); Normal = -View.Vector(); }
     }
+    // Her view is taken round onto the words (the capture's turn: eased, the short way, level), quicker for a glance
+    // than for an about-face. The words begin as it settles, so the first strokes form in front of her.
+    WordsAt = Point + FVector(0.f, 0.f, 12.f);
+    auto* PC = Cast<APlayerController>(Player->GetController());
+    bViewFree = !PC || Player->IsHiddenInSpot();
+    TurnFrom = PC ? PC->GetControlRotation().Quaternion() : FQuat::Identity;
+    const FVector Eye = Player->GetFirstPersonCameraComponent()->GetComponentLocation();
+    const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(float(FVector::DotProduct(TurnFrom.GetForwardVector(), (WordsAt - Eye).GetSafeNormal())), -1.f, 1.f)));
+    TurnSeconds = bViewFree ? 0.f : FMath::Lerp(.6f, .9f, Angle / 180.f);
+    WordsDelay = bViewFree ? 0.f : TurnSeconds * .7f;
     if (Writing) Writing->Destroy();
     FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     Writing = GetWorld()->SpawnActor<ATallowBloodWriting>(Point, FRotator::ZeroRotator, Spawn);
-    if (Writing) Writing->Write(Context.Text, Point, Normal, Context.ChapterIndex * 131 + 17, Context.Where.GetScale3D().X);
-    // Her eyes are drawn by the sound and the wall, not taken: look and move stay hers while it forms.
-    if (auto* PC = Cast<APlayerController>(Player->GetController()); PC && PC->IsMoveInputIgnored())
+    if (Writing) { Writing->Write(Context.Text, Point, Normal, Context.ChapterIndex * 131 + 17, Context.Where.GetScale3D().X, WordsDelay); WordsAt = Writing->GetWordsCentre(); }
+    WordsWhole = WordsDelay + (Writing ? Writing->GetFormEnd() : 4.75f);
+    // It lands with a shock: every door of her room thrown shut at once, and a dead red lamp catching.
+    SlamJolt = SlamRoomDoors(WordsAt + Normal.GetSafeNormal2D() * 50.f) > 0 ? 1.f : 0.f;
+    LightStrobe(WordsAt, Normal);
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS view turn=%.0f deg in %.2fs, words from %.2fs, whole at %.2fs%s"), Angle, TurnSeconds, WordsDelay, WordsWhole, bViewFree ? TEXT(" (hidden: view left free)") : TEXT(""));
+    // Hidden in a cupboard she keeps her own eyes; the words wait on the wall outside.
+    if (bViewFree && PC && PC->IsMoveInputIgnored())
     { PC->SetIgnoreMoveInput(false); PC->SetIgnoreLookInput(false); bInputReleased = true; }
-#if !UE_BUILD_SHIPPING
-    if (RehearseStep >= 0)
+}
+void UTallowBeatPresenter::FindRoomDoors(const UWorld* World, FName Room, TArray<ATallowDoor*>& OutDoors)
+{
+    OutDoors.Reset();
+    const FTallowRoomDef* Def = TallowHouseRooms::Find(Room);
+    if (!World || !Def) return;
+    TSet<FName> OnGraph, OnEdges;
+    for (const FTallowHouseEdge& Edge : TallowHouseGraph::Get().Edges)
+        if (!Edge.DoorActor.IsNone()) { OnGraph.Add(Edge.DoorActor); if (Edge.Joins(Room)) OnEdges.Add(Edge.DoorActor); }
+    for (TActorIterator<ATallowDoor> It(World); It; ++It)
     {
-        // Stand where the clue was heard (the machine's controls side), facing the wall.
-        const AActor* Story = Context.Subject.Get();
-        FVector Foot = Story ? Story->GetActorLocation() + Story->GetActorForwardVector() * 110.f : Point + Normal.GetSafeNormal2D() * 300.f;
-        FHitResult Floor; FCollisionQueryParams Params(TEXT("TallowBeatsFloor"), false, Player);
-        if (GetWorld()->LineTraceSingleByChannel(Floor, Foot + FVector(0, 0, 50.f), Foot - FVector(0, 0, 400.f), ECC_Visibility, Params)) Foot = Floor.ImpactPoint;
-        Player->TeleportTo(Foot + FVector(0, 0, 92.f), FRotator::ZeroRotator, false, true);
-        Player->GetController()->SetControlRotation((Point + FVector(0, 0, 20.f) - Player->GetFirstPersonCameraComponent()->GetComponentLocation()).Rotation());
-        UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS rehearse listening at %s, wall %.0f cm away"), *Foot.ToCompactString(), FVector::Dist2D(Foot, Point));
+        if (It->IsHidden()) continue;
+        bool bOurs = OnEdges.Contains(It->GetFName());
+        if (!bOurs && !OnGraph.Contains(It->GetFName()))
+        {
+            // Off the graph: a door standing in one of the room's walls that opens into it on one side.
+            const FVector At = It->GetActorLocation() + FVector(0.f, 0.f, 60.f);
+            const bool bInWalls = TallowHouseRooms::FloorAt(At.Z) == Def->Floor
+                && At.X > Def->Min.X - 40.f && At.X < Def->Max.X + 40.f && At.Y > Def->Min.Y - 40.f && At.Y < Def->Max.Y + 40.f;
+            for (const FVector& Side : {It->GetActorForwardVector(), -It->GetActorForwardVector(), It->GetActorRightVector(), -It->GetActorRightVector()})
+                bOurs |= bInWalls && TallowHouseRooms::RoomAt(At + Side.GetSafeNormal2D() * 60.f) == Room;
+        }
+        if (bOurs) OutDoors.Add(*It);
     }
-#endif
+}
+bool UTallowBeatPresenter::IsViewTurned() const { return IsHoldingView() && float(GetWorld()->GetTimeSeconds() - StartedAt) >= TurnSeconds + .05f; }
+TArray<ATallowDoor*> UTallowBeatPresenter::GetSlammedDoors() const
+{
+    TArray<ATallowDoor*> Doors;
+    for (const TWeakObjectPtr<ATallowDoor>& Door : Slammed) if (Door.IsValid()) Doors.Add(Door.Get());
+    return Doors;
+}
+int32 UTallowBeatPresenter::SlamRoomDoors(const FVector& Words)
+{
+    Slammed.Reset();
+    const auto* Player = GetPlayer();
+    FName Room = Player ? TallowHouseRooms::RoomAt(Player->GetActorLocation()) : NAME_None;
+    if (Room.IsNone()) Room = TallowHouseRooms::RoomAt(Words);
+    TArray<ATallowDoor*> Doors; FindRoomDoors(GetWorld(), Room, Doors);
+    // Only what stands open is thrown; locks, boards and seals stay as they were, and each opens again after.
+    for (ATallowDoor* Door : Doors)
+        if (Door->SlamShut())
+        {
+            Slammed.Add(Door);
+            const FVector At = Door->GetActorLocation() + FVector(0.f, 0.f, 110.f);
+            Play(Slammed.Num() % 2 ? TEXT("/Game/Audio/CC0/D_Close_00") : TEXT("/Game/Audio/CC0/D_Close_01"), 1.f, &At, .79f + .03f * Slammed.Num());
+        }
+    if (!Slammed.IsEmpty()) TallowHaptics::Play(this, ETallowHaptic::DoorSlam);
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS slam room=%s doors=%d slammed=%d"), *Room.ToString(), Doors.Num(), Slammed.Num());
+    return Slammed.Num();
+}
+void UTallowBeatPresenter::HoldView(float T)
+{
+    if (bViewFree || bInputReleased) return;
+    auto* Player = GetPlayer();
+    auto* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
+    if (!PC) return;
+    if (T >= WordsWhole)
+    {
+        // The words are whole: her eyes and her feet are hers again while it runs and drips.
+        if (PC->IsMoveInputIgnored()) { PC->SetIgnoreMoveInput(false); PC->SetIgnoreLookInput(false); bInputReleased = true; }
+        else bViewFree = true;
+        return;
+    }
+    FRotator Aim = (WordsAt - Player->GetFirstPersonCameraComponent()->GetComponentLocation()).Rotation();
+    Aim.Pitch = FMath::Clamp(Aim.Pitch, -30.f, 30.f); Aim.Roll = 0.f;
+    FQuat View = Aim.Quaternion();
+    if (T < TurnSeconds)
+    {
+        const float X = FMath::Clamp(T / TurnSeconds, 0.f, 1.f);
+        View = FQuat::Slerp(TurnFrom, View, X * X * X * (X * (X * 6.f - 15.f) + 10.f));
+    }
+    // Level: blending two aims picks up roll when both pitch and yaw change.
+    FRotator Level = View.Rotator(); Level.Roll = 0.f;
+    // The doors land as one jolt through her, gone before the turn is.
+    const float Jolt = SlamJolt * FMath::Exp(-T * 8.f);
+    const FRotator Kick(1.4f * Jolt * FMath::Cos(T * 38.f), .6f * Jolt * FMath::Sin(T * 61.f + 1.8f), 1.1f * Jolt * FMath::Sin(T * 27.f + 1.f));
+    PC->SetControlRotation((Level.Quaternion() * Kick.Quaternion()).Rotator());
+}
+void UTallowBeatPresenter::LightStrobe(const FVector& Words, const FVector& Normal)
+{
+    if (!Writing) return;
+    // Hung in the room out from the wall and above the words: it lights them and the walls round her, and throws
+    // the room's shadows about as it fails.
+    const FVector Out = Normal.GetSafeNormal2D(), From = Words + Out * 8.f;
+    FVector At = Words + Out * 150.f + FVector(0.f, 0.f, 75.f);
+    // Drawn halfway along the wall toward the middle of the room, so it is not up against a side wall.
+    if (const FTallowRoomDef* Room = TallowHouseRooms::Find(TallowHouseRooms::RoomAt(Words + Out * 50.f)))
+    {
+        const FVector Along = FVector::CrossProduct(Out, FVector::UpVector);
+        At += Along * FVector::DotProduct(Room->Anchor() - Words, Along) * .5f;
+    }
+    FHitResult Hit; FCollisionQueryParams Params(TEXT("TallowBeatStrobe"), false, GetPlayer()); Params.AddIgnoredActor(Writing);
+    if (GetWorld()->SweepSingleByChannel(Hit, From, At, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(12.f), Params))
+        At = Hit.Location - (At - From).GetSafeNormal() * 10.f;
+    Strobe = NewObject<UPointLightComponent>(Writing, TEXT("BeatStrobe"));
+    Strobe->SetMobility(EComponentMobility::Movable); Strobe->RegisterComponentWithWorld(GetWorld());
+    Strobe->SetWorldLocation(At); Strobe->SetIntensityUnits(ELightUnits::Lumens); Strobe->SetIntensity(0.f); Strobe->SetVisibility(false);
+    Strobe->SetAttenuationRadius(850.f); Strobe->SetLightColor(FLinearColor(1.f, .045f, .03f)); Strobe->SetSourceRadius(4.f);
+    Strobe->SetCastShadows(true); Strobe->SetIndirectLightingIntensity(.4f); Strobe->SetVolumetricScatteringIntensity(0.f);
+    // A dead fitting that catches with the slam and fails the whole time the words form: holds of different lengths,
+    // sags, stutters, short dark gaps. Never a steady beat. It gives out as the last letter closes.
+    StrobeKeys.Reset(); StrobeLevel = 0.f;
+    FRandomStream Random(Context.ChapterIndex * 71 + 5);
+    auto Key = [this](float When, float Level) { StrobeKeys.Add(FVector2f(When, Level)); };
+    Key(0.f, 1.f); Key(.06f, .03f); Key(.11f, .85f); Key(.2f, .05f);
+    float T = .27f;
+    while (T < WordsWhole)
+    {
+        const float Roll = Random.FRand();
+        if (Roll < .18f)
+            for (int32 Flick = Random.RandRange(3, 7); Flick > 0; --Flick)
+            { Key(T, Random.FRandRange(.6f, 1.f)); T += Random.FRandRange(.03f, .06f); Key(T, Random.FRandRange(0.f, .08f)); T += Random.FRandRange(.03f, .07f); }
+        else if (Roll < .3f) { Key(T, Random.FRandRange(0.f, .04f)); T += Random.FRandRange(.15f, .4f); }
+        else if (Roll < .46f) { Key(T, Random.FRandRange(.2f, .4f)); T += Random.FRandRange(.12f, .35f); }
+        else { Key(T, Random.FRandRange(.75f, 1.f)); T += Random.FRandRange(.18f, .6f); }
+    }
+    Key(T, .5f); Key(T + .06f, 0.f); Key(T + .17f, .35f); Key(T + .21f, 0.f);
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS strobe at %s, out at %.2fs"), *At.ToCompactString(), T + .21f);
+}
+void UTallowBeatPresenter::StageStrobe(float T, float DeltaTime)
+{
+    if (!Strobe) return;
+    float Target = 0.f;
+    for (const FVector2f& Step : StrobeKeys) { if (Step.X > T) break; Target = Step.Y; }
+    // A filament, not a switch: it catches at once and dies over a few hundredths of a second.
+    StrobeLevel = Target >= StrobeLevel ? Target : FMath::Lerp(Target, StrobeLevel, FMath::Exp(-DeltaTime / .045f));
+    Strobe->SetIntensity(StrobeLumens * StrobeLevel * (.9f + .1f * Flicker(T, 17)));
+    Strobe->SetVisibility(StrobeLevel > .002f);
+}
+void UTallowBeatPresenter::PrimeBlood()
+{
+    // The editor makes a decal's shaders the first time one is drawn, and until they exist the decal is drawn with
+    // the engine's stand-in material: the wall under the words went black for about a second before they formed
+    // (29 Oct). So the blood is drawn once at the start, a centimetre of it in the air just in front of her eyes,
+    // where it touches nothing and shows nothing, and is gone a few seconds later with its shaders made.
+    if (Primer && GetWorld()->GetTimeSeconds() - PrimedAt > 8.0) { if (IsValid(Primer)) Primer->DestroyComponent(); Primer = nullptr; }
+    if (PrimedAt >= 0.0 || !BloodMaterial || !FApp::CanEverRender()) return;
+    auto* Player = GetPlayer();
+    if (!Player || !Player->GetFirstPersonCameraComponent()) return;
+    auto* Blood = UMaterialInstanceDynamic::Create(BloodMaterial, this);
+    Blood->SetScalarParameterValue(TEXT("Growth"), 0.f); Blood->SetScalarParameterValue(TEXT("Drip"), 0.f);
+    Primer = NewObject<UDecalComponent>(Player, TEXT("BloodPrimer"));
+    Primer->SetupAttachment(Player->GetFirstPersonCameraComponent());
+    Primer->SetRelativeLocation(FVector(14.f, 0.f, 0.f)); Primer->DecalSize = FVector(.5f);
+    Primer->SetFadeScreenSize(0.f); Primer->SetDecalMaterial(Blood);
+    Primer->RegisterComponent();
+    PrimedAt = GetWorld()->GetTimeSeconds();
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS blood primed"));
 }
 bool UTallowBeatPresenter::Once(float T, float At)
 {
@@ -188,6 +351,7 @@ void UTallowBeatPresenter::Tick(float DeltaTime)
 #if !UE_BUILD_SHIPPING
     if (!UGameplayStatics::IsGamePaused(this)) { Rehearse(); Film(); }
 #endif
+    PrimeBlood();
     if (Beat == B::None) return;
     // A pause holds the moment; the menu should not be heard through shut eyes.
     if (UGameplayStatics::IsGamePaused(this))
@@ -201,7 +365,7 @@ void UTallowBeatPresenter::Tick(float DeltaTime)
     const float T = float(GetWorld()->GetTimeSeconds() - StartedAt);
     switch (Beat)
     {
-    case B::BloodWriting: StageWriting(T); break;
+    case B::BloodWriting: StageStrobe(T, DeltaTime); StageWriting(T); break;
     case B::Restraint: StageRestraint(T); break;
     case B::HuntRelease: StageRelease(T); break;
     case B::FuseEvent: StageFuse(T); break;
@@ -213,13 +377,16 @@ void UTallowBeatPresenter::Tick(float DeltaTime)
 void UTallowBeatPresenter::StageWriting(float T)
 {
     const FVector Wall = Writing ? Writing->GetActorLocation() : Context.Where.GetLocation();
-    // It lands with a shock, then is heard being written: a wet drag across the plaster, letter after letter.
-    if (Once(T, 0.f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh1"), Stings), .62f);
-    if (Once(T, .1f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_01"), 1.f, &Wall, .82f);
-    if (Once(T, 1.6f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_02"), .95f, &Wall, .78f);
-    if (Once(T, 3.1f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_03"), .8f, &Wall, .74f);
-    if (Once(T, 4.6f)) Play(TEXT("/Game/Audio/Tension/T_Whisper_01"), .45f, &Wall);
-    if (T >= WritingEnd) Finish();
+    // It lands with a shock, then is heard being written as it forms in front of her: a wet drag across the
+    // plaster, letter after letter.
+    const float W = WordsDelay;
+    if (Once(T, 0.f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh1"), Stings), .078f);
+    if (Once(T, W + .1f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_01"), 1.f, &Wall, .82f);
+    if (Once(T, W + 1.6f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_02"), .95f, &Wall, .78f);
+    if (Once(T, W + 3.1f)) Play(TEXT("/Game/Audio/Tension/T_Scratch_Wall_03"), .8f, &Wall, .74f);
+    if (Once(T, W + 4.6f)) Play(TEXT("/Game/Audio/Tension/T_Whisper_01"), .45f, &Wall);
+    HoldView(T);
+    if (T >= W + WritingEnd) Finish();
 }
 void UTallowBeatPresenter::StageRestraint(float T)
 {
@@ -233,7 +400,7 @@ void UTallowBeatPresenter::StageRestraint(float T)
     // Under the lids: only her breath, and the house a long way off.
     if (Once(T, 3.9f)) Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f);
     if (Once(T, 5.4f)) SetMix(Muffle, false);
-    if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .55f);
+    if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .065f);
     if (T >= RestraintEnd) Finish();
 }
 void UTallowBeatPresenter::StageRelease(float T)
@@ -252,7 +419,7 @@ void UTallowBeatPresenter::StageRelease(float T)
             Play(*FString::Printf(TEXT("/Game/Audio/CC0/K_Step_%02d"), Step % 4), FMath::Lerp(.95f, .35f, Step / 8.f), &At, 1.15f);
         }
     if (Once(T, 5.45f)) Play(TEXT("/Game/Audio/CC0/D_Close_01"), .75f, &Away, .8f);
-    if (Once(T, 6.1f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh11"), Stings), .42f);
+    if (Once(T, 6.1f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh11"), Stings), .285f);
     if (T >= ReleaseEnd) Finish();
 }
 void UTallowBeatPresenter::StageFuse(float T)
@@ -262,7 +429,7 @@ void UTallowBeatPresenter::StageFuse(float T)
     if (Once(T, .3f))
     {
         if (auto* Hum = Hold(TEXT("/Game/Audio/CC0/H_Power_Hum"), 1.f, &Box)) Hum->SetPitchMultiplier(.7f);
-        Hold(*FString::Printf(TEXT("%sS_Beat_StingHighBig1"), Stings), .5f);
+        Hold(*FString::Printf(TEXT("%sS_Beat_StingHighBig1"), Stings), .033f);
     }
     if (!Held.IsEmpty() && Held[0] && T < FuseBlow) Held[0]->SetPitchMultiplier(FMath::Lerp(.7f, 1.35f, FMath::Clamp((T - .3f) / 2.4f, 0.f, 1.f)));
     // The lamps try: stuttering, climbing, the box spitting blue light. Somewhere Mim feels it.
@@ -301,7 +468,7 @@ void UTallowBeatPresenter::StageReset(float T)
         for (TActorIterator<ATallowDoor> It(GetWorld()); It; ++It)
             if (const float Distance = FVector::Dist(It->GetActorLocation(), Player->GetActorLocation()); Distance < Best) { Best = Distance; Where = It->GetActorLocation(); }
         Play(TEXT("/Game/Audio/CC0/D_Close_00"), 1.f, &Where, .82f);
-        Play(*FString::Printf(TEXT("%sS_Beat_StingLow3"), Stings), .75f);
+        Play(*FString::Printf(TEXT("%sS_Beat_StingLow3"), Stings), .041f);
         Fade(0.f, 1.f, .05f);
     }
     if (Once(T, ResetCut)) Cut();
@@ -356,6 +523,8 @@ void UTallowBeatPresenter::Clear()
     for (const FSurged& Light : Surged) if (Light.Light.IsValid()) { Light.Light->SetIntensity(Light.Intensity); Light.Light->SetVisibility(Light.bVisible); }
     Surged.Reset();
     if (Spark) { Spark->DestroyComponent(); Spark = nullptr; }
+    if (IsValid(Strobe)) Strobe->DestroyComponent();
+    Strobe = nullptr; StrobeKeys.Reset(); StrobeLevel = 0.f;
     Beat = B::None; bCutDone = false; bHoldingBlack = false;
 }
 void UTallowBeatPresenter::SetLids(float Close, float Tremble, float LowerRate, float Dark, float Haze)
@@ -443,8 +612,14 @@ void UTallowBeatPresenter::Rehearse()
             // Straight on from the last writing; the transformation's fade it started is dropped with the jump.
             if (auto* PC = UGameplayStatics::GetPlayerController(this, 0); PC && PC->PlayerCameraManager) PC->PlayerCameraManager->StopCameraFade();
             Chapters->JumpToChapter(WordsChapter, P::Exploration);
-            Chapters->NotifyEvent(E::StoryStarted); Chapters->NotifyEvent(E::StoryClueDone); Step(1);
+            // Her back to the wall and the room's doors standing open, so the slam and the turn are both seen.
+            for (TActorIterator<ATallowStoryObject> It(GetWorld()); It; ++It)
+                if (It->GetFName() == Chapters->GetLayout().StoryObject || It->ActorHasTag(FName(*(TEXT("Tallow.Spot.") + Chapters->GetLayout().StoryObject.ToString()))))
+                { StageListening(*It, It->WritingAnchor->GetComponentLocation(), true); break; }
+            Step(2);
         }
+        else if (RehearseStep == 2 && Now - RehearseAt > 1.6)
+        { Chapters->NotifyEvent(E::StoryStarted); Chapters->NotifyEvent(E::StoryClueDone); Step(1); }
         else if (RehearseStep == 1 && Beat == B::None)
         {
             if (++WordsChapter > 2) { RehearseStep = -1; FPlatformMisc::RequestExit(false, TEXT("TallowBeatsWords")); }
@@ -500,6 +675,34 @@ void UTallowBeatPresenter::Rehearse()
     default: break;
     }
 }
+void UTallowBeatPresenter::StageListening(const AActor* Story, const FVector& Anchor, bool bOpenDoors)
+{
+    // Stand where the clue was heard (the machine's controls side), facing the wall; or, with the doors, facing
+    // away from it toward an open door.
+    auto* Player = GetPlayer();
+    if (!Player) return;
+    FVector Foot = Story ? Story->GetActorLocation() + Story->GetActorForwardVector() * 110.f : Player->GetActorLocation();
+    FHitResult Floor; FCollisionQueryParams Params(TEXT("TallowBeatsFloor"), false, Player);
+    if (GetWorld()->LineTraceSingleByChannel(Floor, Foot + FVector(0, 0, 50.f), Foot - FVector(0, 0, 400.f), ECC_Visibility, Params)) Foot = Floor.ImpactPoint;
+    Player->TeleportTo(Foot + FVector(0, 0, 92.f), FRotator::ZeroRotator, false, true);
+    const FVector Eye = Player->GetFirstPersonCameraComponent()->GetComponentLocation();
+    FRotator View = (Anchor + FVector(0, 0, 20.f) - Eye).Rotation();
+    if (bOpenDoors)
+    {
+        View.Yaw += 150.f; View.Pitch = 0.f;
+        TArray<ATallowDoor*> Doors; FindRoomDoors(GetWorld(), TallowHouseRooms::RoomAt(Foot + FVector(0, 0, 50.f)), Doors);
+        bool bFacing = false;
+        for (ATallowDoor* Door : Doors)
+        {
+            if (Door->bChapterSealed || Door->HasChapterBarricade()) continue;
+            if (!Door->IsOpenForChapter()) Door->ToggleDoor(Player);
+            if (!bFacing) { View = (Door->GetActorLocation() + FVector(0, 0, 100.f) - Eye).Rotation(); bFacing = true; }
+        }
+        UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS rehearse opened %d doors"), Doors.Num());
+    }
+    Player->GetController()->SetControlRotation(View);
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS rehearse listening at %s, wall %.0f cm away"), *Foot.ToCompactString(), FVector::Dist2D(Foot, Anchor));
+}
 void UTallowBeatPresenter::Film()
 {
     if (FilmDir.IsEmpty()) return;
@@ -507,7 +710,7 @@ void UTallowBeatPresenter::Film()
     const double Real = FPlatformTime::Seconds();
     if (Beat != B::None || (Chapters && Chapters->GetActiveBeat() != B::None)) FilmUntil = Real + 2.0;
     if (Real > FilmUntil || Real < NextFrame) return;
-    NextFrame = Real + .25;
+    NextFrame = Real + FilmStep;
     const FString Name = Beat != B::None ? StaticEnum<ETallowChapterBeat>()->GetNameStringByValue(int64(Beat)) : Chapters && Chapters->GetActiveBeat() != B::None ? TEXT("Fallback") : TEXT("After");
     const float T = Beat != B::None ? float(GetWorld()->GetTimeSeconds() - StartedAt) : 0.f;
     FScreenshotRequest::RequestScreenshot(FPaths::Combine(FilmDir, FString::Printf(TEXT("%04d_%s_%05.2f.png"), Frames++, *Name, T)), true, false);

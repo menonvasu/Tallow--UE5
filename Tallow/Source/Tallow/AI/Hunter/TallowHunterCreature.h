@@ -5,6 +5,7 @@
 
 class UTallowHunterMotionComponent;
 class UTallowHunterTraversalComponent;
+class UTallowMimVisualScaleComponent;
 
 /** Optional preview creature. The existing creature and StateTree stay intact. */
 UCLASS()
@@ -25,6 +26,12 @@ public:
     /** Uniform physical size; includes mesh, collision and the imported rig. */
     UPROPERTY(EditDefaultsOnly, Category="Hunter|Appearance", meta=(ClampMin=".8",ClampMax="1"))
     float MimBodyScale = .85f;
+    /** How much larger her body is drawn than the body her movement plans for (29 Oct: "a little bigger").
+     *  Collision, navigation and traversal keep MimBodyScale; she settles back to it where space is tight. */
+    UPROPERTY(EditDefaultsOnly, Category="Hunter|Appearance", meta=(ClampMin="1",ClampMax="1.5"))
+    float MimVisualScale = 1.25f;
+    /** Her drawn size this frame: the actor scale times the visual scale. Capture framing is measured in this. */
+    float GetVisibleBodyScale() const;
     /** Seconds the capture shot holds on the lens after the strike before the hard cut to black. */
     UPROPERTY(EditDefaultsOnly, Category="Hunter|Capture")
     float CaptureCutAfterStrike = .55f;
@@ -32,4 +39,6 @@ public:
     TObjectPtr<UTallowHunterMotionComponent> HunterMotion;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter")
     TObjectPtr<UTallowHunterTraversalComponent> HunterTraversal;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter")
+    TObjectPtr<UTallowMimVisualScaleComponent> MimVisual;
 };

@@ -37,6 +37,7 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowDoorRules
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MinCrowbar = 0;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MaxCrowbar = 2;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MinChangedFromPrevious = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) bool bLockpickOnRoute = false;                // a lockpick door lies on a shortest way to the chair or the battery
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<ETallowDoorState, float> StateWeights;   // empty: Open .25 Closed .35 Lockpick .25 Crowbar .15
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<FName, ETallowDoorState> ForcedStates;    // edge id -> state
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FName> FixedEdges;                       // keep DefaultState
@@ -68,7 +69,8 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowBeatTimeouts
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) float TransformationDeferSeconds = 40.f;
 };
 
-/** Where a minor scare happens. Prop scares move a house prop in view; the rest are sounds placed around Nell. */
+/** Where a minor scare happens. Prop scares move a house prop in view; Above to Herring are sounds placed around Nell;
+ *  Door to Look are things she sees happen near her, in her room or its doorway, chosen by where she is looking. */
 UENUM(BlueprintType) enum class ETallowScarePlace : uint8
 {
 	Prop,       // a house prop (ActorNamePatterns) moves where she can see it, with the group's sound if it has one
@@ -77,7 +79,13 @@ UENUM(BlueprintType) enum class ETallowScarePlace : uint8
 	Elsewhere,  // at a door in another room
 	Near,       // in a room close by, out of sight (PreferredRooms first)
 	Head,       // a whisper that passes from one ear to the other
-	Herring     // one of the soundscape's red herrings
+	Herring,    // one of the soundscape's red herrings
+	Door,       // a door in front of her eases shut, or comes off its latch and creaks open a hand's width
+	Train,      // the toy train runs out of the dark across the floor in front of her and stops there
+	Frame,      // a picture on the wall in front of her swings on its nail and is left hanging crooked
+	Gust,       // her own flame lies down flat and nearly goes out, with Mim nowhere near
+	Light,      // a candle or lamp she can see gutters, goes out, and catches again by itself
+	Look        // a music box starts up behind her in her room and stops the moment she turns to it
 };
 
 USTRUCT(BlueprintType) struct TALLOW_API FTallowScareGroupDef
@@ -101,6 +109,7 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowScareGroupDef
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FString> Sounds;             // object paths; a different one each time
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) float Volume = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FName> PreferredRooms;       // Near: rooms tried first (TallowHouseRooms ids)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FName Kind;                         // never two of a kind in a row (none: the group is its own kind)
 };
 
 USTRUCT(BlueprintType) struct TALLOW_API FTallowScareRules
@@ -115,6 +124,8 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowScareRules
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<float> ChapterGapScale;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) float HuntGapScale = 1.3f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 MaxPerChapter = 8;
+	/** Once a gap is up, how long the house holds out for something she can see before it settles for a sound. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) float SightPatienceSeconds = 0.f;
 };
 
 USTRUCT(BlueprintType) struct TALLOW_API FTallowRoomSearchRules
@@ -189,6 +200,7 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowLayoutHistory
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedBatterySpots;
+	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedCrowbarSpots;
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedChairRooms;
 	UPROPERTY(BlueprintReadOnly) TArray<FName> UsedStoryObjects;
 	UPROPERTY(BlueprintReadOnly) int32 PreviousDoorHash = 0;

@@ -68,6 +68,7 @@ void UTallowScareDirector::Stop()
         E->ResetForChapter(); E->bAlertsMim = S.bAlerts; E->NoiseLoudness = S.Loudness; E->NoiseRange = S.Range; E->SetEventSound(S.Sound.Get());
     }
     OriginalSettings.Reset(); Emitters.Reset(); CurrentPhase = ETallowChapterPhase::None;
+    ClearSights();
 }
 bool UTallowScareDirector::IsCuePlaying() const { return Cue && Cue->IsPlaying(); }
 UTallowSoundscapeComponent* UTallowScareDirector::FindSoundscape() const
@@ -82,12 +83,14 @@ bool UTallowScareDirector::HouseAllowsScare(bool& bNormal, bool& bMajor) const
     bNormal = bMajor = false;
     if (IsCuePlaying()) return false;
     if (const UTallowSoundscapeComponent* Mix = FindSoundscape(); Mix && !Mix->AllowsMinorScare()) return false;
+    // A protected moment (reading, threading the film, the screening) is never interrupted, hunt or not.
+    const auto* Pacing = GetWorld()->GetSubsystem<UTallowHunterDirector>();
+    if (Pacing && Pacing->IsProtected()) return false;
     if (!FTallowScareScheduler::IsHunt(CurrentPhase)) { bNormal = bMajor = true; return true; }
     // In a hunt the house plays its tricks in the quiet and the build, the dread before contact: never over the peak
-    // (the chase), never inside the relief after it, never in a protected moment.
-    const auto* Pacing = GetWorld()->GetSubsystem<UTallowHunterDirector>();
+    // (the chase), never inside the relief after it.
     if (!Pacing) { bNormal = true; return true; }
-    if (Pacing->IsProtected() || (Pacing->GetPhase() != ETallowTensionPhase::Quiet && Pacing->GetPhase() != ETallowTensionPhase::Build)) return false;
+    if (Pacing->GetPhase() != ETallowTensionPhase::Quiet && Pacing->GetPhase() != ETallowTensionPhase::Build) return false;
     bNormal = true; bMajor = Pacing->AllowsHouseEvent(true);
     return true;
 }
@@ -177,6 +180,26 @@ bool UTallowScareDirector::PlaceSound(const FTallowScareGroupDef& G, FVector& Fr
     default: return false;
     }
 }
+void UTallowScareDirector::MakeAttenuation()
+{
+    if (PlacedAttenuation) return;
+    // Somewhere in the house: falls off with distance, darkens with it, and the walls between muffle it.
+    PlacedAttenuation = NewObject<USoundAttenuation>(this);
+    FSoundAttenuationSettings& S = PlacedAttenuation->Attenuation;
+    S.bAttenuate = S.bSpatialize = true; S.AttenuationShapeExtents = FVector(200.f); S.FalloffDistance = 2600.f;
+    S.DistanceAlgorithm = EAttenuationDistanceModel::NaturalSound; S.dBAttenuationAtMax = -24.f;
+    S.bAttenuateWithLPF = true; S.LPFRadiusMin = 500.f; S.LPFRadiusMax = 3000.f; S.LPFFrequencyAtMin = 20000.f; S.LPFFrequencyAtMax = 3500.f;
+    S.bEnableOcclusion = true; S.OcclusionLowPassFilterFrequency = 2200.f; S.OcclusionVolumeAttenuation = .75f;
+    // Through a ceiling or inside a wall: the recording is already filtered for that, so no second muffling.
+    ThroughAttenuation = NewObject<USoundAttenuation>(this);
+    FSoundAttenuationSettings& T = ThroughAttenuation->Attenuation;
+    T = S; T.bEnableOcclusion = false; T.FalloffDistance = 1800.f; T.bAttenuateWithLPF = false;
+}
+bool UTallowScareDirector::IsSeenGroup(int32 I) const
+{
+    const auto& G = Scheduler.GetGroups()[I];
+    return G.bPlush || G.Place == ETallowScarePlace::Prop || IsSight(G.Place);
+}
 bool UTallowScareDirector::FireSound(const FTallowScareGroupDef& G, bool bAlert, FString& Where)
 {
     UTallowSoundscapeComponent* Mix = FindSoundscape();
@@ -186,20 +209,7 @@ bool UTallowScareDirector::FireSound(const FTallowScareGroupDef& G, bool bAlert,
     if (!PlaceSound(G, From, To)) return false;
     USoundBase* Sound = PickSound(G);
     if (!Sound) return false;
-    if (!PlacedAttenuation)
-    {
-        // Somewhere in the house: falls off with distance, darkens with it, and the walls between muffle it.
-        PlacedAttenuation = NewObject<USoundAttenuation>(this);
-        FSoundAttenuationSettings& S = PlacedAttenuation->Attenuation;
-        S.bAttenuate = S.bSpatialize = true; S.AttenuationShapeExtents = FVector(200.f); S.FalloffDistance = 2600.f;
-        S.DistanceAlgorithm = EAttenuationDistanceModel::NaturalSound; S.dBAttenuationAtMax = -24.f;
-        S.bAttenuateWithLPF = true; S.LPFRadiusMin = 500.f; S.LPFRadiusMax = 3000.f; S.LPFFrequencyAtMin = 20000.f; S.LPFFrequencyAtMax = 3500.f;
-        S.bEnableOcclusion = true; S.OcclusionLowPassFilterFrequency = 2200.f; S.OcclusionVolumeAttenuation = .75f;
-        // Through a ceiling or inside a wall: the recording is already filtered for that, so no second muffling.
-        ThroughAttenuation = NewObject<USoundAttenuation>(this);
-        FSoundAttenuationSettings& T = ThroughAttenuation->Attenuation;
-        T = S; T.bEnableOcclusion = false; T.FalloffDistance = 1800.f; T.bAttenuateWithLPF = false;
-    }
+    MakeAttenuation();
     const bool bThrough = G.Place == ETallowScarePlace::Above || G.Place == ETallowScarePlace::InWall;
     Cue = UGameplayStatics::SpawnSoundAtLocation(this, Sound, From, FRotator::ZeroRotator, G.Volume, Random.FRandRange(.95f, 1.03f), 0.f,
         bThrough ? ThroughAttenuation.Get() : PlacedAttenuation.Get());
@@ -228,17 +238,19 @@ bool UTallowScareDirector::Fire(int32 Index)
             const int32 Start = Random.RandRange(0, List->Num() - 1);
             for (int32 N = 0; N < List->Num(); ++N) if (auto* E = (*List)[(Start + N) % List->Num()].Get())
             {
+                if (E->IsHidden()) continue;   // a prop a sight scare has taken away for the chapter
                 E->bChapterSilent = G.bSilent; E->bAlertsMim = bAlert; E->NoiseLoudness = G.NoiseLoudness; E->NoiseRange = G.NoiseRange;
-                if (!G.Sounds.IsEmpty() && !G.bSilent) E->SetEventSound(PickSound(G));
+                if (!G.Sounds.IsEmpty() && !G.bSilent) { E->SetEventSound(PickSound(G)); E->SetEventVolume(G.Volume); }
                 if (E->TryTriggerEvent()) { Fired = E; break; }
             }
         }
     }
+    else if (IsSight(G.Place)) { MakeAttenuation(); if (!FireSight(G, Where, Fired)) return false; }
     else if (!FireSound(G, bAlert, Where)) return false;
     if (!Fired && Where.IsEmpty()) return false;
     Scheduler.Commit(Index, GetWorld()->GetTimeSeconds()); ChapterEvents = Scheduler.GetCount();
     OnScareFired.Broadcast(G.Group, Fired, bAlert);
-    UE_LOG(LogTemp, Display, TEXT("TALLOW_SCARE ch=%d group=%s emitter=%s alerted=%d next=%.0f"), Chapter, *G.Group.ToString(), Fired ? *Fired->GetName() : *Where, bAlert, Scheduler.GetGap());
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_SCARE ch=%d group=%s emitter=%s alerted=%d next=%.0f"), Chapter, *G.Group.ToString(), !Where.IsEmpty() ? *Where : Fired ? *Fired->GetName() : TEXT("none"), bAlert, Scheduler.GetGap());
     return true;
 }
 bool UTallowScareDirector::TryFireGroup(FName Group)
@@ -262,7 +274,9 @@ void UTallowScareDirector::Tick(float Dt)
     // An overhead cue walks across the room while it sounds.
     if (Cue && Cue->IsPlaying() && CueSeconds > 0.f)
         Cue->SetWorldLocation(FMath::Lerp(CueFrom, CueTo, FMath::Clamp((GetWorld()->GetTimeSeconds() - CueStarted) / CueSeconds, 0.f, 1.f)));
-    if (!bOwnsScheduling || GetWorld()->IsPaused()) return;
+    if (GetWorld()->IsPaused()) return;
+    UpdateSights(GetWorld()->GetTimeSeconds());
+    if (!bOwnsScheduling) return;
     BindChapter(); SampleAge += Dt;
     if (SampleAge < 2.f) return;
     SampleAge = 0.f;
@@ -271,6 +285,7 @@ void UTallowScareDirector::Tick(float Dt)
     if (!HouseAllowsScare(bNormal, bMajor))
     {
         if (BlockedSince < 0.f) BlockedSince = Now;
+        SightWaitSince = -1.f;
         return;
     }
     // After a long hold (a chase, a reading, a relief) the house waits a little before it starts again, so the first
@@ -281,13 +296,23 @@ void UTallowScareDirector::Tick(float Dt)
         BlockedSince = -1.f;
     }
     if (Now < ResumeAt) return;
+    // Something she can see comes first. When the one drawn cannot happen where she is looking, the others she could see
+    // are tried; sounds out of sight wait until the house has held out for a sight a while (SightPatienceSeconds).
     TArray<int32> Available;
     for (int32 I = 0; I < Scheduler.GetGroups().Num(); ++I) Available.Add(I);
+    bool bSightMissed = false;
     while (!Available.IsEmpty())
     {
         const int32 I = Scheduler.Choose(CurrentPhase, Now, bNormal, bMajor, &Available);
-        if (I == INDEX_NONE || Fire(I)) break;
+        if (I == INDEX_NONE) break;
+        if (Fire(I)) { SightWaitSince = -1.f; return; }
         Available.Remove(I);
+        if (!bSightMissed && IsSeenGroup(I))
+        {
+            bSightMissed = true;
+            if (SightWaitSince < 0.f) SightWaitSince = Now;
+            if (Now - SightWaitSince < Scheduler.GetRules().SightPatienceSeconds) Available.RemoveAll([this](int32 J) { return !IsSeenGroup(J); });
+        }
     }
 }
 void UTallowScareDirector::Describe(TArray<FString>& Lines) const

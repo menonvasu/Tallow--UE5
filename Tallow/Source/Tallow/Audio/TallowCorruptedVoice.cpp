@@ -12,13 +12,13 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/SOverlay.h"
-#include "UI/Presentation/STallowMark.h"
+#include "UI/Presentation/TallowSubtitles.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTallowCorrupt, Log, All);
 
 namespace
 {
-	constexpr float FadeSeconds = .15f;
+	constexpr float CancelFadeSeconds = .15f;   // named apart: unity builds put this beside other files' FadeSeconds
 	const TCHAR* const Section = TEXT("Tallow.Settings");
 }
 
@@ -282,7 +282,7 @@ void UTallowCorruptedVoiceSubsystem::Handle(const TArray<FTallowCorruptEvent>& E
 		if (E.Kind == FTallowCorruptEvent::EKind::Start) { Play(E); bSubtitles = true; continue; }
 		const int32 Index = Playing.IndexOfByPredicate([&E](const FPlaying& P) { return P.Session == E.Session && P.Line == E.Cue->Line; });
 		if (Index == INDEX_NONE) continue;
-		if (E.Kind == FTallowCorruptEvent::EKind::Cancel && Playing[Index].Component.IsValid()) Playing[Index].Component->FadeOut(FadeSeconds, 0.f);
+		if (E.Kind == FTallowCorruptEvent::EKind::Cancel && Playing[Index].Component.IsValid()) Playing[Index].Component->FadeOut(CancelFadeSeconds, 0.f);
 		Playing.RemoveAtSwap(Index);
 		bSubtitles = true;
 	}
@@ -321,26 +321,11 @@ void UTallowCorruptedVoiceSubsystem::Play(const FTallowCorruptEvent& Event)
 
 void UTallowCorruptedVoiceSubsystem::ShowSubtitles()
 {
+	// The words go to the one subtitle display, in the hidden voice's own ink; it shows them only with subtitles on and
+	// "show hidden voice" chosen.
 	FString Joined;
-	if (TallowCorrupted::ShowHiddenVoice())
-		for (const FPlaying& P : Playing) Joined += (Joined.IsEmpty() ? TEXT("") : TEXT("\n")) + P.Subtitle;
-	SubtitleText = FText::FromString(Joined);
-	UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-	if (!Viewport) return;
-	if (Joined.IsEmpty() && !SubtitleWidget.IsValid()) return;
-	if (!SubtitleWidget.IsValid())
-	{
-		// Smaller and dimmer than the story's own words: this is not meant to be read as part of the page.
-		// In the book face's italic, on a little soot, set lower and fainter than anything the story says aloud.
-		SubtitleWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.f, 0.f, 0.f, 150.f))
-			.Visibility_Lambda([this] { return SubtitleText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
-			[SNew(SOverlay)
-				+ SOverlay::Slot()[SNew(STallowSmudge).Alpha(.7f)]
-				+ SOverlay::Slot().Padding(FMargin(12.f, 4.f))
-				[SNew(STextBlock).Text_Lambda([this] { return SubtitleText; })
-					.Font(TallowPaper::FellItalic(TallowPaper::Pt::Small + 3)).ColorAndOpacity(TallowPaper::Ink.CopyWithNewOpacity(.74f)).Justification(ETextJustify::Center)]];
-		Viewport->AddViewportWidgetContent(SubtitleWidget.ToSharedRef(), 80);
-	}
+	for (const FPlaying& P : Playing) Joined += (Joined.IsEmpty() ? TEXT("") : TEXT("\n")) + P.Subtitle;
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->SetHidden(Joined);
 }
 
 void UTallowCorruptedVoiceSubsystem::Deinitialize()
@@ -348,10 +333,5 @@ void UTallowCorruptedVoiceSubsystem::Deinitialize()
 	TArray<FTallowCorruptEvent> Events;
 	Scheduler.CancelAll(Events);
 	Playing.Reset();
-	if (SubtitleWidget.IsValid())
-	{
-		if (UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) Viewport->RemoveViewportWidgetContent(SubtitleWidget.ToSharedRef());
-		SubtitleWidget.Reset();
-	}
 	Super::Deinitialize();
 }

@@ -109,6 +109,19 @@ public:
     /** Lying in wait and keeping still: the heap, a hold, a corner brace, a covered ambush, or watching her. The
      *  house must not announce it (no search lines, no "too close", no hunted drone); only its breath this close. */
     UFUNCTION(BlueprintPure, Category="Hunter|Body") bool IsLurking() const;
+    /** Coming in silently (29 Oct: "she made herself known every time, so it was never a surprise"): a creep in on a
+     *  sound, or a hunt that does not announce itself. No heard beat, no lines, no search scratching; the first sign is
+     *  seeing her, or her breath right beside you. The brain mirrors it into the voice's SetCreeping every tick (the
+     *  voice, her steps and the soundscape read that), and IsLurking() is true too, so the run widget's signs hush.
+     *  Anything else that makes her heard (body foley, drag) should go quiet while this is true. */
+    UFUNCTION(BlueprintPure, Category="Hunter|Body") bool IsCreeping() const;
+    /** The director sent it to search the room she is keeping still in (the close call). */
+    UFUNCTION(BlueprintPure, Category="Hunter|Body") bool IsCloseCall() const { return bCloseCall; }
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter|Tactics") int32 Creeps = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter|Tactics") int32 CloseCallsStarted = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter|Tactics") int32 CloseCallsLeft = 0;
+    /** Closest it came to her (cm) in the current or last close call. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter|Tactics") float CloseCallClosest = 0.f;
     /** Standing off in the dark watching her (the stalk): eyes catch what light there is. */
     UFUNCTION(BlueprintPure, Category="Hunter|Body") bool IsWatching() const { return bWatching; }
     /** 0..1 while it watches, eased in and out, for the eye glints. */
@@ -186,6 +199,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hunter") float CaptureWindupSeconds = .55f;
 protected:
     UFUNCTION() void HearNoise(const FTallowNoiseEvent& Event);
+    /** On a fresh trail (it saw her or answered a sound a little while ago) a new sound is followed at once. */
+    bool IsOnTrail(float Now) const;
+    /** Follow a new sound on the trail straight away: no listening beat, no new plan. A loud one ends a creep. */
+    void CloseInOn(const FVector& Where, bool bLoud);
     UFUNCTION() void OnCaptured();
 private:
     UPROPERTY() TObjectPtr<UTallowHunterBrain> HunterBrain;
@@ -372,8 +389,27 @@ private:
     void Rush(const FVector& Where, float Seconds);
     /** Prying a door open: one of the noise responses below, weighted for the door. */
     void ReactToPry(const FVector& Where);
-    ETallowNoiseResponse ChooseNoiseResponse(const FVector& Where, bool bPry);
-    void RespondToNoise(const FVector& Where, bool bPry);
+    /** bLoud: her running, a landing, a door she slammed. Those it comes for, it does not wait for. */
+    ETallowNoiseResponse ChooseNoiseResponse(const FVector& Where, bool bPry, bool bLoud = false);
+    void RespondToNoise(const FVector& Where, bool bPry, bool bLoud = false);
+    float LastNoiseResponseAt = -1000.f;
+    /** The answer chosen at the listening beat comes silently (no heard beat, no line, then a creep). */
+    bool bListenSilent = false;
+    bool bCreeping = false;
+    float CreepUntil = 0.f;
+    void BeginCreep(float Seconds, float Pace);
+    void EndCreep();
+    // The close call (29 Oct): dark, still and holding her breath, the director sends it to search her room for
+    // real. It is told the room, never where she is in it; its own senses decide whether it finds her.
+    bool TryCloseCall(float Now);
+    bool UpdateCloseCall(float Now);
+    void EndCloseCall(float Now, bool bLeave, const TCHAR* Why);
+    bool bCloseCall = false, bCloseCallPausing = false;
+    FName CloseCallRoom;
+    TArray<FVector> CloseCallPoints;
+    TArray<TWeakObjectPtr<ATallowHideVolume>> CloseCallSpots;
+    FVector CloseCallLookB = FVector::ZeroVector;
+    float CloseCallStartedAt = 0.f, CloseCallLookSwapAt = -1.f, NextCloseCallTry = 0.f;
     /** What the end of a listening pause turns into (set by RespondToNoise; a plain listen investigates). */
     ETallowNoiseResponse ListenOutcome = ETallowNoiseResponse::Hunt;
     void FinishListening(float Now);
@@ -406,6 +442,8 @@ private:
     /** Candle out: how close it is to you in the dark, and whether it can hear your breathing. */
     bool IsDark() const;
     bool HearsBreathing(float Distance) const;
+    /** How far it hears her breathe: BreathHearing, further while she pants after a run. */
+    float BreathRadius() const;
     float NextBreathGoal = 0.f;
     float NextWanderClimb = 15.f;
     void AlertPlayer();
@@ -417,7 +455,7 @@ private:
     bool SetGoal(const FVector& Location);
     void UpdateMove(float Now);
     void Observe(const FVector& Location, float Strength, bool bVisual);
-    void BeginListening(float Duration);
+    void BeginListening(float Duration, bool bVoice = true);
     void UpdateAttack(float Now);
     bool HasClearTrace(const FVector& From, const FVector& To, AActor* ExtraIgnored = nullptr) const;
     bool HasAmbushCover(const FVector& Location) const;
@@ -435,7 +473,7 @@ private:
     void CancelSpiderPlans();
     /** The mound and the holds run the body themselves while active. True while they do. */
     bool UpdateSpiderAmbush(float Now, float DeltaSeconds);
-    bool HandleNoiseInAmbush(const FVector& Where, float Perceived);
+    bool HandleNoiseInAmbush(const FVector& Where, float Perceived, bool bLoud = false);
     // The disguise ambush: it goes still as a harmless heap on her likely route and unfolds when she comes close
     // or turns her back (my resting form: "soft, fluffy, harmless").
     bool bDisguisePending = false, bDisguiseArrived = false, bDisguised = false;

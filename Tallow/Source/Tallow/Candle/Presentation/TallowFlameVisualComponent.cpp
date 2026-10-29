@@ -75,16 +75,42 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	// A held breath slows the flame's own flutter; the strain shakes it again (below).
 	Elapsed += Dt * (1.f - .8f * Calm);
 	float TargetExposure = StandaloneExposure;
+	// Mim close (29 Oct: your candle betrays you): how hard she pushes the flame, which way (wick space), and the gust.
+	float Pushed = 0.f, GustNow = 0.f; FVector2D Away = FVector2D::ZeroVector;
 	if (!bStandalone)
 	{
 		TargetExposure = CandleSource->IsGuttering() ? 1.f : (CandleSource->IsInDraft() ? .85f : 0.f);
 		TargetExposure=FMath::Max(TargetExposure,FMath::Clamp((.2f-CandleSource->GetWaxFraction())/.2f,0.f,1.f)*.92f);
-		if (IsValid(GutterSource)) TargetExposure = FMath::Max(TargetExposure, GutterSource->GetGutterAmount());
+		if (IsValid(GutterSource))
+		{
+			TargetExposure = FMath::Max(TargetExposure, GutterSource->GetGutterAmount());
+			const FVector Lean = GutterSource->GetGutterLean();
+			Pushed = FMath::Clamp(static_cast<float>(Lean.Size()), 0.f, 1.f);
+			GustNow = GutterSource->GetGustAmount();
+			TargetExposure = FMath::Max(TargetExposure, GustNow);
+			const FVector Local = WickAnchor->GetComponentTransform().InverseTransformVectorNoScale(Lean.GetSafeNormal());
+			Away = FVector2D(Local.X, Local.Y).GetSafeNormal();
+		}
 	}
 	Exposure = FMath::FInterpTo(Exposure, FMath::Clamp(TargetExposure * (1.f - .55f * Calm), 0.f, 1.f), Dt, 8.f);
 	IgnitionRemaining = FMath::Max(0.f, IgnitionRemaining - Dt);
 	auto Shape = TallowFlameVisual::Evaluate(Elapsed + PhaseOffset, Exposure, State == ECandleState::Cupped, IgnitionRemaining / .25f);
 	Shape.BendX *= 1.f - .75f * Calm; Shape.BendY *= 1.f - .75f * Calm;
+	if (!Away.IsNearlyZero())
+	{
+		// Her guttering pushes the flame away from her, the way she is coming, and it shakes (Nell: "the flame shakes
+		// when it is close"); a held breath steadies the shaking, not the push. The gust lays it flat the same way just
+		// before it goes. A cupped hand keeps most of it off.
+		const FVector2D Bend(Shape.BendX, Shape.BendY), Side(-Away.Y, Away.X);
+		const float Now = GetWorld()->GetTimeSeconds();
+		const float Shield = State == ECandleState::Cupped ? .3f : 1.f;
+		const FVector2D Shake = FVector2D(FMath::PerlinNoise1D(Now * 23.f + 11.f), FMath::PerlinNoise1D(Now * 19.f + 5.f))
+			* .18f * Pushed * Pushed * (1.f - .5f * Calm);
+		const FVector2D Bent = FMath::Lerp(Bend, Away * Bend.X + Side * Bend.Y, FMath::Clamp(Pushed * 4.f, 0.f, 1.f))
+			+ (Away * (.22f * Pushed + 1.1f * GustNow) + Shake) * Shield;
+		Shape.BendX = Bent.X; Shape.BendY = Bent.Y;
+		Shape.Height *= 1.f - .5f * GustNow * Shield;
+	}
 	const float WaxStrength=bStandalone ? 1.f : FMath::Lerp(.48f,1.f,FMath::Clamp(CandleSource->GetWaxFraction()/.35f,0.f,1.f));
 	const float Height = FMath::Clamp(HeightCm, .1f, 20.f)*WaxStrength;
 	// Seen (25 Oct: you could not tell): at its call the flame bows hard toward the Keeper and shrinks, then stays
@@ -110,8 +136,9 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 				(Seer->GuideTarget - WickAnchor->GetComponentLocation()).GetSafeNormal2D());
 			const float Pull = FMath::Square(.5f + .5f * FMath::Sin(GetWorld()->GetTimeSeconds() * 1.7f));
 			const float Near = 1.f - FMath::Clamp((Seer->GuideWalk - 250.f) / 2250.f, 0.f, 1.f);
+			// With Mim close the warning wins: the draught gives way to her push.
 			const float Lean = (.18f + .22f * Near + (.07f + .05f * Near) * Pull) * (1.f + .6f * FMath::Clamp(Seer->GuideEmphasis, 0.f, 1.f))
-				* (1.f - .6f * Calm) * (State == ECandleState::Cupped ? .35f : 1.f);
+				* (1.f - .6f * Calm) * (State == ECandleState::Cupped ? .35f : 1.f) * (1.f - FMath::Clamp(Pushed * 1.5f, 0.f, 1.f));
 			DraughtBend = FMath::Vector2DInterpTo(DraughtBend, FVector2D(Way.X, Way.Y).GetSafeNormal() * Lean, GetWorld()->GetDeltaSeconds(), 1.6f);
 		}
 		else DraughtBend = FMath::Vector2DInterpTo(DraughtBend, FVector2D::ZeroVector, GetWorld()->GetDeltaSeconds(), 3.f);
