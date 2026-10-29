@@ -12,6 +12,11 @@ class ATallowCreature;
 class ATallowFuseBox;
 class UTallowLessonWidget;
 class UTallowRunWidget;
+class UTallowInventoryWidget;
+class UTallowMatchCountWidget;
+class UTallowCandleStatusWidget;
+class UTallowSoundscapeComponent;
+class UTallowSlidesWidget;
 class UTallowPlayerPresentationComponent;
 class UTallowFlameVisualComponent;
 class ULevelSequence;
@@ -72,6 +77,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Player") float CandleIntensityLumens = 90.f;
 	UPROPERTY(EditAnywhere, Category="Player") TObjectPtr<UStaticMesh> CrowbarMesh;
 	UPROPERTY(EditAnywhere, Category="Player") TObjectPtr<UStaticMesh> FuseMesh;
+	UPROPERTY(EditAnywhere, Category="Player") TObjectPtr<UStaticMesh> FilmReelMesh;
+	UPROPERTY(EditAnywhere, Category="Player") FTransform FilmReelCameraTransform = FTransform(FRotator(0,-65,5),FVector(44.5f,-15.f,-17.f),FVector(.7f));
 	UPROPERTY(EditAnywhere, Category="Player") TObjectPtr<UStaticMesh> MatchMesh;
 	UPROPERTY(EditAnywhere, Category="Player") FTransform MatchCameraTransform;
 	UPROPERTY(EditAnywhere, Category="Player") float MatchCalibrationTime = 19.f / 30.f;
@@ -102,6 +109,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Capture") float GetCaptureTime() const { return CaptureTime; }
     UFUNCTION(BlueprintPure, Category="Capture") bool IsCaptureTracking() const { return bCaptureTracking; }
 	UFUNCTION(BlueprintCallable, Category="Flow") void FinishRun();
+	/** Ending B (TALLOW-LORE.md): the candle left in Maisie's place. Mim hears it and comes; the rest is in the dark. */
+	void OnCandleGivenBack(const FVector& Where);
 	UFUNCTION(BlueprintPure, Category="Flow") FText GetObjective() const;
 	UFUNCTION(BlueprintPure, Category="Flow") bool IsMenuOpen() const { return Menu && Menu->IsInViewport(); }
 	UFUNCTION(BlueprintPure, Category="Flow") UTallowMenuWidget* GetMenuWidget() const { return Menu; }
@@ -142,24 +151,54 @@ private:
 	void SetPowerVisuals(bool bEnabled);
 	void UpdateLessons(float DeltaSeconds);
 	void UpdatePlayerAnimation();
-	void ApplyPickupVisual(AActor* Actor);
+	void ApplyPickupVisual(AActor* Actor, bool bPlaceOnSurface = false);
 	void OnActorSpawned(AActor* Actor);
 	UFUNCTION() void OnSequenceFinished();
 	UFUNCTION() void OnChairEscaped();
+	/** Vasu's lockpick, heard: pins set with a small click, a false set duller, the pick snaps, the latch gives. */
+	UFUNCTION() void OnLockPin();
+	UFUNCTION() void OnLockFalseSet();
+	UFUNCTION() void OnLockSnap();
+	UFUNCTION() void OnLockOpen();
 	UFUNCTION() void OnCandleAcquired();
 	UFUNCTION() void OnCandleReset();
 	UFUNCTION() void OnCandleStateChanged(ECandleState State);
 	UFUNCTION() void OnRelight();
 	UFUNCTION() void OnPower();
 	UFUNCTION() void OnPlankRemoved(bool bBroken);
+	UFUNCTION() void OnOptionalPlankRemoved(bool bBroken);
 	UFUNCTION() void OnStill(bool bStill);
 	UFUNCTION() void OnCaught();
+	UFUNCTION() void ShowCaughtMenu();
 	UFUNCTION() void OnFuseInserted();
-	// Interim CC0 cues (SourceAssets/Audio/CREDITS.md) until Ty's own sound design pass replaces them.
+	// Interim CC0 cues (SourceAssets/Audio/CREDITS.md) until my own sound design pass replaces them.
 	USoundBase* Cue(const FString& Name);
 	void PlayCue(const FString& Name, float Volume, const FVector* Where = nullptr);
+	void TryNellLine(int32 Number);
+	UPROPERTY(Transient) TObjectPtr<UAudioComponent> NellVoice;
+	uint32 NellSaidLines = 0;
 	void AddFootsteps();
 	void UpdateSound();
+	/** 25 Oct: with the candle out the screen went fully black, so you could not see anything, not even the
+	 *  grey "it sees you" look. A cold, shadowless fill comes up as your eyes adjust. */
+	void UpdateNightEyes(float DeltaSeconds);
+	/** Pick the next thing she needs and hand it to the flame's draught (Player->GuideTarget). */
+	void UpdateGuide();
+	float NextGuide = 0.f;
+	/** Derives the hunter director's story act from real route progress; the director fires its beats. */
+	void UpdatePacing();
+	float NextPacing = 0.f;
+	/** When the first board came off (the wake). First contact lasts at least FirstContactSeconds from it, so its
+	 *  glimpse, watcher and gentler first hunt are not skipped by prying three boards in six seconds. */
+	float FirstPlankAt = -1.f;
+	float FirstContactSeconds = 45.f;
+	bool bPacingProjectionDone = false;
+	/** 25 Oct: no text telling you what to do. The journal by the candle teaches, the house guides; the lesson
+	 *  pop-ups and the objective line stay off unless this is switched back on. */
+	UPROPERTY(EditAnywhere, Category = "Presentation") bool bScreenInstructions = false;
+	UPROPERTY(EditAnywhere, Category = "Presentation") float NightEyesLumens = 1.f;
+	UPROPERTY(EditAnywhere, Category = "Presentation") float NightEyesAdjustSeconds = 2.5f;
+	float NightEyesLevel = 0.f;
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<USoundBase>> Cues;
 	UPROPERTY(Transient) TObjectPtr<USoundAttenuation> CueAttenuation;
 	UPROPERTY(Transient) TObjectPtr<UAudioComponent> PowerHum;
@@ -173,9 +212,14 @@ private:
 	FTimerHandle BoardDropHandle;
 	// Jumpscare staging on top of the game mode's capture (look lock, fade and reset stay owned there).
 	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> CaptureLight;
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> NightEyes;
 	float CaptureTime = 0.f;
 	float CaptureBaseFOV = 0.f;
 	float CaptureStrike = 0.f;
+    FVector CaptureBaseCameraLocation = FVector::ZeroVector, CaptureFaceFocus = FVector::ZeroVector;
+    FRotator CaptureBaseCameraRotation = FRotator::ZeroRotator;
+    float CapturePullDistance = 0.f, CaptureAimErrorDegrees = 0.f;
+    bool bCaptureCameraBaseValid = false, bCaptureInDarkness = false;
 	FTimerHandle StingHandle;
 	/** 28 Oct: the view is turned onto her face first, she holds dead still, then the strike. */
 	void UpdateCaptureShot(float DeltaSeconds);
@@ -215,6 +259,30 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UTallowMenuWidget> Menu;
 	UPROPERTY(Transient) TObjectPtr<UTallowLessonWidget> Lessons;
 	UPROPERTY(Transient) TObjectPtr<UTallowRunWidget> RunUI;
+	UPROPERTY(Transient) TObjectPtr<UTallowInventoryWidget> InventoryUI;
+	UPROPERTY(Transient) TObjectPtr<UTallowMatchCountWidget> MatchUI;
+	UPROPERTY(Transient) TObjectPtr<UTallowCandleStatusWidget> CandleStatusUI;
+	UPROPERTY(Transient) TObjectPtr<UTallowSoundscapeComponent> Soundscape;
+	UPROPERTY(Transient) TObjectPtr<UTallowSlidesWidget> SlidesUI;
+	/** The opening or ending stills with the constable's voice (TALLOW-LORE.md), then the given next step. */
+	void PlaySlides(bool bEnding, TFunction<void()> Then);
+	bool bEndSlidesShown = false;
+	/** The story's scripted moments: Mim's "Hiiii, Nell." as she comes round, "Tommy?" after the portrait, its lines
+	 *  on the dark run of Ending B. */
+	void UpdateStory();
+	void OnLoreRead(FName Key);
+	/** A scripted line from a point in the house (VO_Mim_*, or one of my creature lines until it is recorded). */
+	float SayAt(const FString& Name, const FString& Fallback, const FVector& Where, float Volume = .6f);
+	/** Says Mim's next Ending B line and returns how long it lasts. */
+	float SpeakSaidNo();
+	/** At the latch: the rest of Mim's lines, then the ending. */
+	void LeaveAfterSaidNo();
+	bool bSaidNo = false;
+	int32 SaidNoLines = 0;
+	float NextSaidNoLine = 0.f;
+	bool bHiNellPlayed = false;
+	float TiedSince = -1.f;
+	FTimerHandle StoryHandle;
 	UPROPERTY(Transient) TObjectPtr<UTallowPlayerPresentationComponent> Presentation;
 	UPROPERTY(Transient) TObjectPtr<UTallowFlameVisualComponent> Flame;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> HeldCandle;
@@ -224,6 +292,8 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> OriginalHeldTool;
 	FTransform CrowbarHandTransform;
 	FTransform FuseHandTransform;
+	FTransform FilmReelHandTransform;
+	float ProjectorGestureUntil=0.f, ProjectorGestureDuration=.55f;
 	FDelegateHandle ActorSpawnedHandle;
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> Wick;
 	UPROPERTY(Transient) TObjectPtr<ULevelSequencePlayer> SequencePlayer;
@@ -236,7 +306,9 @@ private:
 	int32 TotalPlanks = 0;
 	int32 RemovedPlanks = 0;
 	bool bIntroPlaying = false;
+	bool bIntroFading = false;
 	bool bLeaving = false;
+	FTimerHandle TravelHandle;
 	bool bInitialized = false;
 	bool bKeeperAwake = false;
 	bool bWasTied = false;
