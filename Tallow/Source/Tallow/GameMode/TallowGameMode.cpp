@@ -112,6 +112,9 @@ void ATallowGameMode::HandlePlayerCaptured()
 
 	if (Player && Player->GetCharacterMovement())
 	{
+		CaptureMovementMode = Player->GetCharacterMovement()->MovementMode;
+		CaptureCustomMovementMode = Player->GetCharacterMovement()->CustomMovementMode;
+		bCaptureLockedMovement = true;
 		Player->GetCharacterMovement()->DisableMovement();
 	}
 
@@ -181,13 +184,10 @@ void ATallowGameMode::ClearCaptureState()
 
 void ATallowGameMode::ResetGame()
 {
-	bCaptureInProgress = false;
-	GetWorld()->GetTimerManager().ClearTimer(CaptureFadeTimerHandle);
-	if (bCaptureLockedLook && Player)
-	{
-		if (APlayerController* PC = Cast<APlayerController>(Player->GetController())) PC->SetIgnoreLookInput(false);
-	}
-	bCaptureLockedLook = false;
+	ClearCaptureState();
+	if (auto* Chapters = UTallowChapterSubsystem::GetActive(this)) { Chapters->RestartChapter(ETallowRestartReason::Caught); return; }
+	for (TActorIterator<ATallowEscapePoint> It(GetWorld()); It; ++It) It->SetCodeVerified(false);
+	for (TActorIterator<ATallowProjector> It(GetWorld()); It; ++It) It->ResetProjector();
 	if (Creature)
 	{
 		Creature->ResetToSpawn();

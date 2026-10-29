@@ -1,4 +1,6 @@
 #include "Presentation/TallowPlayDirector.h"
+#include "Chapter/TallowChapterSubsystem.h"
+#include "Save/TallowSaveSubsystem.h"
 #include "Presentation/TallowRunWidget.h"
 #include "AI/TallowCreature.h"
 #include "AIController.h"
@@ -104,6 +106,9 @@ void ATallowPlayDirector::InitializeGameplay()
 	AddFootsteps();
 	SetKeeperAwake(false);
 	SetPowerVisuals(false);
+	if (UTallowChapterSubsystem::ShouldRunChapters())
+		if (auto* Chapters = GetWorld()->GetSubsystem<UTallowChapterSubsystem>()) Chapters->Activate(this);
+	bWasTied = Player->IsTiedToChair();
 	if (!PlayerHands || !CandleMesh || !FlameMesh || !FlameMaterial || !HoldClip)
 	{
 		UE_LOG(LogTemp, Error, TEXT("TALLOW_INTEGRATION missing presentation references")); return;
@@ -192,9 +197,20 @@ void ATallowPlayDirector::ApplyPickupVisual(AActor* Actor)
 	UStaticMesh* Mesh = Actor->IsA<ATallowFusePickup>() ? FuseMesh.Get() : Actor->IsA<ATallowCrowbarPickup>() ? CrowbarMesh.Get() : nullptr;
 	if (!Mesh) return;
 	auto* Visual = Actor->FindComponentByClass<UStaticMeshComponent>();
-	if (!Visual || Visual->GetStaticMesh() == Mesh) return;
-	const FVector Surface = Actor->GetActorLocation();
-	const FRotator Rotation(90.f,Actor->GetActorRotation().Yaw,0.f);
+	// A new run moves the existing pickup back to a surface marker. Its mesh
+	// may already be correct; its pivot height and resting rotation still need seating.
+	if (!Visual || (Visual->GetStaticMesh() == Mesh && !bPlaceOnSurface)) return;
+	FVector Surface = Actor->GetActorLocation();
+	// A dropped one is spawned 2 cm off the top it was dropped on: set it down on that top, not above it.
+	if (!bPlaceOnSurface)
+	{
+		FHitResult Hit; FCollisionQueryParams Params(TEXT("PickupDrop"), true, Actor);
+		Params.AddIgnoredActor(Actor->GetOwner());
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Surface + FVector(0,0,1), Surface - FVector(0,0,6), ECC_Visibility, Params)) Surface.Z = Hit.ImpactPoint.Z;
+	}
+	// Lying the way it lies on an authored spot, turned to where it was dropped.
+	const FRotator Rotation = (FRotator(0.f,Actor->GetActorRotation().Yaw,0.f).Quaternion()
+		* ATallowPickupSpot::RestingRotation(Actor->IsA<ATallowCrowbarPickup>() ? ETallowPickupSpotItem::Crowbar : ETallowPickupSpotItem::Fuse).Quaternion()).Rotator();
 	const FBox Bounds = Mesh->GetBoundingBox().TransformBy(FTransform(Rotation));
 	Visual->SetStaticMesh(Mesh);
 	Visual->EmptyOverrideMaterials();
@@ -237,28 +253,28 @@ void ATallowPlayDirector::RandomizePickups()
 {
 	ActiveRunSeed = RunSeed ? RunSeed : FMath::Rand();
 	FRandomStream Random(ActiveRunSeed);
-	auto Candidates = [this](FName Tag)
+	// Every pickup starts the run on an authored spot, a real top it rests on (28 Oct). A spot is taken at
+	// most once, so two matchboxes never share one.
+	TArray<ATallowPickupSpot*> Taken;
+	auto Place = [&](AActor* Item, ETallowPickupSpotItem Kind, FName Floor, const TCHAR* What)
 	{
-		TArray<AActor*> Points; UGameplayStatics::GetAllActorsWithTag(this, Tag, Points);
-		Points.Sort([](const AActor& A, const AActor& B) { return A.GetName() < B.GetName(); });
-		return Points;
+		ATallowPickupSpot* Spot = ATallowPickupSpot::PickSpot(this, Kind, Floor, {}, Taken, Random);
+		if (!Spot) { UE_LOG(LogTemp, Error, TEXT("TALLOW_INTEGRATION no pickup spot left for the %s (%s)"), What, *Floor.ToString()); return; }
+		Taken.Add(Spot);
+		Spot->SeatItem(Item);
+		UE_LOG(LogTemp, Display, TEXT("TALLOW_INTEGRATION %s at %s, %s (%s) %s"), What, *Spot->Room.ToString(), *Spot->Place, *GetNameSafe(Spot), *Spot->GetActorLocation().ToCompactString());
 	};
-	TArray<AActor*> Bars = Candidates(TEXT("Tallow.Spawn.Crowbar"));
-	if (auto* Crowbar = UGameplayStatics::GetActorOfClass(this, ATallowCrowbarPickup::StaticClass()); Crowbar && Bars.Num())
-	{
-		const auto* Point = Bars[Random.RandRange(0, Bars.Num()-1)];
-		Crowbar->SetActorLocationAndRotation(Point->GetActorLocation(), Point->GetActorRotation());
-	}
+	if (auto* Crowbar = UGameplayStatics::GetActorOfClass(this, ATallowCrowbarPickup::StaticClass())) Place(Crowbar, ETallowPickupSpotItem::Crowbar, NAME_None, TEXT("crowbar"));
+	const FName Floors[] = {TEXT("Basement"), TEXT("Ground"), TEXT("Upper")};
 	TArray<AActor*> Fuses; UGameplayStatics::GetAllActorsOfClass(this, ATallowFusePickup::StaticClass(), Fuses);
 	Fuses.Sort([](const AActor& A, const AActor& B) { return A.GetName() < B.GetName(); });
-	const FName Groups[] = {TEXT("Tallow.Spawn.Fuse.Basement"), TEXT("Tallow.Spawn.Fuse.Ground"), TEXT("Tallow.Spawn.Fuse.Upper")};
-	for (int32 I = 0; I < Fuses.Num() && I < 3; ++I)
-	{
-		const auto Points = Candidates(Groups[I]);
-		if (!Points.Num()) { UE_LOG(LogTemp, Error, TEXT("TALLOW_INTEGRATION missing fuse spawn group %d"), I); continue; }
-		const auto* Point = Points[Random.RandRange(0, Points.Num()-1)];
-		Fuses[I]->SetActorLocationAndRotation(Point->GetActorLocation(), Point->GetActorRotation());
-	}
+	for (int32 I = 0; I < Fuses.Num() && I < 3; ++I) Place(Fuses[I], ETallowPickupSpotItem::Fuse, Floors[I], TEXT("fuse"));
+	// The start box stays by the candle. The others keep their floor (tagged Tallow.Matchbox.<Floor>).
+	TArray<AActor*> Boxes; UGameplayStatics::GetAllActorsOfClass(this, ATallowMatchbox::StaticClass(), Boxes);
+	Boxes.Sort([](const AActor& A, const AActor& B) { return A.GetName() < B.GetName(); });
+	for (AActor* Box : Boxes)
+		for (const FName Floor : Floors)
+			if (Box->ActorHasTag(FName(TEXT("Tallow.Matchbox.") + Floor.ToString()))) Place(Box, ETallowPickupSpotItem::Matchbox, Floor, TEXT("matches"));
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_INTEGRATION run seed=%d, fuses=%d; placements persist through capture"), ActiveRunSeed, Fuses.Num());
 }
 
@@ -327,11 +343,19 @@ void ATallowPlayDirector::OnMenuAction(ETallowMenuAction Action)
 	switch (Action)
 	{
 	case ETallowMenuAction::Start:
+		if (auto* Save = UTallowSaveSubsystem::Get(this)) Save->PrepareNewGame();
+		if (auto* Story = GetGameInstance()->GetSubsystem<UTallowStorySubsystem>()) Story->BeginRun();
 		CloseMenu(); bIntroPlaying = true;
 		if (!PlaySequence(IntroSequence, false)) OnSequenceFinished();
 		break;
 	case ETallowMenuAction::Resume: CloseMenu(); break;
-	case ETallowMenuAction::Restart: LoadDestination(GameMap); break;
+	case ETallowMenuAction::Restart:
+		if (auto* Save = UTallowSaveSubsystem::Get(this)) Save->PrepareRestart(Scene == ETallowPlayScene::Ending);
+		LoadDestination(GameMap); break;
+	case ETallowMenuAction::Continue:
+		if (auto* Save = UTallowSaveSubsystem::Get(this); Save && Save->PrepareContinue()) LoadDestination(GameMap);
+		else if (Menu) Menu->RearmActions();
+		break;
 	case ETallowMenuAction::MainMenu: LoadDestination(MenuMap); break;
 	case ETallowMenuAction::Quit: UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false); break;
 	}
@@ -393,6 +417,14 @@ void ATallowPlayDirector::OnCandleAcquired()
 	PlayCue(TEXT("P_Cup_Rustle_01"), .3f);
 	ForcedClip = PickupClip; ForcedUntil = GetWorld()->GetTimeSeconds() + (PickupClip ? PickupClip->GetPlayLength() : 0.f);
 }
+void ATallowPlayDirector::ResetPresentationForChapter()
+{
+	GetWorldTimerManager().ClearTimer(StingHandle);
+	OnCandleReset();
+	bWasTied = Player && Player->IsTiedToChair();
+	if (!bWasTied && Lessons) Lessons->DismissLesson();
+}
+
 void ATallowPlayDirector::OnCandleReset()
 {
 	EndCaptureShot();
@@ -825,6 +857,8 @@ void ATallowPlayDirector::UpdatePlayerAnimation()
 
 FText ATallowPlayDirector::GetObjective() const
 {
+	if (!bScreenInstructions) return FText::GetEmpty();
+	if (const auto* Chapters = UTallowChapterSubsystem::GetActive(this)) return Chapters->GetObjectiveText();
 	if (!Player || Scene != ETallowPlayScene::Game || IsMenuOpen()) return FText::GetEmpty();
 	if (Player->IsTiedToChair()) return FText::FromString(TEXT("Find a way out of the chair."));
 	if (!Player->GetCandleComponent()->IsAcquired()) return FText::FromString(TEXT("Take the candle."));
@@ -846,6 +880,7 @@ void ATallowPlayDirector::FinishRun()
 	if (!CanEscape()) return;
 	PlayCue(TEXT("P_Latch"), .7f);
 	SetKeeperAwake(false);
+	if (auto* Chapters = UTallowChapterSubsystem::GetActive(this)) Chapters->NotifyEvent(ETallowChapterEvent::FinalReached);
 	LoadDestination(EndingMap);
 }
 

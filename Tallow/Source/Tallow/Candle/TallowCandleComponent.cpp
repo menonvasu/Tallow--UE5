@@ -257,3 +257,21 @@ void UTallowCandleComponent::ResetCandle()
     ResetMatchCount();
     OnCandleReset.Broadcast();
 }
+
+void UTallowCandleComponent::RestoreForChapter(bool bAcquired, float Wax, int32 Matches, ECandleState State)
+{
+    if (GetWorld())
+    {
+        auto& Timers = GetWorld()->GetTimerManager();
+        Timers.ClearTimer(RelightTimerHandle); Timers.ClearTimer(SprintExtinguishTimerHandle); Timers.ClearTimer(DraftExtinguishTimerHandle);
+    }
+    bIsAcquired = bAcquired; bGivenUp = false;
+    WaxFraction = FMath::Clamp(Wax, 0.f, 1.f); MatchCount = FMath::Max(0, Matches);
+    ActiveDraftCount = 0;
+    CurrentState = bAcquired && WaxFraction > 0.f ? State : ECandleState::Out;
+    if (CachedMovementComponent) CachedMovementComponent->MaxWalkSpeed = DefaultWalkSpeed;
+    OnCandleGutteringChanged.Broadcast(false);
+    OnMatchesChanged.Broadcast(MatchCount, false);
+    OnFuelChanged.Broadcast(WaxFraction, GetFuelStage());
+    OnCandleStateChanged.Broadcast(CurrentState);
+}

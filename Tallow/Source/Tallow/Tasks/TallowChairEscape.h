@@ -50,6 +50,15 @@ public:
 	bool IsAtRest() const;
 
 
+    void SetRequiredRocks(int32 Rocks);
+    void ReleasePlayerQuietly();
+    FTransform GetStartTransform() const { return StartTransform; }
+    UStaticMeshComponent* GetChairMesh() const { return ChairMesh; }
+    FTransform GetExitTransform() const;
+    FTransform GetExitRelativeTransform() const;
+    FTransform GetSeatRelativeTransform() const;
+    FTransform GetStandingMeshRelativeTransform() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -78,6 +87,7 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chair")
 	TObjectPtr<ATallowCharacter> TiedPlayerCharacter;
 
+	FTransform StartTransform;
 	FTransform InitialChairRelativeTransform;
 
 	/** Event properties */

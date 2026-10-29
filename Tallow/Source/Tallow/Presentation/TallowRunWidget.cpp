@@ -1,4 +1,5 @@
 #include "Presentation/TallowRunWidget.h"
+#include "Chapter/TallowChapterSubsystem.h"
 #include "Presentation/TallowPlayDirector.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/SOverlay.h"

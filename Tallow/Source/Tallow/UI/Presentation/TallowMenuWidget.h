@@ -17,7 +17,7 @@ UENUM(BlueprintType)
 enum class ETallowMenuPage : uint8 { Home, Controls, Credits, Confirm };
 
 UENUM(BlueprintType)
-enum class ETallowMenuAction : uint8 { Start, Resume, Restart, MainMenu, Quit };
+enum class ETallowMenuAction : uint8 { Start, Resume, Restart, MainMenu, Quit, Continue };
 
 UENUM(BlueprintType)
 enum class ETallowMenuCommand : uint8

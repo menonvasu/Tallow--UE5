@@ -39,6 +39,7 @@ ATallowChairEscape::ATallowChairEscape()
 void ATallowChairEscape::BeginPlay()
 {
 	Super::BeginPlay();
+    StartTransform = GetActorTransform();
 	Stiffness = FMath::Square(RockingFrequency * 2.0f * UE_PI);
 
 	if (ChairMesh)
@@ -198,6 +199,7 @@ void ATallowChairEscape::AttemptRock()
 void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 {
 	if (!InPlayer) return;
+    if (TiedPlayerCharacter) ReleasePlayerQuietly();
 	
 	// Reattach chair mesh if not already
 	RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
@@ -295,3 +297,34 @@ void ATallowChairEscape::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	Super::EndPlay(EndPlayReason);
 }
+void ATallowChairEscape::SetRequiredRocks(int32 Rocks)
+{
+    RequiredRocks = FMath::Clamp(Rocks, 1, 6);
+    OnRockProgressChanged.Broadcast(CurrentRockCount, RequiredRocks);
+}
+void ATallowChairEscape::ReleasePlayerQuietly()
+{
+    if (TiedPlayerCharacter)
+    {
+        if (auto* PC = TiedPlayerCharacter->GetController<APlayerController>(); PC && PC->PlayerCameraManager)
+        {
+            auto* Camera = PC->PlayerCameraManager.Get();
+            Camera->ViewPitchMin = CachedPitchMin; Camera->ViewPitchMax = CachedPitchMax;
+            Camera->ViewYawMin = CachedYawMin; Camera->ViewYawMax = CachedYawMax;
+        }
+        TiedPlayerCharacter->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        TiedPlayerCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+        TiedPlayerCharacter->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        TiedPlayerCharacter->SetTiedChair(nullptr);
+        TiedPlayerCharacter->bUseControllerRotationYaw = true;
+        TiedPlayerCharacter = nullptr;
+    }
+    if (ActiveOverlayWidget) { ActiveOverlayWidget->RemoveFromParent(); ActiveOverlayWidget = nullptr; }
+    bIsTied = false; CurrentRockCount = 0; CurrentSwingAngle = 0.f; AngularVelocity = 0.f;
+    RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
+    SetActorTickEnabled(false);
+}
+FTransform ATallowChairEscape::GetExitTransform() const { return EscapeExitPoint->GetComponentTransform(); }
+FTransform ATallowChairEscape::GetExitRelativeTransform() const { return EscapeExitPoint->GetRelativeTransform(); }
+FTransform ATallowChairEscape::GetStandingMeshRelativeTransform() const { return InitialChairRelativeTransform; }
+FTransform ATallowChairEscape::GetSeatRelativeTransform() const { return SeatAttachPoint->GetRelativeTransform() * InitialChairRelativeTransform; }

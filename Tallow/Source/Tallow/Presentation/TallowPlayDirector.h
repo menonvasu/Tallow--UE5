@@ -107,6 +107,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Flow") void TogglePause();
 	UFUNCTION(BlueprintCallable, Category="Flow") void SkipIntro();
 	UFUNCTION() void OnMenuAction(ETallowMenuAction Action);
+	UFUNCTION(BlueprintCallable, Category="Journal|Audio") void ToggleBackgroundReading();
+	UFUNCTION(BlueprintCallable, Category="Journal|Audio") void SkipBackgroundReading();
+	/** Mim has been woken (the first board); Nell's notes and others read it. */
+	bool IsKeeperAwake() const { return bKeeperAwake; }
+	/** One of Nell's recorded lines (VO_Nell_Line_<n>), once a run, if nothing more important is speaking. */
+	bool SayNellLine(int32 Number);
+
+	/** The director keeps presentation; chapters request these operations. */
+	void SetKeeperAwakeForChapter(bool bAwake) { SetKeeperAwake(bAwake); }
+	void SetPowerVisualsForChapter(bool bEnabled) { SetPowerVisuals(bEnabled); }
+	void PlayChapterCue(const FString& Name, float Volume, const FVector* Where = nullptr) { PlayCue(Name, Volume, Where); }
+	void ReloadGameMap() { LoadDestination(GameMap); }
+	void ShowChapterRecoveryMenu() { ShowCaughtMenu(); }
+	void ResetPresentationForChapter();
+	ATallowCharacter* GetPlayerCharacter() const { return Player; }
+	ATallowCreature* GetKeeper() const { return Keeper; }
+
 private:
 	void InitializeScene();
 	void InitializeGameplay();

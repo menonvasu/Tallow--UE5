@@ -36,6 +36,7 @@ public:
 	virtual void OnInteractTick_Implementation(AActor* Interactor, float DeltaTime, float Progress) override;
 	
 	virtual void ResetPlankState();
+	void SetChapterRetired(bool bRetired);
 	
 	/** Plank breaking loudness */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Plank|Tunables")

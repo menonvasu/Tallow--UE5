@@ -24,6 +24,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void ResetPickup(AActor* Interactor);
 
+    void SetTakenForChapter(bool bTaken);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pickup")
 	TObjectPtr<UStaticMeshComponent> PickupMesh;
 

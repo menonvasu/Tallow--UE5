@@ -117,6 +117,8 @@ void ATallowPlank::ResetPlankState()
 	PlankMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECR_Block);
 	SetActorTransform(InitialPlankTransform);
 	
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
 	bBroken = false;
 	TimeSinceLastNoise = 0.0f;
 }
@@ -137,3 +139,12 @@ FText ATallowPlank::GetInteractionPromptText_Implementation(AActor* Interactor) 
 
 
 
+
+void ATallowPlank::SetChapterRetired(bool bRetired)
+{
+    ResetPlankState();
+    bBroken = bRetired;
+    SetActorHiddenInGame(bRetired);
+    SetActorEnableCollision(!bRetired);
+    if (PlankMesh) PlankMesh->SetCollisionEnabled(bRetired ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryOnly);
+}

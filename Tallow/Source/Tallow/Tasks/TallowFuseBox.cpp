@@ -135,10 +135,10 @@ FText ATallowFuseBox::GetInteractionPromptText_Implementation(AActor* Interactor
 	// if missing fuse
 	if (!Player->HasCarriedItem(ECarriedItemType::Fuse))
 	{
-		return FText::FromString(TEXT("REQUIRES FUSE"));
+		return FText::FromString(TEXT("REQUIRES ") + (ChapterNoun.IsEmpty() ? FString(TEXT("FUSE")) : ChapterNoun.ToString().ToUpper()));
 	}
 	// else
-	return FText::FromString(TEXT("INSERT FUSE"));
+	return FText::FromString(TEXT("INSERT ") + (ChapterNoun.IsEmpty() ? FString(TEXT("FUSE")) : ChapterNoun.ToString().ToUpper()));
 }
 
 void ATallowFuseBox::ResetVisual()
@@ -148,4 +148,14 @@ void ATallowFuseBox::ResetVisual()
 	FuseMesh1->SetVisibility(false);
 	FuseMesh2->SetVisibility(false);
 	FuseMesh3->SetVisibility(false);
+}
+
+void ATallowFuseBox::RestoreInstalledFuses(int32 Count)
+{
+    CurrentFuses = FMath::Clamp(Count, 0, RequiredFuses);
+    // A restored checkpoint latches the power the same way the last insert does.
+    bHasPower = CurrentFuses >= RequiredFuses;
+    FuseMesh1->SetVisibility(CurrentFuses >= 1);
+    FuseMesh2->SetVisibility(CurrentFuses >= 2);
+    FuseMesh3->SetVisibility(CurrentFuses >= 3);
 }

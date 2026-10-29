@@ -104,6 +104,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
 	FOnCandleReset OnCandleReset;
 
+    void RestoreForChapter(bool bAcquired, float Wax, int32 Matches, ECandleState State);
+
 protected:
 	/** Current Candle state variable */
 	ECandleState CurrentState = ECandleState::Out;

@@ -20,6 +20,7 @@ public:
 	void HandlePlayerCaptured();
 
 	void ResetGame();
+	void ClearCaptureState();
 
 	UPROPERTY(BlueprintAssignable, Category = "Tallow|Events")
 	FOnCaught OnCaught;
@@ -74,6 +75,11 @@ protected:
 	FTimerHandle CaptureFadeTimerHandle;
 	bool bCaptureInProgress = false;
 	bool bCaptureLockedLook = false;
+	bool bCaptureLockedMovement = false;
+	/** The capture's cut left the picture and the sound on black; whatever restarts the run brings them back. */
+	bool bCaptureFadeHeld = false;
+	uint8 CaptureMovementMode = 0;
+	uint8 CaptureCustomMovementMode = 0;
 	void BeginCaptureFade();
 	void FinishCapturePresentation();
 	/** Preserve the authored capture before fading; unconfigured creatures retain the original timing. */

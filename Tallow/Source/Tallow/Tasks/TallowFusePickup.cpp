@@ -19,10 +19,9 @@ void ATallowFusePickup::OnInteract_Implementation(AActor* Interactor)
 	if (!Player) { return; }
 	
 	// if carrying item, ignore
-	if (Player->GetCarriedItem() != ECarriedItemType::None) { return; }
+	if (bChapterDormant || IsHidden() || !Player->CollectItem(ECarriedItemType::Fuse)) return;
 	
 	// give fuse and broadcast sound/change
-	Player->SetCarriedItem(ECarriedItemType::Fuse);
 	OnFusePickedUp.Broadcast();
 	
 	// Deactivate it
@@ -36,12 +35,7 @@ bool ATallowFusePickup::CanInteract_Implementation(AActor* Interactor) const
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return false; }
 	
-	// if player is holding item - return cannot interact
-	if (Player->GetCarriedItem() != ECarriedItemType::None) 
-	{
-		return false;
-	}
-	return true;
+	return !bChapterDormant && !IsHidden() && Player->CanCollectItem(ECarriedItemType::Fuse);
 }
 	
 FText ATallowFusePickup::GetInteractionPromptText_Implementation(AActor* Interactor) const
@@ -50,17 +44,25 @@ FText ATallowFusePickup::GetInteractionPromptText_Implementation(AActor* Interac
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return FText::GetEmpty(); }
 	
-	if (Player->GetCarriedItem() != ECarriedItemType::None)
+	if (!Player->CanCollectItem(ECarriedItemType::Fuse))
 	{
-		return FText::FromString(TEXT("HANDS FULL"));
+		return FText::FromString(TEXT("POCKETS FULL"));
 	}
-	return FText::FromString(TEXT("TAKE FUSE"));
+	return FText::FromString(TEXT("TAKE ") + (ChapterNoun.IsEmpty() ? FString(TEXT("FUSE")) : ChapterNoun.ToString().ToUpper()));
 	
 }
 
 void ATallowFusePickup::ResetPickup()
 {
+	bChapterDormant = false;
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
 }
 
+
+void ATallowFusePickup::SetDormant(bool bDormant)
+{
+    bChapterDormant = bDormant;
+    SetActorHiddenInGame(bDormant);
+    SetActorEnableCollision(!bDormant);
+}
