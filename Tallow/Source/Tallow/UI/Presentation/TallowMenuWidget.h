@@ -30,13 +30,15 @@ struct TALLOW_API FTallowMenuState
 {
 	ETallowMenuMode Mode = ETallowMenuMode::Main;
 	ETallowMenuPage Page = ETallowMenuPage::Home;
-	int32 Selection = 0;
+	int32 Selection = 1;
 	bool bAwaitingAction = false;
+	bool bContinueAvailable = false;
 	TOptional<ETallowMenuAction> PendingConfirmation;
 
 	void Show(ETallowMenuMode InMode);
 	TArray<ETallowMenuCommand> Commands() const;
 	void Navigate(int32 Direction);
+	bool IsEnabled(ETallowMenuCommand Command) const;
 	TOptional<ETallowMenuAction> Activate(ETallowMenuCommand Command);
 	TOptional<ETallowMenuAction> Back();
 

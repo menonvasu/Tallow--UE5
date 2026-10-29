@@ -1,5 +1,18 @@
 #include "UI/Presentation/TallowMenuWidget.h"
 #include "Engine/Font.h"
+#include "Engine/Engine.h"
+#include "Misc/App.h"
+#include "Misc/ConfigCacheIni.h"
+#include "Save/TallowSaveSubsystem.h"
+#include "Input/TallowUIInput.h"
+#include "Input/TallowInputPrompts.h"
+#include "Input/TallowInputDeviceSubsystem.h"
+#include "Input/TallowGamepadContext.h"
+#include "Input/TallowHaptics.h"
+#include "Widgets/Input/SSlider.h"
+#include "UI/Presentation/STallowMark.h"
+#include "UI/Presentation/TallowPaper.h"
+#include "Presentation/TallowPlaytestSubsystem.h"
 #include "Engine/Texture2D.h"
 #include "Widgets/Images/SImage.h"
 #include "InputCoreTypes.h"
@@ -20,7 +33,7 @@ void FTallowMenuState::Show(ETallowMenuMode InMode)
 {
 	Mode = InMode;
 	Page = ETallowMenuPage::Home;
-	Selection = ReturnSelection = 0;
+	Selection = ReturnSelection = Mode == ETallowMenuMode::Main && !bContinueAvailable ? 1 : 0;
 	bAwaitingAction = false;
 	PendingConfirmation.Reset();
 }
@@ -32,14 +45,23 @@ TArray<ETallowMenuCommand> FTallowMenuState::Commands() const
 	if (Page != ETallowMenuPage::Home) return {C::Back};
 	if (Mode == ETallowMenuMode::Pause) return {C::Resume, C::Controls, C::Restart, C::MainMenu, C::Quit};
 	if (Mode == ETallowMenuMode::Outro) return {C::Restart, C::MainMenu, C::Credits};
-	return {C::Start, C::Controls, C::Credits, C::Quit};
+	return {C::Continue, C::Start, C::Settings, C::Controls, C::Credits, C::Quit};
+}
+
+bool FTallowMenuState::IsEnabled(ETallowMenuCommand Command) const
+{
+	return Command != ETallowMenuCommand::Continue || bContinueAvailable;
 }
 
 void FTallowMenuState::Navigate(int32 Direction)
 {
 	if (bAwaitingAction || Direction == 0) return;
 	const int32 Count = Commands().Num();
-	Selection = (Selection + (Direction > 0 ? 1 : -1) + Count) % Count;
+	for (int32 I = 0; I < Count; ++I)
+	{
+		Selection = (Selection + (Direction > 0 ? 1 : -1) + Count) % Count;
+		if (IsEnabled(Commands()[Selection])) break;
+	}
 }
 
 TOptional<ETallowMenuAction> FTallowMenuState::Request(ETallowMenuAction Action)
@@ -59,7 +81,7 @@ TOptional<ETallowMenuAction> FTallowMenuState::Activate(ETallowMenuCommand Comma
 {
 	using C = ETallowMenuCommand;
 	using A = ETallowMenuAction;
-	if (bAwaitingAction || !Commands().Contains(Command)) return {};
+	if (bAwaitingAction || !Commands().Contains(Command) || !IsEnabled(Command)) return {};
 	Selection = Commands().IndexOfByKey(Command);
 	if (Command == C::Back || Command == C::Cancel) { ReturnHome(); return {}; }
 	if (Command == C::Confirm)
@@ -79,6 +101,7 @@ TOptional<ETallowMenuAction> FTallowMenuState::Activate(ETallowMenuCommand Comma
 	A Action;
 	switch (Command)
 	{
+	case C::Continue: Action = A::Continue; break;
 	case C::Start: Action = A::Start; break;
 	case C::Resume: Action = A::Resume; break;
 	case C::Restart: Action = A::Restart; break;
@@ -86,7 +109,8 @@ TOptional<ETallowMenuAction> FTallowMenuState::Activate(ETallowMenuCommand Comma
 	case C::Quit: Action = A::Quit; break;
 	default: return {};
 	}
-	if (Mode == ETallowMenuMode::Pause && Action != A::Resume)
+	if ((Mode == ETallowMenuMode::Pause && Action != A::Resume)
+		|| (Action == A::Start && bContinueAvailable))
 	{
 		PendingConfirmation = Action;
 		Page = ETallowMenuPage::Confirm;
@@ -117,6 +141,8 @@ UTallowMenuWidget::UTallowMenuWidget(const FObjectInitializer& ObjectInitializer
 
 void UTallowMenuWidget::ShowMenu(ETallowMenuMode Mode)
 {
+	const auto* Save = UTallowSaveSubsystem::Get(this);
+	State.bContinueAvailable = Save && Save->HasContinue();
 	State.Show(Mode);
 	SetVisibility(ESlateVisibility::Visible);
 	Refresh();
@@ -135,8 +161,30 @@ void UTallowMenuWidget::ActivateSelected()
 	const TArray<ETallowMenuCommand> Commands = State.Commands();
 	if (Commands.IsValidIndex(State.Selection)) ActivateCommand(Commands[State.Selection]);
 }
-void UTallowMenuWidget::ActivateCommand(ETallowMenuCommand Command) { Dispatch(State.Activate(Command)); }
-void UTallowMenuWidget::GoBack() { Dispatch(State.Back()); }
+void UTallowMenuWidget::ActivateCommand(ETallowMenuCommand Command)
+{
+	NoteInput();
+	if (Command == ETallowMenuCommand::BabyMode && !State.bAwaitingAction && State.Commands().Contains(Command))
+		UTallowPlaytestSubsystem::SetBabyModeEnabled(!UTallowPlaytestSubsystem::IsBabyModeEnabled());
+	if (Command == ETallowMenuCommand::Vibration && !State.bAwaitingAction && State.Commands().Contains(Command))
+	{
+		const bool bEnabled = !TallowHaptics::IsEnabled();
+		TallowHaptics::SetEnabled(bEnabled);
+		if (GConfig)
+		{
+			GConfig->SetBool(TEXT("Tallow.Settings"), TEXT("Vibration"), bEnabled, GGameUserSettingsIni);
+			GConfig->Flush(false, GGameUserSettingsIni);
+		}
+	}
+	if (Command == ETallowMenuCommand::InvertLook && !State.bAwaitingAction && State.Commands().Contains(Command))
+		UTallowGamepadContext::SetInvertLook(!UTallowGamepadContext::InvertLook());
+	if (Command == ETallowMenuCommand::InvertMove && !State.bAwaitingAction && State.Commands().Contains(Command))
+		UTallowGamepadContext::SetInvertMove(!UTallowGamepadContext::InvertMove());
+	if (Command == ETallowMenuCommand::HiddenVoice && !State.bAwaitingAction && State.Commands().Contains(Command))
+		TallowCorrupted::SetShowHiddenVoice(!TallowCorrupted::ShowHiddenVoice());
+	Dispatch(State.Activate(Command));
+}
+void UTallowMenuWidget::GoBack() { NoteInput(); Dispatch(State.Back()); }
 void UTallowMenuWidget::RearmActions()
 {
 	// A failed action returns to the home menu; a consumed confirmation is never reused.
@@ -165,9 +213,13 @@ FText UTallowMenuWidget::Heading() const
 
 FText UTallowMenuWidget::Body() const
 {
-	if (State.Page == ETallowMenuPage::Controls) return ControlsText;
-	if (State.Page == ETallowMenuPage::Credits) return CreditsText;
-	if (State.Page == ETallowMenuPage::Confirm) return LOCTEXT("LoseProgress", "Your progress in this run will be lost.");
+	if (State.Page == ETallowMenuPage::Confirm)
+	{
+		if (State.PendingConfirmation == ETallowMenuAction::Start) return LOCTEXT("ReplaceSave", "A new game will replace your saved chapter.");
+		if (State.PendingConfirmation == ETallowMenuAction::Restart && State.bContinueAvailable) return LOCTEXT("RestartChapter", "Return to the start of your saved chapter?");
+		return State.bContinueAvailable ? LOCTEXT("LoseChapterProgress", "Your progress since the start of this chapter will be lost.") : LOCTEXT("LoseProgress", "Your progress in this run will be lost.");
+	}
+	if (State.Page == ETallowMenuPage::Home && State.Mode == ETallowMenuMode::Caught) return LOCTEXT("CaughtLine", "It carried you back to the chair.");
 	return FText::GetEmpty();
 }
 
@@ -184,9 +236,10 @@ FText UTallowMenuWidget::Label(ETallowMenuCommand Command) const
 	case C::Controls: return LOCTEXT("ControlsButton", "Controls");
 	case C::Credits: return LOCTEXT("CreditsButton", "Credits");
 	case C::Back: return LOCTEXT("Back", "Back");
-	case C::Cancel: return LOCTEXT("Cancel", "Keep playing");
+	case C::Cancel: return State.Mode == ETallowMenuMode::Main ? LOCTEXT("CancelNew", "Cancel") : LOCTEXT("Cancel", "Keep playing");
 	case C::Confirm:
-		if (State.PendingConfirmation == ETallowMenuAction::Restart) return LOCTEXT("ConfirmRestart", "Restart this run");
+		if (State.PendingConfirmation == ETallowMenuAction::Start) return LOCTEXT("ConfirmStart", "New game");
+		if (State.PendingConfirmation == ETallowMenuAction::Restart) return State.bContinueAvailable ? LOCTEXT("ConfirmRestartChapter", "Restart chapter") : LOCTEXT("ConfirmRestart", "Restart this run");
 		if (State.PendingConfirmation == ETallowMenuAction::Quit) return LOCTEXT("ConfirmQuit", "Quit game");
 		return LOCTEXT("ConfirmMenu", "Return to main menu");
 	default: return FText::GetEmpty();
@@ -333,6 +386,8 @@ void UTallowMenuWidget::Refresh()
 FReply UTallowMenuWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
 	const FKey Key = Event.GetKey();
+	NoteInput();
+	const ETallowPadIntent Pad = TallowUIInput::ClassifyGamepad(Key);
 	if (ReadingScroll.IsValid() && (Key == EKeys::PageUp || Key == EKeys::PageDown))
 	{
 		const float Delta = Key == EKeys::PageUp ? -240.f : 240.f;
@@ -342,12 +397,12 @@ FReply UTallowMenuWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyE
 	if (Key == EKeys::Up || Key == EKeys::Gamepad_DPad_Up) { Navigate(-1); return FReply::Handled(); }
 	if (Key == EKeys::Down || Key == EKeys::Gamepad_DPad_Down) { Navigate(1); return FReply::Handled(); }
 	if (Key == EKeys::Tab) { Navigate(Event.IsShiftDown() ? -1 : 1); return FReply::Handled(); }
-	if (Key == EKeys::Enter || Key == EKeys::SpaceBar || Key == EKeys::Gamepad_FaceButton_Bottom)
+	if (Key == EKeys::Enter || Key == EKeys::SpaceBar || Pad == ETallowPadIntent::Confirm)
 	{
 		if (!Event.IsRepeat()) ActivateSelected();
 		return FReply::Handled();
 	}
-	if (Key == EKeys::Escape || Key == EKeys::Gamepad_FaceButton_Right)
+	if (Key == EKeys::Escape || Pad == ETallowPadIntent::Back || Pad == ETallowPadIntent::Menu)
 	{
 		if (!Event.IsRepeat()) GoBack();
 		return FReply::Handled();
