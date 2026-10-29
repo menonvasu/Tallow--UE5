@@ -1,0 +1,107 @@
+{
+ "about": "From solve_face.py: Mim's face only, static, in the dark beyond Nell, caught by the candle between two dips. Read by build_menu_scene.py.",
+ "apparitions": [
+  {
+   "frames": [
+    {
+     "root": [
+      208.00683468096335,
+      -187.9223409488099,
+      -3.06637970955353
+     ],
+     "yaw": 96.75,
+     "pitch": 10.0,
+     "roll": 4.0,
+     "scale": 0.45,
+     "clip": "MIM_Act_Upright_Idle",
+     "t": 2.0,
+     "seconds": 0.35
+    }
+   ],
+   "sting": "low",
+   "empty_chair": 0.0,
+   "staging": [
+    {
+     "pose": "pose_MIM_Act_Upright_Idle_2.00",
+     "clip": "MIM_Act_Upright_Idle",
+     "t": 2.0,
+     "scale": 0.45,
+     "tilt": 0,
+     "pitch": 10.0,
+     "yaw": 96.75,
+     "roll": 4.0,
+     "root": [
+      208.00683468096335,
+      -187.9223409488099,
+      -3.06637970955353
+     ],
+     "face": [
+      229.19099319488785,
+      -202.12201025162352,
+      95.47420286968757
+     ],
+     "face_screen": [
+      0.82,
+      0.32
+     ],
+     "depth": 340,
+     "facing": 0.581,
+     "flame_angle": 66.3,
+     "candle_cm": 169.5,
+     "score": 0.4238
+    }
+   ]
+  },
+  {
+   "frames": [
+    {
+     "root": [
+      248.3276726484247,
+      -189.30343659990115,
+      42.28567556404487
+     ],
+     "yaw": 96.78,
+     "pitch": -8.0,
+     "roll": 8.0,
+     "scale": 0.45,
+     "clip": "MIM_Cap_Smile_Reveal",
+     "t": 1.0,
+     "seconds": 0.35
+    }
+   ],
+   "sting": "low",
+   "empty_chair": 0.0,
+   "staging": [
+    {
+     "pose": "pose_MIM_Cap_Smile_Reveal_1.00",
+     "clip": "MIM_Cap_Smile_Reveal",
+     "t": 1.0,
+     "scale": 0.45,
+     "tilt": 1,
+     "pitch": -8.0,
+     "yaw": 96.78,
+     "roll": 8.0,
+     "root": [
+      248.3276726484247,
+      -189.30343659990115,
+      42.28567556404487
+     ],
+     "face": [
+      215.23183535310596,
+      -186.2894453677374,
+      88.46373879994314
+     ],
+     "face_screen": [
+      0.82,
+      0.38
+     ],
+     "depth": 320,
+     "facing": 0.547,
+     "flame_angle": 70.3,
+     "candle_cm": 149.0,
+     "score": 0.6258
+    }
+   ]
+  }
+ ]
+}
