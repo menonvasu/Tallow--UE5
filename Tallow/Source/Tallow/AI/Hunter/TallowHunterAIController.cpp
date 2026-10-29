@@ -692,7 +692,11 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
     if (Player && Creature && !Player->IsTiedToChair() && !Player->IsHiddenInSpot())
     {
         const ECandleState Light = Player->GetCandleComponent()->GetCandleState();
-        if (Light != ECandleState::Out)
+        // A struck match flares brighter than the candle it lights: for that moment she is as plain as an open flame,
+        // and further (29 Oct: relighting near it is a gamble).
+        const float Flare = Player->GetCandleComponent()->GetMatchFlare();
+        const bool bOpenFlame = Light == ECandleState::Lit || Flare > .05f;
+        if (Light != ECandleState::Out || Flare > .05f)
         {
             FVector Eye; FRotator Facing;
             Creature->GetActorEyesViewPoint(Eye, Facing);
@@ -700,14 +704,14 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
             const FVector Target = Player->GetPawnViewLocation();
             const FVector ToPlayer = Target - Eye;
             const auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>();
-            float Range = (Light == ECandleState::Lit ? LitSightRange : CuppedSightRange)
+            float Range = (bOpenFlame ? LitSightRange : CuppedSightRange) * (1.f + .3f * Flare)
                 * (Overseer ? Overseer->GetSightMultiplier() : 1.f);
             // Only the candle gives you away (25 Oct): holding your breath silences you, it doesn't hide you.
             const float ViewDot = FVector::DotProduct(ToPlayer.GetSafeNormal(), Facing.Vector());
             // Once it has you it keeps you: the cone no longer matters, it simply turns to look.
             const bool bTracking = bHadVisible;
             if (ToPlayer.SizeSquared() < FMath::Square(Range) && (bTracking || ViewDot > .34f
-                || (Light == ECandleState::Lit && ViewDot > -.3f && ToPlayer.SizeSquared() < FMath::Square(700.f))))
+                || (bOpenFlame && ViewDot > -.3f && ToPlayer.SizeSquared() < FMath::Square(700.f))))
             {
                 // Head, body or legs: a chair or a rail in the way does not break contact.
                 const FVector Body = Player->GetActorLocation(), Legs = Body - FVector(0, 0, 70.f);
@@ -722,7 +726,7 @@ bool ATallowHunterAIController::SensePlayer(float DeltaSeconds)
             {
                 SightConfidence = 1.f;
             }
-            const float Gain = Light == ECandleState::Lit ? 7.f : 1.7f;
+            const float Gain = bOpenFlame ? 7.f * (1.f + Flare) : 1.7f;
             SightConfidence = FMath::Clamp(SightConfidence + DeltaSeconds * (bSense ? Gain : -3.f), 0.f, 1.f);
         }
         else SightConfidence = FMath::Max(0.f, SightConfidence - DeltaSeconds * 3.f);

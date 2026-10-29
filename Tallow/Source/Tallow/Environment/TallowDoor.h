@@ -53,6 +53,12 @@ public:
 	bool IsOpenForChapter() const { return bIsOpen; }
 	bool HasChapterBarricade() const { return IsBarricaded(); }
 	bool HasAuthoredPlanks() const { return !InitialPlanks.IsEmpty(); }
+	const TArray<TObjectPtr<ATallowPlank>>& GetAuthoredPlanks() const { return InitialPlanks; }
+	/** Shuts an open leaf hard, as if something on the far side threw it (the blood writing's slam). Lock, seal and
+	 *  boards are left as they are, so it opens again as before. False if the leaf was already shut. */
+	bool SlamShut();
+	/** How far the leaf stands open, in degrees from shut. */
+	float GetLeafAngle() const;
 	
 	/** Overlap function */
 	UFUNCTION()

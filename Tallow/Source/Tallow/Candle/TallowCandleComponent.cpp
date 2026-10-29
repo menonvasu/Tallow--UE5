@@ -174,6 +174,9 @@ void UTallowCandleComponent::StartRelighting()
     // start ligthing anim
     OnRelightStarted.Broadcast();
 
+    // the match head flares as it catches (GetMatchFlare)
+    MatchStruckAt = GetWorld()->GetTimeSeconds();
+
     // report candle lit noise
     if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
     {
@@ -285,6 +288,24 @@ void UTallowCandleComponent::HandleDraftExtinguishTimerExpired()
     SetCandleState(ECandleState::Out);
 }
 
+bool UTallowCandleComponent::GustOut()
+{
+    // only an open, steady flame: cupping protects it, and a match mid-strike isn't a flame yet
+    if (!bIsAcquired || bGivenUp || CurrentState != ECandleState::Lit || IsRelighting()) return false;
+    SetCandleState(ECandleState::Out);
+    OnCandleGustedOut.Broadcast();
+    return true;
+}
+
+float UTallowCandleComponent::GetMatchFlare() const
+{
+    if (!GetWorld()) return 0.f;
+    const float Age = GetWorld()->GetTimeSeconds() - MatchStruckAt;
+    if (Age < 0.f || Age >= MatchFlareSeconds) return 0.f;
+    // a bright burst as the head catches, settling to the match's own burn, then gone
+    return FMath::Lerp(.45f, 1.f, FMath::Exp(-Age / .25f)) * FMath::Clamp((MatchFlareSeconds - Age) / .3f, 0.f, 1.f);
+}
+
 void UTallowCandleComponent::GiveUp()
 {
     GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
@@ -295,6 +316,7 @@ void UTallowCandleComponent::GiveUp()
 void UTallowCandleComponent::ResetCandle()
 {
     GetWorld()->GetTimerManager().ClearTimer(RelightTimerHandle);
+    MatchStruckAt = -100.0;
     bIsAcquired = false;
     bGivenUp = false;
     WaxFraction = 1.f;
@@ -311,7 +333,7 @@ void UTallowCandleComponent::RestoreForChapter(bool bAcquired, float Wax, int32 
         auto& Timers = GetWorld()->GetTimerManager();
         Timers.ClearTimer(RelightTimerHandle); Timers.ClearTimer(SprintExtinguishTimerHandle); Timers.ClearTimer(DraftExtinguishTimerHandle);
     }
-    bIsAcquired = bAcquired; bGivenUp = false;
+    bIsAcquired = bAcquired; bGivenUp = false; MatchStruckAt = -100.0;
     WaxFraction = FMath::Clamp(Wax, 0.f, 1.f); MatchCount = FMath::Max(0, Matches);
     ActiveDraftCount = 0;
     CurrentState = bAcquired && WaxFraction > 0.f ? State : ECandleState::Out;

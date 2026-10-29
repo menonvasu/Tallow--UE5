@@ -294,6 +294,26 @@ void ATallowDoor::ToggleDoor(ATallowCharacter* Player)
 	if (!bIsOpen) UpdateLeafNavigation(false);
 }
 
+bool ATallowDoor::SlamShut()
+{
+	if (!bIsOpen) return false;
+	bIsOpen = false;
+	UpdateLeafNavigation(false);
+	if (DoorTimeline && DoorTimelineCurve)
+	{
+		// Faster than a running child slams it open: it is thrown, not pushed.
+		DoorTimeline->SetPlayRate(DoorSlamPlayRate * 1.5f);
+		DoorTimeline->Reverse();
+	}
+	else UpdateDoorRotation(0.f);
+	return true;
+}
+
+float ATallowDoor::GetLeafAngle() const
+{
+	return HingePivot ? FMath::Abs(HingePivot->GetRelativeRotation().Yaw) : 0.f;
+}
+
 void ATallowDoor::ResetDoor()
 {
 	// reset meshes and states.

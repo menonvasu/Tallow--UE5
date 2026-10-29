@@ -9,8 +9,10 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetRenderingLibrary.h"
+#include "MaterialShared.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/App.h"
+#include "RHIShaderPlatform.h"
 #include "UI/Presentation/TallowPaper.h"
 namespace
 {
@@ -23,6 +25,24 @@ ATallowBloodWriting::ATallowBloodWriting()
     PrimaryActorTick.bCanEverTick = true;
     Decal = CreateDefaultSubobject<UDecalComponent>(TEXT("Blood")); SetRootComponent(Decal);
     Decal->SetFadeScreenSize(0.f); Decal->SortOrder = 5;
+    // Nothing shows until the words start (see IsBloodReady).
+    Decal->SetVisibility(false);
+    // The beat's red light hangs off this actor; the house's darkness pass leaves authored lights alone.
+    Tags.Add(TEXT("Tallow.AuthoredLight"));
+}
+bool ATallowBloodWriting::IsBloodReady() const
+{
+    if (!Blood) return false;
+    if (!FApp::CanEverRender()) return true;
+    // Finished: nothing still loading or compiling for it. (An editor shader map is never "complete": the shaders
+    // for other uses are only made when asked for.)
+    const FMaterialResource* Resource = Blood->GetMaterialResource(GMaxRHIShaderPlatform);
+#if WITH_EDITOR
+    return Resource && Resource->GetGameThreadShaderMap() && Resource->IsCompilationFinished();
+#else
+    // A packaged game loads the shaders with the material's package, so once the map is there it is ready.
+    return Resource && Resource->GetGameThreadShaderMap();
+#endif
 }
 bool ATallowBloodWriting::FindWall(const UWorld* World, const FTransform& Anchor, const AActor* Subject, FVector& OutPoint, FVector& OutNormal)
 {
@@ -47,7 +67,7 @@ bool ATallowBloodWriting::FindWall(const UWorld* World, const FTransform& Anchor
     }
     return !OutNormal.IsNearlyZero();
 }
-float ATallowBloodWriting::Write(const FText& Text, const FVector& WallPoint, const FVector& WallNormal, int32 Seed, float WidthScale)
+float ATallowBloodWriting::Write(const FText& Text, const FVector& WallPoint, const FVector& WallNormal, int32 Seed, float WidthScale, float Delay)
 {
     Text.ToString().ParseIntoArray(Lines, TEXT("\n")); InkSeed = Seed;
     int32 Longest = 1; for (const FString& Line : Lines) Longest = FMath::Max(Longest, Line.Len());
@@ -64,6 +84,7 @@ float ATallowBloodWriting::Write(const FText& Text, const FVector& WallPoint, co
     const float TextCentre = (TextTop + TextBottom) * .5f;
     // The words sit a little above the anchor, over a child's eye line; the runs hang below them.
     SetActorLocationAndRotation(WallPoint + FVector(0.f, 0.f, 12.f - (.5f - TextCentre) * Height), Facing);
+    WordsCentre = WallPoint + FVector(0.f, 0.f, 12.f);
     Decal->DecalSize = FVector(14.f, Height * .5f, Width * .5f);
     if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatBloodWriting.M_BeatBloodWriting")))
     {
@@ -75,7 +96,7 @@ float ATallowBloodWriting::Write(const FText& Text, const FVector& WallPoint, co
     }
     else UE_LOG(LogTemp, Warning, TEXT("TALLOW_BEATS missing M_BeatBloodWriting"));
     Decal->MarkRenderStateDirty();
-    WrittenAt = GetWorld()->GetTimeSeconds();
+    WrittenAt = -1.0; StartAt = GetWorld()->GetTimeSeconds() + FMath::Max(0.f, Delay);
     UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS writing \"%s\" at %s normal %s width %.0f cm"), *Text.ToString().Replace(TEXT("\n"), TEXT(" / ")), *WallPoint.ToCompactString(), *WallNormal.ToCompactString(), Width);
     return Width;
 }
@@ -134,7 +155,17 @@ float ATallowBloodWriting::GetAge() const { return WrittenAt < 0.0 ? 0.f : float
 void ATallowBloodWriting::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (!Blood || WrittenAt < 0.0) return;
+    if (!Blood) return;
+    if (WrittenAt < 0.0)
+    {
+        // The wall stays as it was until the first stroke: the decal goes up only with its own shader ready (a few
+        // seconds' grace, then it goes up regardless rather than never).
+        const double Now = GetWorld()->GetTimeSeconds();
+        if (Now < StartAt || (!IsBloodReady() && Now < StartAt + 4.0)) return;
+        WrittenAt = Now;
+        Decal->SetVisibility(true);
+        UE_LOG(LogTemp, Display, TEXT("TALLOW_BEATS writing starts late=%.2fs ready=%d"), float(WrittenAt - StartAt), IsBloodReady() ? 1 : 0);
+    }
     const float Age = GetAge();
     // Glyphs a font has not drawn before reach its atlas a frame late: lay the words again once they are there.
     if ((Redraws == 0 && Age > .05f) || (Redraws == 1 && Age > .5f)) { ++Redraws; DrawInk(); }
