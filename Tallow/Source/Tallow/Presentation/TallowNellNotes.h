@@ -16,7 +16,7 @@ UENUM()
 enum class ETallowNote : uint8
 {
 	Journal, Candle, Guide, Glimpse, Seen, Lost, Close, Listen, HeldPast, Hide, HideClose, Draught, Sprint, Dark,
-	NoMatches, Wax, Board, Snap, Omen, Trick, Fuse, LastFuse, Power, Reel, Projector, Code, Open, Retry, Map, Count
+	NoMatches, Wax, Board, Snap, Omen, Trick, Fuse, LastFuse, Power, Reel, Projector, Code, Open, Retry, Map, Bolted, Hiss, Follow, Count
 };
 
 /** 28 Oct: "I should understand aspects of the game... what certain small triggers, like it looking at you,

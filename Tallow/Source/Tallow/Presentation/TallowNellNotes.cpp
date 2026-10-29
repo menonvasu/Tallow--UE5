@@ -186,15 +186,7 @@ void UTallowNellNotesComponent::Watch(float Now)
 	if (Tension == ETallowTension::Chase || Nell->bSeenByKeeper) ThreatAt = Now;
 
 	// Danger first: these are the moments the rules are learned or a life is lost.
-	if (bFreshCall && bLit) Notice(ETallowNote::Seen);
-	if (bLit && bAwake && Distance < 700.f && !Nell->bSeenByKeeper && Now - SeenCall > 3.f) Notice(ETallowNote::Close);
-	if (bHave && !bLit && bAwake && Distance < 900.f && !Nell->IsHiddenInSpot()) Notice(ETallowNote::Listen);
-	if (Nell->IsHiddenInSpot() && bAwake && Distance < 450.f) Notice(ETallowNote::HideClose);
-	if (SeenCall < 0.f && Nell->KeeperSight < .1f && CanSeeKeeper()) Notice(ETallowNote::Glimpse);   // only before it ever has
-	if (Tension == ETallowTension::After && Now - ThreatAt < 30.f) Notice(ETallowNote::Lost);
-	if (const auto* Breath = Nell->FindComponentByClass<UTallowBreathFeedbackComponent>(); Breath && Breath->HasHeldPast() && Now - Breath->GetLastPastAt() < 3.f)
-		Notice(ETallowNote::HeldPast);
-	if (Nell->IsHiddenInSpot()) Notice(ETallowNote::Hide);
+	// 29 Oct: no notes about what the Keeper saw, heard or is doing. The flame and her breath say it.
 
 	// The candle.
 	if (bHave && State == ECandleState::Lit && Candle->IsInDraft()) Notice(ETallowNote::Draught);
@@ -202,9 +194,23 @@ void UTallowNellNotesComponent::Watch(float Now)
 	if (OutSince >= 0.f && Now - OutSince > 1.2f && !(bAwake && Distance < 1500.f))
 		Notice(Candle->GetMatchCount() > 0 ? ETallowNote::Dark : ETallowNote::NoMatches);
 	if (bLit && Candle->GetFuelStage() == ETallowCandleFuelStage::Low) Notice(ETallowNote::Wax);
-	if (bLit && CandleSince >= 0.f && Now - CandleSince > 25.f && Now - SeenCall > 15.f && !(bAwake && Distance < 900.f)
+	if (bLit && CandleSince >= 0.f && Now - CandleSince > 6.f && Now - SeenCall > 15.f && !(bAwake && Distance < 900.f)
 		&& !Nell->GuideTarget.IsZero() && Nell->GuideWalk > 400.f && Nell->GetVelocity().Size2D() > 40.f)
 		Notice(ETallowNote::Guide);
+	// The objective's hiss carries a little way: heard once she is within earshot of it, shortly after the flame's lesson.
+	if (HasLearned(ETallowNote::Guide) && Now - ShownUntil > 8.f && !Nell->GuideTarget.IsZero() && Nell->GuideWalk > 0.f && Nell->GuideWalk < 1800.f)
+		Notice(ETallowNote::Hiss, 1.f);
+	// Wandering a long while without getting nearer: say it again, not often.
+	if (bLit && !Nell->GuideTarget.IsZero() && Nell->GuideWalk > 0.f)
+	{
+		if (Nell->GuideWalk < BestWalk - 250.f || Nell->GuideWalk > BestWalk + 800.f || BestWalkAt <= 0.f) { BestWalk = Nell->GuideWalk; BestWalkAt = Now; }
+		if (HasLearned(ETallowNote::Hiss) && Now - BestWalkAt > 180.f && Now - FollowAt > 240.f && Now - SeenCall > 15.f && !(bAwake && Distance < 900.f) && Pending == ETallowNote::Count)
+		{
+			FollowAt = Now; BestWalkAt = Now;
+			LearnedMask &= ~(1ull << uint32(ETallowNote::Follow));
+			Notice(ETallowNote::Follow);
+		}
+	}
 
 	// Maisie's book, before it has been read: Nell knows the hand.
 	if (Journal.IsValid() && Now - SeenCall > 10.f)
@@ -220,11 +226,9 @@ void UTallowNellNotesComponent::Watch(float Now)
 	if (auto* House = GetWorld()->GetSubsystem<UTallowHousePresenceSubsystem>())
 	{
 		const int32 Events = House->GetEventCount();
-		if (Events > HouseEvents && bAwake) Notice(ETallowNote::Omen, 1.5f);
 		HouseEvents = Events;
 	}
 	const bool bDistraction = Soundscape.IsValid() && Soundscape->HasDistractionPlaying();
-	if (bDistraction && !bWasDistraction && bLit && bAwake && Distance > 1200.f) Notice(ETallowNote::Trick, 1.f);
 	bWasDistraction = bDistraction;
 	if (const auto* Map = Nell->FindComponentByClass<UTallowHouseMapComponent>(); Map && Map->HasMap()) Notice(ETallowNote::Map);
 
@@ -265,8 +269,9 @@ void UTallowNellNotesComponent::Present(float Now)
 	const float Seconds = FMath::Clamp(3.2f + .055f * float(Text.Len() + Hint.Len() * .5f), 4.5f, 8.f);
 	Widget->ShowNote(Text, Hint, Seconds);
 	Showing = Pending; Pending = ETallowNote::Count;
-	LearnedMask |= 1ull << uint32(Showing);
-	Written.Add(Showing);
+	if (Showing != ETallowNote::Bolted && Showing != ETallowNote::Follow) LearnedMask |= 1ull << uint32(Showing);
+	if (Showing != ETallowNote::Bolted && Showing != ETallowNote::Follow) Written.Add(Showing);
+	else ++BoltedVariant;
 	if (Showing == ETallowNote::Guide) GuideUntil = Now + Seconds;
 	if (Line > 0) Director->SayNellLine(Line);
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_NOTES %s | %s"), *Text.Replace(TEXT("\n"), TEXT(" / ")), *Hint);
@@ -282,45 +287,22 @@ void UTallowNellNotesComponent::Compose(ETallowNote Note, FString& Text, FString
 	{
 	case ETallowNote::Journal: Text = TEXT("that is her writing."); Line = 13; break;
 	case ETallowNote::Candle:
-		Text = TEXT("maisie?\nher candle. it lets me see.\nit will let it see me too.");
+		Text = TEXT("maisie?\nher candle. it lets me see.");
 		Hint = TEXT("[ right mouse ]  shield it          [ R ]  blow it out"); break;
-	case ETallowNote::Guide: Text = TEXT("the flame leans, like there is a draught.\nit wants me to go that way."); break;
-	case ETallowNote::Glimpse:
-		Text = TEXT("there. that is what maisie drew.\nit has not seen me. not yet.");
-		Hint = bLit ? TEXT("[ R ]  put the light out") : TEXT("[ F ]  hold my breath"); break;
-	case ETallowNote::Seen:
-		Text = TEXT("it has seen my light.\nthe flame bent to it and went cold.");
-		Hint = TEXT("[ R ]  light out, and get out of its sight"); break;
-	case ETallowNote::Lost:
-		if (Nell && Nell->IsHiddenInSpot()) Text = TEXT("it did not find me in here.");
-		else if (!bLit) Text = TEXT("it lost me in the dark.\nit cannot see me without the light.");
-		else Text = TEXT("it lost me.\nout of its sight, it has to look for me.");
-		break;
-	case ETallowNote::Close:
-		Text = TEXT("that was not the wind.\nthe flame shakes when it is close.");
-		Hint = TEXT("[ R ]  light out          [ F ]  hold my breath"); Line = 6; break;
-	case ETallowNote::Listen:
-		Text = TEXT("it cannot see me in the dark.\nhold your breath. it listens.");
-		Hint = TEXT("[ F ]  hold my breath, and creep"); break;
-	case ETallowNote::HeldPast: Text = TEXT("it went past me.\nit did not hear me."); break;
-	case ETallowNote::Hide: Text = TEXT("it cannot see me in here.\nnot unless it saw me get in."); break;
-	case ETallowNote::HideClose:
-		Text = TEXT("it is right there.\nmy heart is so loud."); Hint = TEXT("[ F ]  hold my breath"); break;
+	case ETallowNote::Guide: Text = TEXT("the flame leans.\nsomething is pulling it that way."); break;
+	case ETallowNote::Hiss: Text = TEXT("listen. it hisses when it wants me."); break;
+	case ETallowNote::Follow: Text = TEXT("follow the flame."); break;
 	case ETallowNote::Draught:
 		Text = TEXT("not now. please.\na draught. it will blow the flame out.");
 		Hint = TEXT("[ hold right mouse ]  shield it"); Line = 8; break;
-	case ETallowNote::Sprint: Text = TEXT("running makes the flame gutter.\nand running is loud."); break;
+	case ETallowNote::Sprint: Text = TEXT("running makes the flame gutter."); break;
 	case ETallowNote::Dark:
-		Text = TEXT("dark. a match will light it.\nit will hear the scratch."); Hint = TEXT("[ R ]  strike a match"); break;
+		Text = TEXT("dark. a match will light it."); Hint = TEXT("[ R ]  strike a match"); break;
 	case ETallowNote::NoMatches:
 		Text = StartMatches.IsValid() && !StartMatches->IsHidden() ? TEXT("no matches.\ni left them by the candle.")
 			: TEXT("no matches left.\nthere are boxes about the house.");
 		break;
 	case ETallowNote::Wax: Text = TEXT("it is burning down.\ni need another candle."); break;
-	case ETallowNote::Board: Text = TEXT("the nails screamed.\nit will have heard that."); break;
-	case ETallowNote::Snap: Text = TEXT("the pick snapped.\nit hears things like that."); break;
-	case ETallowNote::Omen: Text = TEXT("something moved on its own.\nthe house does that when it is coming."); break;
-	case ETallowNote::Trick: Text = TEXT("was that it?\nthe flame did not shake. not close, then."); break;
 	case ETallowNote::Fuse: Text = TEXT("one fuse in.\ntwo more."); break;
 	case ETallowNote::LastFuse: Text = TEXT("i need one more."); Line = 11; break;
 	case ETallowNote::Power: Text = TEXT("it is still dark.\nthe motor works. the lamps do not."); break;
