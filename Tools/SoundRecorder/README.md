@@ -8,6 +8,4 @@ Saved WAVs and sidecar notes go to `Tallow/SourceAssets/Audio/RecordedTakes/YYYY
 
 This is the recording tool for the final sound pass. The cue list does not dictate Vasu's puzzle logic or event timing. Record and trim against the final animations and merged lockpick events. The tool does not start recording by itself.
 
-Validation: `python3 -m unittest discover -s Tools/SoundRecorder -p 'test_*.py'` runs seven storage/HTTP tests, including failed writes, retained WAVs when note storage fails, duplicate names, folder escape rejection and truncated uploads. `node Tools/SoundRecorder/test_capture.mjs` checks synthetic worklet tail flushing, the 60-second limit, WAV encoding, microphone cleanup and save/interruption recovery using native JavaScript stubs. Neither command opens a browser or uses a microphone. A real device recording/playback check remains a user action.
-
 If capture stops unexpectedly, already received audio is retained for review and download, with a warning to check the ending. A worklet that does not acknowledge Stop within two seconds is recovered the same way. If only the note fails to save, the valid WAV remains saved and listed; the interface asks you to keep the note separately.
