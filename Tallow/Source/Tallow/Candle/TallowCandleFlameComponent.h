@@ -26,7 +26,12 @@ public:
 
 	/** 0 = calm flame, 1 = fully guttering */
 	UFUNCTION(BlueprintPure, Category = "Candle|Flame")
-	float GetGutterAmount() const { return Gutter; }
+	float GetGutterAmount() const { return FMath::Max(Gutter, FMath::Max(GetGustAmount(), GetLayDownAmount())); }
+	/** A breath of air from nowhere (a minor scare): for Seconds the flame lies down and all but goes out, then stands up
+	 *  again. Only the look and the light of it; the candle's state, and what Mim can see of it, are untouched. */
+	UFUNCTION(BlueprintCallable, Category = "Candle|Flame")
+	void LayDown(float Seconds);
+	float GetLayDownAmount() const;
 	/** The integrated presentation owns the prop and wick; retain this component's existing gutter/light rules. */
 	UFUNCTION(BlueprintCallable, Category="Candle|Flame")
 	void UseExternalPresentation(USceneComponent* Wick, float LightIntensity = 18.f);

@@ -233,7 +233,7 @@ void UTallowBeatPresenter::StageRestraint(float T)
     // Under the lids: only her breath, and the house a long way off.
     if (Once(T, 3.9f)) Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f);
     if (Once(T, 5.4f)) SetMix(Muffle, false);
-    if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .55f);
+    if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .065f);
     if (T >= RestraintEnd) Finish();
 }
 void UTallowBeatPresenter::StageRelease(float T)
@@ -252,7 +252,7 @@ void UTallowBeatPresenter::StageRelease(float T)
             Play(*FString::Printf(TEXT("/Game/Audio/CC0/K_Step_%02d"), Step % 4), FMath::Lerp(.95f, .35f, Step / 8.f), &At, 1.15f);
         }
     if (Once(T, 5.45f)) Play(TEXT("/Game/Audio/CC0/D_Close_01"), .75f, &Away, .8f);
-    if (Once(T, 6.1f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh11"), Stings), .42f);
+    if (Once(T, 6.1f)) Play(*FString::Printf(TEXT("%sS_Beat_StingHigh11"), Stings), .285f);
     if (T >= ReleaseEnd) Finish();
 }
 void UTallowBeatPresenter::StageFuse(float T)
@@ -262,7 +262,7 @@ void UTallowBeatPresenter::StageFuse(float T)
     if (Once(T, .3f))
     {
         if (auto* Hum = Hold(TEXT("/Game/Audio/CC0/H_Power_Hum"), 1.f, &Box)) Hum->SetPitchMultiplier(.7f);
-        Hold(*FString::Printf(TEXT("%sS_Beat_StingHighBig1"), Stings), .5f);
+        Hold(*FString::Printf(TEXT("%sS_Beat_StingHighBig1"), Stings), .033f);
     }
     if (!Held.IsEmpty() && Held[0] && T < FuseBlow) Held[0]->SetPitchMultiplier(FMath::Lerp(.7f, 1.35f, FMath::Clamp((T - .3f) / 2.4f, 0.f, 1.f)));
     // The lamps try: stuttering, climbing, the box spitting blue light. Somewhere Mim feels it.
@@ -301,7 +301,7 @@ void UTallowBeatPresenter::StageReset(float T)
         for (TActorIterator<ATallowDoor> It(GetWorld()); It; ++It)
             if (const float Distance = FVector::Dist(It->GetActorLocation(), Player->GetActorLocation()); Distance < Best) { Best = Distance; Where = It->GetActorLocation(); }
         Play(TEXT("/Game/Audio/CC0/D_Close_00"), 1.f, &Where, .82f);
-        Play(*FString::Printf(TEXT("%sS_Beat_StingLow3"), Stings), .75f);
+        Play(*FString::Printf(TEXT("%sS_Beat_StingLow3"), Stings), .041f);
         Fade(0.f, 1.f, .05f);
     }
     if (Once(T, ResetCut)) Cut();

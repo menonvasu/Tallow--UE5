@@ -68,6 +68,7 @@ public:
 
     void ResetForChapter();
     /** The chapter scares give some props a better sound than the one they were placed with. */
+    void SetEventVolume(float Volume) { if (EventAudio) EventAudio->SetVolumeMultiplier(Volume); }
     void SetEventSound(USoundBase* Sound) { EventSound = Sound; if (EventAudio) EventAudio->SetSound(Sound); }
     UPROPERTY(Transient) bool bChapterSilent = false;
     int32 GetSelfScheduledEvents() const { return SelfScheduledEvents; }

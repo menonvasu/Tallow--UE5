@@ -71,6 +71,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Keeper|Voice")
 	void SetLurking(bool bOn) { bLurking = bOn; }
 
+	/** The hunter calls this while it creeps in silence: no ordinary lines, no scratching, and the soundscape and the
+	 *  footstep component keep her foley near-inaudible and the house bed up, so her arrival is not announced. */
+	UFUNCTION(BlueprintCallable, Category = "Keeper|Voice")
+	void SetCreeping(bool bOn) { bCreeping = bOn; }
+	UFUNCTION(BlueprintPure, Category = "Keeper|Voice")
+	bool IsCreeping() const { return bCreeping; }
+
 	/** Nails on wood or a soft knock from where it is (the brain calls this at doors and on walls). */
 	UFUNCTION(BlueprintCallable, Category = "Keeper|Voice")
 	void Foley(bool bKnock, float Volume = .35f);
@@ -104,6 +111,7 @@ private:
 	struct FPool { TArray<FString> Names; TArray<int32> Bag; float Gap = 10.f, Volume = .5f, Ready = 0.f; };
 	TMap<ETallowKeeperLine, FPool> Pools;
 	FPool DemonPool;
+	TMap<FName, float> PlayedAt;
 	float NextDemon = 0.f;
 	USoundBase* Draw(FPool& Pool);
 
@@ -113,10 +121,10 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UAudioComponent> FoleyPlaying;
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<USoundBase>> Cache;
 	uint8 LastState = 0;
-	float QuietUntil = 0.f, NextAny = 0.f, NextFoley = 0.f, NextFoleyAllowed = 0.f;
+	float QuietUntil = 0.f, NextAny = 0.f, NextOrdinary = 0.f, NextFoley = 0.f, NextFoleyAllowed = 0.f;
 	float HeardSeenCall = -100.f, ChaseStarted = -100.f, CaptureEndsAt = 0.f;
 	float AggressiveUntil = 0.f;
 	int32 LastKnock = INDEX_NONE, LastScratch = INDEX_NONE;
-	bool bDisguised = false, bLurking = false, bAwake = true, bCapturing = false;
+	bool bDisguised = false, bLurking = false, bCreeping = false, bAwake = true, bCapturing = false;
 	FTimerHandle StrikeHandle, ScreamHandle, GiggleHandle, CaptureLineHandle;
 };

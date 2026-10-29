@@ -251,7 +251,7 @@ private:
 	/** Nothing of her may come nearer the lens than this (cm). The near plane is 1 cm. */
 	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureLensKeepOut = 8.f;
 	/** The strike sting plays flat at full level (its first 300 ms measure -7.9 dBFS RMS, over her scream's -14.4). */
-	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureStingVolume = 1.f;
+	UPROPERTY(EditAnywhere, Category = "Capture") float CaptureStingVolume = .25f;
 	UPROPERTY(Transient) TObjectPtr<APlayerController> PC;
 	UPROPERTY(Transient) TObjectPtr<ATallowCharacter> Player;
 	UPROPERTY(Transient) TObjectPtr<ATallowCreature> Keeper;

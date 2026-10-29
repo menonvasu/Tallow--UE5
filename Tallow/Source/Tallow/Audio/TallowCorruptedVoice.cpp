@@ -18,7 +18,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogTallowCorrupt, Log, All);
 
 namespace
 {
-	constexpr float FadeSeconds = .15f;
+	constexpr float CancelFadeSeconds = .15f;   // named apart: unity builds put this beside other files' FadeSeconds
 	const TCHAR* const Section = TEXT("Tallow.Settings");
 }
 
@@ -282,7 +282,7 @@ void UTallowCorruptedVoiceSubsystem::Handle(const TArray<FTallowCorruptEvent>& E
 		if (E.Kind == FTallowCorruptEvent::EKind::Start) { Play(E); bSubtitles = true; continue; }
 		const int32 Index = Playing.IndexOfByPredicate([&E](const FPlaying& P) { return P.Session == E.Session && P.Line == E.Cue->Line; });
 		if (Index == INDEX_NONE) continue;
-		if (E.Kind == FTallowCorruptEvent::EKind::Cancel && Playing[Index].Component.IsValid()) Playing[Index].Component->FadeOut(FadeSeconds, 0.f);
+		if (E.Kind == FTallowCorruptEvent::EKind::Cancel && Playing[Index].Component.IsValid()) Playing[Index].Component->FadeOut(CancelFadeSeconds, 0.f);
 		Playing.RemoveAtSwap(Index);
 		bSubtitles = true;
 	}
@@ -348,10 +348,5 @@ void UTallowCorruptedVoiceSubsystem::Deinitialize()
 	TArray<FTallowCorruptEvent> Events;
 	Scheduler.CancelAll(Events);
 	Playing.Reset();
-	if (SubtitleWidget.IsValid())
-	{
-		if (UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr) Viewport->RemoveViewportWidgetContent(SubtitleWidget.ToSharedRef());
-		SubtitleWidget.Reset();
-	}
 	Super::Deinitialize();
 }

@@ -53,7 +53,7 @@ namespace
     void PlaySting(const UObject* Context)
     {
         if (USoundBase* Sting = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/Creature/K_Mim_Capture_Sting.K_Mim_Capture_Sting")))
-            UGameplayStatics::PlaySound2D(Context, Sting, .55f);
+            UGameplayStatics::PlaySound2D(Context, Sting, .12f);
     }
 }
 

@@ -112,8 +112,6 @@ private:
 	struct FPlaying { int32 Session = 0; FName Line; TWeakObjectPtr<class UAudioComponent> Component; FString Subtitle; };
 	TArray<FPlaying> Playing;
 	bool bPausedAudio = false;
-	TSharedPtr<class SWidget> SubtitleWidget;
-	FText SubtitleText;
 	UPROPERTY(Transient) TObjectPtr<class USoundConcurrency> Concurrency;
 	UPROPERTY(Transient) TObjectPtr<class USoundClass> NarrationClass;
 };

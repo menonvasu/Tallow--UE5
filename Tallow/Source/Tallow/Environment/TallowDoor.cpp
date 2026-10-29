@@ -2,6 +2,7 @@
 
 #include "AI/TallowCreature.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Components/SceneComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Player/TallowCharacter.h"
@@ -220,11 +221,60 @@ void ATallowDoor::UpdateDoorRotation(float OutputValue)
 	float CurrentYaw = FMath::Lerp(0.0f, OpenAngle, OutputValue);
 	HingePivot->SetRelativeRotation(FRotator(0.0f, CurrentYaw, 0.0f));
 	UpdateLeafNavigation(bIsOpen && OutputValue >= .98f);
+	// A drift ends where it was meant to: a hand's width open (the timeline stops there and can carry on from it), or shut.
+	if (bDrifting && DriftStop > 0.f && OutputValue >= DriftStop) { if (DoorTimeline) DoorTimeline->Stop(); EndDrift(); }
+	else if (bDrifting && DriftStop <= 0.f && OutputValue <= .002f) EndDrift();
+}
+
+void ATallowDoor::EndDrift()
+{
+	bDrifting = false; DriftStop = 0.f;
+	if (DoorTimeline) DoorTimeline->SetPlayRate(1.f);
+}
+
+bool ATallowDoor::CanDrift() const
+{
+	return !bDrifting && !bChapterSealed && !bIsLocked && !IsBarricaded() && !IsHidden() && DoorTimeline && DoorTimelineCurve && !DoorTimeline->IsPlaying();
+}
+
+bool ATallowDoor::DriftAjar(float Fraction, float PlayRate)
+{
+	if (!CanDrift() || bIsOpen || DoorTimeline->GetPlaybackPosition() > KINDA_SMALL_NUMBER) return false;
+	bDrifting = true; DriftStop = FMath::Clamp(Fraction, .02f, .5f);
+	DoorTimeline->SetPlayRate(FMath::Max(PlayRate, .05f));
+	DoorTimeline->Play();
+	return true;
+}
+
+bool ATallowDoor::DriftShut(float PlayRate)
+{
+	if (!CanDrift() || !bIsOpen) return false;
+	bDrifting = true; DriftStop = 0.f;
+	DoorTimeline->SetPlayRate(FMath::Max(PlayRate, .05f));
+	DoorTimeline->Reverse();
+	bIsOpen = false;
+	UpdateLeafNavigation(false);
+	return true;
+}
+
+float ATallowDoor::GetSwingSeconds(float PlayRate) const
+{
+	return (DoorTimeline ? DoorTimeline->GetTimelineLength() : 1.f) / FMath::Max(PlayRate, .05f);
+}
+
+FVector ATallowDoor::GetLeafCentre() const { return DoorMesh ? DoorMesh->Bounds.Origin : GetActorLocation(); }
+FVector ATallowDoor::GetHingeLocation() const { return HingePivot ? HingePivot->GetComponentLocation() : GetActorLocation(); }
+float ATallowDoor::GetLeafWidth() const
+{
+	if (!DoorMesh || !DoorMesh->GetStaticMesh()) return 100.f;
+	const FVector Extent = DoorMesh->GetStaticMesh()->GetBounds().BoxExtent * DoorMesh->GetComponentScale().GetAbs();
+	return 2.f * FMath::Max(Extent.X, Extent.Y);
 }
 
 void ATallowDoor::ToggleDoor(ATallowCharacter* Player)
 {
 	if (!Player || !DoorTimeline) return;
+	if (bDrifting) EndDrift();
 	
 	if (!bIsOpen)
 	{
@@ -248,6 +298,7 @@ void ATallowDoor::ResetDoor()
 {
 	// reset meshes and states.
 	bChapterSealed = false;
+	EndDrift();
 	if (DoorTimeline)
 	{
 		DoorTimeline->Stop();
@@ -280,7 +331,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	
 	if (!bIsOpen)
 	{
-		
+		if (bDrifting) EndDrift();
 		if (const bool bIsChasing = (Creature->CurrentState == ETallowCreatureState::Chasing))
 		{
 			DoorTimeline->SetPlayRate(DoorSlamPlayRate);
@@ -308,6 +359,7 @@ void ATallowDoor::OnAIProximityBeginOverlap(UPrimitiveComponent* OverlappedComp,
 
 void ATallowDoor::ApplyChapterState(ETallowDoorState State)
 {
+    EndDrift();
     bChapterSealed = State == ETallowDoorState::StoryGated;
     bIsLocked = State == ETallowDoorState::Lockpick;
     bIsOpen = State == ETallowDoorState::Open;

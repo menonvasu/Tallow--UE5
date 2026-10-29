@@ -97,6 +97,18 @@ public:
 
 	/** Whether this actor stands on the room side of the door. */
 	bool IsInside(const AActor* Actor) const;
+
+	/** The house's own hand on the door (a minor scare): a shut, free door comes off its latch and creaks open by
+	 *  Fraction of its swing, or an open one eases shut. Either way it is an ordinary door again the moment it rests. */
+	bool CanDrift() const;
+	bool DriftAjar(float Fraction, float PlayRate);
+	bool DriftShut(float PlayRate);
+	bool IsDrifting() const { return bDrifting; }
+	/** How long a full swing takes at this play rate. */
+	float GetSwingSeconds(float PlayRate) const;
+	FVector GetLeafCentre() const;
+	FVector GetHingeLocation() const;
+	float GetLeafWidth() const;
 	
 	FOnTimelineFloat TimelineProgress;
 	
@@ -136,6 +148,11 @@ protected:
 	TObjectPtr<UCurveFloat> DoorTimelineCurve;
 	
 	bool bIsOpen = false ;
+
+	bool bDrifting = false;
+	/** While drifting open: where on the timeline's curve the leaf stops (0: drifting shut). */
+	float DriftStop = 0.f;
+	void EndDrift();
 	
 	bool IsBarricaded() const { return BarricadePlanks.Num() > 0; }
 	void UpdateNavigationBarrier();

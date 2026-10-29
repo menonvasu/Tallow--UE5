@@ -160,9 +160,12 @@ void UTallowCandleFlameComponent::TickComponent(float DeltaTime, ELevelTick Tick
 		const bool bHolding = Owner && Owner->IsHoldingStill();
 		const auto* Mode=GetWorld()->GetAuthGameMode<ATallowGameMode>();
 		const bool bCaptured=Mode&&Mode->IsCaptureInProgress();
-		if (Gutter > 0.08f && !bHolding && !bCaptured && !Breath->IsPlaying()) Breath->Play();
-		if ((Gutter < 0.03f || bHolding || bCaptured) && Breath->IsPlaying() && Breath->GetPlayState()!=EAudioComponentPlayState::FadingOut) Breath->FadeOut(.08f,0.f);
-		Breath->SetVolumeMultiplier(FMath::Clamp(Gutter * .55f, 0.001f, .32f));
+		// Breath only carries meaning when the Keeper is almost on top of her; guttering alone or a far Keeper stays silent.
+		const float Dist = Keeper.IsValid() ? FVector::Dist(Keeper->GetActorLocation(), GetOwner()->GetActorLocation()) : 1e7f;
+		const float Close = FMath::Clamp((CloseBreathStart - Dist) / FMath::Max(1.f, CloseBreathStart - CloseBreathFull), 0.f, 1.f);
+		if (Close > 0.15f && !bHolding && !bCaptured && !Breath->IsPlaying()) Breath->Play();
+		if ((Close < 0.05f || bHolding || bCaptured) && Breath->IsPlaying() && Breath->GetPlayState()!=EAudioComponentPlayState::FadingOut) Breath->FadeOut(.6f,0.f);
+		Breath->SetVolumeMultiplier(FMath::Clamp(Close * .14f, 0.001f, .14f));
 	}
 
 	// Layered noise reads as flame rather than a faulty bulb: slow breathing, quick flutter, rare pops.
@@ -279,4 +282,17 @@ void UTallowCandleFlameComponent::UseExternalPresentation(USceneComponent* Wick,
 			NavigationSpill->SetIndirectLightingIntensity(0.f); NavigationSpill->SetVolumetricScatteringIntensity(0.f);
 			GetOwner()->AddInstanceComponent(NavigationSpill); NavigationSpill->RegisterComponent();
 		}
+}
+
+void UTallowCandleFlameComponent::LayDown(float Seconds)
+{
+	LayDownStarted = Time; LayDownSeconds = FMath::Max(Seconds, .2f);
+}
+
+float UTallowCandleFlameComponent::GetLayDownAmount() const
+{
+	// Down in a breath, held there, then up again more slowly than it went.
+	const float T = LayDownSeconds > 0.f ? (Time - LayDownStarted) / LayDownSeconds : 2.f;
+	if (T < 0.f || T >= 1.f) return 0.f;
+	return T < .1f ? FMath::SmoothStep(0.f, .1f, T) : T < .55f ? 1.f : 1.f - FMath::SmoothStep(.55f, 1.f, T);
 }

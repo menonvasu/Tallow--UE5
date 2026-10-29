@@ -2304,7 +2304,7 @@ void ATallowHunterAIController::RevealBoo(float Now)
         const FVector To = Creature->GetActorLocation() + FVector(0, 0, 80) - Eye;
         if (To.Size() < 1000.f && FVector::DotProduct(To.GetSafeNormal(), PC->PlayerCameraManager->GetActorForwardVector()) > .45f)
             if (USoundBase* Sting = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/Creature/K_Mim_Capture_Sting.K_Mim_Capture_Sting")))
-                UGameplayStatics::PlaySound2D(this, Sting, .55f);
+                UGameplayStatics::PlaySound2D(this, Sting, .12f);
     }
     bTravellingToAmbush = false; AmbushUntil = 0.f;
     SetPace(1.6f, 1.2f);

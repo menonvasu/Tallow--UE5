@@ -14,7 +14,11 @@ struct TALLOW_API FTallowScareScheduler
     float GetLastFireTime() const { return LastFire; }
     float GetReadyAt(int32 Index) const { return ReadyAt.IsValidIndex(Index) ? ReadyAt[Index] : MAX_flt; }
     float GetGap() const { return Gap; }
+    const FTallowScareRules& GetRules() const { return Rules; }
     static bool IsHunt(ETallowChapterPhase Phase);
+    /** The group's kind: two of a kind never follow one another (Ty played a whole evening and noticed none of them). */
+    FName KindOf(int32 Index) const;
+    FName GetLastKind() const { return LastKind; }
 private:
     float DrawGap(bool bFirst);
     TArray<FTallowScareGroupDef> Groups;
@@ -22,5 +26,6 @@ private:
     FTallowScareRules Rules;
     FRandomStream Random;
     int32 Chapter = 0, Count = 0, LastGroup = INDEX_NONE;
+    FName LastKind;
     float LastFire = 0.f, Gap = 0.f;
 };

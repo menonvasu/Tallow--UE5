@@ -781,7 +781,7 @@ void ATallowPlayDirector::OnCaught()
 	{
 		static const TCHAR* Strike = TEXT("/Game/FinalPass/Capture/K_Capture_StrikeSting.K_Capture_StrikeSting");
 		USoundBase* Sting = LoadObject<USoundBase>(nullptr, Strike, nullptr, LOAD_NoWarn | LOAD_Quiet);
-		const float Volume = Sting ? CaptureStingVolume : .8f;
+		const float Volume = Sting ? CaptureStingVolume : .2f;
 		if (!Sting) Sting = Cue(TEXT("K_Mim_Capture_Sting"));
 		if (Sting) CaptureSting = UGameplayStatics::SpawnSound2D(this, Sting, Volume, 1.f, 0.f, nullptr, false, false);
 		UE_LOG(LogTemp, Display, TEXT("MIM_CAPTURE sting %s volume %.2f at %.3fs"), *GetNameSafe(Sting), Volume, CaptureTime);
@@ -1495,7 +1495,7 @@ void ATallowPlayDirector::AddFootsteps()
 		auto* Heavy = NewObject<UTallowFootstepComponent>(Keeper, TEXT("IntegratedKeeperFootsteps"));
 		for (int32 I = 0; I < 6; ++I) Heavy->Steps.Add(Creature(FString::Printf(TEXT("C_Pat_%02d"), I)));
 		for (int32 I = 0; I < 3; ++I) Heavy->Extras.Add(Creature(FString::Printf(TEXT("C_Drag_%02d"), I)));
-		Heavy->StrideCm = 60.f; Heavy->Volume = .5f; Heavy->ExtraChance = .3f; Heavy->ExtraVolume = .35f; Heavy->FalloffCm = 1800.f;   // track it by ear through the house
+		Heavy->StrideCm = 60.f; Heavy->Volume = .7f; Heavy->ExtraChance = .3f; Heavy->ExtraVolume = .45f; Heavy->FalloffCm = 3000.f; Heavy->bNaturalFalloff = true;   // track it by ear through the house
 		Keeper->AddInstanceComponent(Heavy); Heavy->RegisterComponent();
 	}
 	// Vasu's doors own their state; the director only listens to their hinges (and the route gates') swinging.
@@ -1594,6 +1594,8 @@ void ATallowPlayDirector::UpdateSound()
 		if (!Hinges[I]) continue;
 		const float Yaw = FMath::Abs(Hinges[I]->GetRelativeRotation().Yaw);
 		const float Delta = Yaw - HingeYaw[I];
+		// A door the house moves itself (a minor scare) brings its own creak and latch, not the hand-opened sound.
+		if (const auto* Door = Cast<ATallowDoor>(Hinges[I]->GetOwner()); Door && Door->IsDrifting()) { HingeYaw[I] = Yaw; continue; }
 		if (!HingeMoving[I] && FMath::Abs(Delta) > .15f)
 		{
 			HingeMoving[I] = true;
