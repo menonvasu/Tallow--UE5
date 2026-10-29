@@ -33,9 +33,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Keeper|Voice")
 	TArray<FSoftObjectPath> HuntingCues;
 
-	/** The mask splitting open, under the capture roar */
-	UPROPERTY(EditAnywhere, Category = "Keeper|Voice")
-	FSoftObjectPath MaskCrack;
+	/** The brain sets this while it lies in wait (a hold, a corner, a covered ambush, a watch): it keeps still and
+	 *  quiet, with no search lines or scratching to give the place away; only its breath this close. */
+	UFUNCTION(BlueprintCallable, Category = "Keeper|Voice")
+	void SetLurking(bool bOn) { bLurking = bOn; }
 
 	/** Distance (cm) at which the Keeper's voice fades to silence */
 	UPROPERTY(EditAnywhere, Category = "Keeper|Voice")

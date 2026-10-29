@@ -392,7 +392,7 @@ void ATallowPlayDirector::OnCandleReset()
 	if (CaptureBaseFOV > 0.f && Player) Player->GetFirstPersonCameraComponent()->SetFieldOfView(CaptureBaseFOV);
 	if (CaptureLight) CaptureLight->SetIntensity(0.f);
 	CaptureTime = 0.f;
-	ForcedClip = nullptr; bPowerRestored = false; bBoardsCleared = false; RemovedPlanks = 0;
+	ForcedClip = nullptr; bPowerRestored = false; bBoardsCleared = false; RemovedPlanks = 0; FirstPlankAt = -1.f;
 	SetPowerVisuals(false); SetKeeperAwake(false);
 	if (Lessons) { Lessons->DismissLesson(); Lessons->ShowLesson(ETallowLesson::Chair); }
 }
@@ -426,6 +426,7 @@ void ATallowPlayDirector::OnPlankRemoved(bool bBroken)
 	PlayCue(TEXT("P_Board_Pry"), .7f);
 	GetWorldTimerManager().SetTimer(BoardDropHandle, FTimerDelegate::CreateWeakLambda(this, [this] { PlayCue(TEXT("P_Board_Drop"), .55f); }), .55f, false);
 	if (!bBroken || bBoardsCleared) return;
+	if (!bKeeperAwake) FirstPlankAt = GetWorld()->GetTimeSeconds();
 	SetKeeperAwake(true);
 	RemovedPlanks = FMath::Min(RemovedPlanks+1, TotalPlanks);
 	bBoardsCleared = TotalPlanks > 0 && RemovedPlanks >= TotalPlanks;
