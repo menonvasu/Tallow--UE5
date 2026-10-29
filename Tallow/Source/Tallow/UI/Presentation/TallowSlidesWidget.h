@@ -70,5 +70,6 @@ private:
 	bool bPlaying = false;
 	bool bVoiceStarted = false;
 	int32 CorruptSession = 0;
+	int32 SubtitleTrack = 0;
 	bool bDucked = false;
 };

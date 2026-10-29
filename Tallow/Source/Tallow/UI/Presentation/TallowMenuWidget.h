@@ -22,7 +22,7 @@ enum class ETallowMenuAction : uint8 { Start, Resume, Restart, MainMenu, Quit, C
 UENUM(BlueprintType)
 enum class ETallowMenuCommand : uint8
 {
-	Start, Resume, Restart, MainMenu, Quit, Controls, Credits, Back, Confirm, Cancel, Settings, BabyMode, Continue, Vibration, InvertLook, InvertMove, HiddenVoice, Volume, Brightness
+	Start, Resume, Restart, MainMenu, Quit, Controls, Credits, Back, Confirm, Cancel, Settings, BabyMode, Continue, Vibration, InvertLook, InvertMove, HiddenVoice, Subtitles, Volume, Brightness
 };
 
 /** Small presentation state machine shared by the widget and its navigation tests. */

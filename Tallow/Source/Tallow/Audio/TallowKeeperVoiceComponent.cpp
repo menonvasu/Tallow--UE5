@@ -1,4 +1,5 @@
 #include "Audio/TallowKeeperVoiceComponent.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "AI/TallowCreature.h"
 #include "Player/TallowCharacter.h"
 #include "TimerManager.h"
@@ -159,6 +160,14 @@ void UTallowKeeperVoiceComponent::SetAwake(bool bOn)
 	if (bOn && GetWorld()) NextAny = GetWorld()->GetTimeSeconds() + FMath::FRandRange(3.f, 6.f);
 }
 
+void UTallowKeeperVoiceComponent::CaptionLine(USoundBase* Cue)
+{
+	// Only what she could hear: its voice fades out at HearingDistance. Sounds with no words in them have no caption.
+	const AActor* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!Cue || !Player || !GetOwner() || FVector::Dist(Player->GetActorLocation(), GetOwner()->GetActorLocation()) > HearingDistance) return;
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Cue->GetFName(), Cue->GetDuration(), ETallowSubtitleVoice::Mim);
+}
+
 bool UTallowKeeperVoiceComponent::Speak(USoundBase* Cue, float Volume, float Pitch)
 {
 	if (!Cue || !GetOwner()) return false;
@@ -178,10 +187,12 @@ bool UTallowKeeperVoiceComponent::Speak(USoundBase* Cue, float Volume, float Pit
 				Speaking->SoundClassOverride=Class;
 			Speaking->Play();
 		}
+		CaptionLine(Cue);
 		return Speaking!=nullptr;
 	}
 	Speaking = UGameplayStatics::SpawnSoundAttached(Cue, GetOwner()->GetRootComponent(), NAME_None, FVector(0, 0, 60),
 		EAttachLocation::KeepRelativeOffset, false, Volume, Pitch, 0.f, Attenuation);
+	if (Speaking) CaptionLine(Cue);
 	return Speaking != nullptr;
 }
 

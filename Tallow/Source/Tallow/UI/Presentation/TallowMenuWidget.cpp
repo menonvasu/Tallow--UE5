@@ -1,5 +1,6 @@
 #include "UI/Presentation/TallowMenuWidget.h"
 #include "Audio/TallowCorruptedVoice.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "Engine/Font.h"
 #include "Engine/Engine.h"
 #include "Misc/App.h"
@@ -44,7 +45,7 @@ TArray<ETallowMenuCommand> FTallowMenuState::Commands() const
 {
 	using C = ETallowMenuCommand;
 	if (Page == ETallowMenuPage::Confirm) return {C::Cancel, C::Confirm};
-	if (Page == ETallowMenuPage::Settings) return {C::Volume, C::Brightness, C::Vibration, C::InvertLook, C::InvertMove, C::HiddenVoice, C::Back};
+	if (Page == ETallowMenuPage::Settings) return {C::Volume, C::Brightness, C::Subtitles, C::Vibration, C::InvertLook, C::InvertMove, C::HiddenVoice, C::Back};
 	if (Page != ETallowMenuPage::Home) return {C::Back};
 	if (Mode == ETallowMenuMode::Pause) return {C::Resume, C::Settings, C::Controls, C::Restart, C::MainMenu, C::Quit};
 	if (Mode == ETallowMenuMode::Caught) return {C::Restart, C::MainMenu};
@@ -87,7 +88,7 @@ TOptional<ETallowMenuAction> FTallowMenuState::Activate(ETallowMenuCommand Comma
 	using A = ETallowMenuAction;
 	if (bAwaitingAction || !Commands().Contains(Command) || !IsEnabled(Command)) return {};
 	Selection = Commands().IndexOfByKey(Command);
-	if (Command == C::BabyMode || Command == C::Vibration || Command == C::InvertLook || Command == C::InvertMove || Command == C::HiddenVoice || Command == C::Volume || Command == C::Brightness) return {};
+	if (Command == C::BabyMode || Command == C::Vibration || Command == C::InvertLook || Command == C::InvertMove || Command == C::HiddenVoice || Command == C::Subtitles || Command == C::Volume || Command == C::Brightness) return {};
 	if (Command == C::Back || Command == C::Cancel) { ReturnHome(); return {}; }
 	if (Command == C::Confirm)
 	{
@@ -238,6 +239,8 @@ void UTallowMenuWidget::ActivateCommand(ETallowMenuCommand Command)
 		UTallowGamepadContext::SetInvertMove(!UTallowGamepadContext::InvertMove());
 	if (Command == ETallowMenuCommand::HiddenVoice && !State.bAwaitingAction && State.Commands().Contains(Command))
 		TallowCorrupted::SetShowHiddenVoice(!TallowCorrupted::ShowHiddenVoice());
+	if (Command == ETallowMenuCommand::Subtitles && !State.bAwaitingAction && State.Commands().Contains(Command))
+		TallowSubtitles::SetEnabled(!TallowSubtitles::Enabled());
 	Dispatch(State.Activate(Command));
 }
 void UTallowMenuWidget::GoBack() { NoteInput(); Dispatch(State.Back()); }
@@ -305,6 +308,7 @@ FText UTallowMenuWidget::Label(ETallowMenuCommand Command) const
 	case C::InvertLook: return LOCTEXT("InvertLook", "Invert look up/down");
 	case C::InvertMove: return LOCTEXT("InvertMove", "Invert move up/down");
 	case C::HiddenVoice: return LOCTEXT("HiddenVoice", "Show hidden voice");
+	case C::Subtitles: return LOCTEXT("Subtitles", "Subtitles");
 	case C::Resume: return LOCTEXT("Resume", "Resume");
 	case C::Restart: if (State.Mode == ETallowMenuMode::Caught) return LOCTEXT("Retry", "Try again"); return State.Mode == ETallowMenuMode::Outro ? LOCTEXT("Replay", "Play again") : LOCTEXT("Restart", "Restart");
 	case C::MainMenu: return LOCTEXT("MainMenu", "Main menu");
@@ -333,6 +337,7 @@ FText UTallowMenuWidget::Value(ETallowMenuCommand Command) const
 	case C::InvertLook: return OnOff(UTallowGamepadContext::InvertLook());
 	case C::InvertMove: return OnOff(UTallowGamepadContext::InvertMove());
 	case C::HiddenVoice: return OnOff(TallowCorrupted::ShowHiddenVoice());
+	case C::Subtitles: return OnOff(TallowSubtitles::Enabled());
 	default: return FText::GetEmpty();
 	}
 }
@@ -349,6 +354,7 @@ FText UTallowMenuWidget::SettingNote(ETallowMenuCommand Command) const
 	case C::InvertLook: return LOCTEXT("InvertLookHelp", "Controller only. Pushing the right stick up looks down.");
 	case C::InvertMove: return LOCTEXT("InvertMoveHelp", "Controller only. Pushing the left stick up walks backward.");
 	case C::HiddenVoice: return LOCTEXT("HiddenVoiceHelp", "Write down the other voice in the recordings.");
+	case C::Subtitles: return LOCTEXT("SubtitlesHelp", "The words of every voice, low on the screen.");
 	default: return FText::GetEmpty();
 	}
 }

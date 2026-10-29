@@ -35,6 +35,7 @@
 #include "Player/TallowCharacter.h"
 #include "Presentation/TallowStorySubsystem.h"
 #include "Audio/TallowCorruptedVoice.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "HAL/IConsoleManager.h"
 #include "Sound/SoundBase.h"
 
@@ -158,6 +159,7 @@ void UTallowJournalWidget::StopNarration()
 	if(CorruptSession){if(auto* Corrupt=UTallowCorruptedVoiceSubsystem::Get(this))Corrupt->Release(CorruptSession,Playback.bFinished);CorruptSession=0;}
 	if (Narration) { Narration->OnAudioFinished.RemoveDynamic(this,&UTallowJournalWidget::ReadingFinished);Narration->OnAudioPlaybackPercent.RemoveDynamic(this,&UTallowJournalWidget::ReadingPercent);Narration->Stop(); Narration->DestroyComponent(); Narration = nullptr; }
 	bHaveAudioPercent=false;
+	if(SubtitleTrack){if(auto* Subtitles=UTallowSubtitleSubsystem::Get(this))Subtitles->End(SubtitleTrack);SubtitleTrack=0;}
 	Playback=FTallowReadingPlayback();
 	bNarrationDucked = false;
 }
@@ -175,6 +177,8 @@ void UTallowJournalWidget::PlayNarration()
 	// Unrecorded pages remain readable without a missing-asset warning every frame.
 	if (!Sound && FPackageName::DoesPackageExist(Package)) Sound = LoadObject<USoundBase>(nullptr, *ObjectPath);
 	Playback.Prepare(Sound!=nullptr,Sound?Sound->GetDuration():0.f,!bNarrationMuted);
+	// The words of this page, timed by the reading's own clock so a hold, a pause or a replay keeps them in step.
+	if(Sound)if(auto* Subtitles=UTallowSubtitleSubsystem::Get(this))SubtitleTrack=Subtitles->Begin(*Name,Sound->GetDuration(),ETallowSubtitleVoice::Told,false);
 	Playback.HoldUntil=HoldUntil;Playback.bPriorityPaused=FPlatformTime::Seconds()<HoldUntil;
 	if (!Sound) return;
 	if(auto* Corrupt=UTallowCorruptedVoiceSubsystem::Get(this))CorruptSession=Corrupt->Begin(*FString::Printf(TEXT("read:%s:%d"),*DocumentKey.ToString(),Page+1),Playback.Duration);
@@ -236,6 +240,8 @@ void UTallowJournalWidget::NativeTick(const FGeometry& Geometry, float DeltaTime
 		}
 	}
 	Playback.Advance((CVarCorruptSimClock.GetValueOnGameThread()&&Playback.bAvailable)||(!bHaveAudioPercent&&Narration&&Narration->IsPlaying())?DeltaTime:0.f,FPlatformTime::Seconds(),UGameplayStatics::IsGamePaused(this));
+	// With the paper open she reads the page itself; tucked away, the words come up under the picture.
+	if(SubtitleTrack)if(auto* Subtitles=UTallowSubtitleSubsystem::Get(this))Subtitles->SetPosition(SubtitleTrack,Playback.Position,bCompact&&Playback.IsRunning());
 	if(bCompact&&Playback.bFinished){ReadingFinished();return;}
 	if(Narration)Narration->SetPaused(!Playback.IsRunning());
 }

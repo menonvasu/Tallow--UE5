@@ -104,6 +104,7 @@ private:
 	USoundBase* Next(ETallowKeeperLine Line);
 	void UpdateVoice(float Now);
 	bool Speak(USoundBase* Cue, float Volume, float Pitch = 1.f);
+	void CaptionLine(USoundBase* Cue);
 	void ClearCaptureTimers();
 	void PlayCaptureGiggle();
 	void PlayCaptureLine();

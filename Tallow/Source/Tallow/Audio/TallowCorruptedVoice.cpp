@@ -12,7 +12,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/SOverlay.h"
-#include "UI/Presentation/STallowMark.h"
+#include "UI/Presentation/TallowSubtitles.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTallowCorrupt, Log, All);
 
@@ -321,26 +321,11 @@ void UTallowCorruptedVoiceSubsystem::Play(const FTallowCorruptEvent& Event)
 
 void UTallowCorruptedVoiceSubsystem::ShowSubtitles()
 {
+	// The words go to the one subtitle display, in the hidden voice's own ink; it shows them only with subtitles on and
+	// "show hidden voice" chosen.
 	FString Joined;
-	if (TallowCorrupted::ShowHiddenVoice())
-		for (const FPlaying& P : Playing) Joined += (Joined.IsEmpty() ? TEXT("") : TEXT("\n")) + P.Subtitle;
-	SubtitleText = FText::FromString(Joined);
-	UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-	if (!Viewport) return;
-	if (Joined.IsEmpty() && !SubtitleWidget.IsValid()) return;
-	if (!SubtitleWidget.IsValid())
-	{
-		// Smaller and dimmer than the story's own words: this is not meant to be read as part of the page.
-		// In the book face's italic, on a little soot, set lower and fainter than anything the story says aloud.
-		SubtitleWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.f, 0.f, 0.f, 150.f))
-			.Visibility_Lambda([this] { return SubtitleText.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
-			[SNew(SOverlay)
-				+ SOverlay::Slot()[SNew(STallowSmudge).Alpha(.7f)]
-				+ SOverlay::Slot().Padding(FMargin(12.f, 4.f))
-				[SNew(STextBlock).Text_Lambda([this] { return SubtitleText; })
-					.Font(TallowPaper::FellItalic(TallowPaper::Pt::Small + 3)).ColorAndOpacity(TallowPaper::Ink.CopyWithNewOpacity(.74f)).Justification(ETextJustify::Center)]];
-		Viewport->AddViewportWidgetContent(SubtitleWidget.ToSharedRef(), 80);
-	}
+	for (const FPlaying& P : Playing) Joined += (Joined.IsEmpty() ? TEXT("") : TEXT("\n")) + P.Subtitle;
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->SetHidden(Joined);
 }
 
 void UTallowCorruptedVoiceSubsystem::Deinitialize()

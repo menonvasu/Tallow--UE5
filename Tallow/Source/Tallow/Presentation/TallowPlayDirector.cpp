@@ -51,6 +51,7 @@
 #include "UI/Presentation/TallowCandleStatusWidget.h"
 #include "UI/Presentation/TallowSlidesWidget.h"
 #include "Audio/TallowCorruptedVoice.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/Presentation/TallowPresentationAnimInstance.h"
 #include "Animation/TallowCreatureAnimationComponent.h"
@@ -1274,6 +1275,7 @@ float ATallowPlayDirector::SayAt(const FString& Name, const FString& Fallback, c
 	if (!Line && !Fallback.IsEmpty()) Line = Load(Fallback, TEXT("Creature"));
 	if (!Line) return 0.f;
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s"), *Line->GetName());
+	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Line->GetFName(), Line->GetDuration(), ETallowSubtitleVoice::Mim);
 	UGameplayStatics::PlaySoundAtLocation(this, Line, Where, Volume, 1.f, 0.f, CueAttenuation);
 	return Line->GetDuration();
 }
@@ -1445,6 +1447,7 @@ void ATallowPlayDirector::TryNellLine(int32 Number)
 		NellVoice->bIsUISound = false;
 		NellVoice->Play();
 		NellSaidLines |= Bit;
+		if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(*Name, Sound->GetDuration(), ETallowSubtitleVoice::Nell);
 		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE Nell %s"), *Name);
 	}
 }

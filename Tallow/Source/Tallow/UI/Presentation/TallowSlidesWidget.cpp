@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Audio/TallowCorruptedVoice.h"
+#include "UI/Presentation/TallowSubtitles.h"
 #include "Styling/CoreStyle.h"
 #include "UI/Presentation/TallowPaper.h"
 #include "Widgets/Text/STextBlock.h"
@@ -25,7 +26,7 @@ namespace
 	/** Where the words sit on a plate and what they say (Tools/Presentation/UIRedo/story_data.py, in sentence case).
 	 *  Side: 'L' or 'R' is the dark third the plate leaves for them; 'T' is a title plate (the wordmark, centred). */
 	struct FPlateCaption { const TCHAR* Name; TCHAR Side; const TCHAR* Headline; const TCHAR* Line; };
-	const FPlateCaption Captions[] = {
+	const FPlateCaption PlateCaptions[] = {
 		{TEXT("Intro_01"), 'L', TEXT("London. Winter 1974."), TEXT("The children always disappear one at a time.")},
 		{TEXT("Intro_02"), 'R', TEXT("Then they come home."), TEXT("Clean. Fed. Polite. They cannot remember where they have been.")},
 		{TEXT("Intro_03"), 'L', TEXT("Every child draws the same thing."), TEXT("Ten arms. Two great eyes. An impossible smile. They call it Mim.")},
@@ -49,7 +50,7 @@ namespace
 
 	const FPlateCaption* CaptionFor(FName Name)
 	{
-		for (const FPlateCaption& Caption : Captions) if (Name == Caption.Name) return &Caption;
+		for (const FPlateCaption& Caption : PlateCaptions) if (Name == Caption.Name) return &Caption;
 		return nullptr;
 	}
 }
@@ -122,6 +123,10 @@ void UTallowSlidesWidget::NativeTick(const FGeometry& Geometry, float DeltaTime)
 	{
 		bVoiceStarted = true;
 		if (Slide.Voice) Voice = UGameplayStatics::SpawnSound2D(this, Slide.Voice, .85f, 1.f, 0.f, nullptr, false, true);
+		// Under the plate's own words: the whole of what is said, the constable's, or Mim's on the title.
+		if (Slide.Voice)
+			if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this))
+				SubtitleTrack = Subtitles->Begin(FName(*(TEXT("VO_1974_") + Slide.Name.ToString())), Slide.Voice->GetDuration(), Slide.Name == TEXT("Intro_Title") ? ETallowSubtitleVoice::Mim : ETallowSubtitleVoice::Told);
 		if (Slide.Voice && !Slide.CorruptKey.IsNone())
 			if (auto* Corrupt = UTallowCorruptedVoiceSubsystem::Get(this)) CorruptSession = Corrupt->Begin(Slide.CorruptKey, Slide.Voice->GetDuration());
 	}
@@ -143,6 +148,7 @@ void UTallowSlidesWidget::NativeTick(const FGeometry& Geometry, float DeltaTime)
 
 void UTallowSlidesWidget::EndCorrupt(bool bFinished)
 {
+	if (SubtitleTrack) { if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->End(SubtitleTrack); SubtitleTrack = 0; }
 	if (!CorruptSession) return;
 	if (auto* Corrupt = UTallowCorruptedVoiceSubsystem::Get(this)) Corrupt->Release(CorruptSession, bFinished);
 	CorruptSession = 0;
