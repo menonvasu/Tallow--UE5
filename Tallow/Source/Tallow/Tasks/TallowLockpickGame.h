@@ -64,7 +64,7 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
 	/** Start a session */
-	void StartLockpickSession(AActor* InTargetLockable, int32 PinCount = 4);
+	void StartLockpickSession(AActor* InTargetLockable, int32 PinCount = 3);
 	
 	/** Session over */
 	void EndLockpickSession(bool bWasSuccessful);
@@ -169,10 +169,10 @@ protected:
 	/** Stress variables */
 	float OversetStressTimer = 0.0f;
 	
-	UPROPERTY(EditAnywhere, Category="Lockpick|Tuning") float OversetMargin = 0.06f;
+	UPROPERTY(EditAnywhere, Category="Lockpick|Tuning") float OversetMargin = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float MaxStressDuration = 0.55f;
+	float MaxStressDuration = 1.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float LockpickSnapLoudness = 1.0f;
@@ -187,7 +187,7 @@ protected:
 	
 	/** Max false set Torque */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
-	float MaxFalseTorque = 0.4f;
+	float MaxFalseTorque = 0.55f;
 	
 	/** Depth of pick */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Lockpick|State")
@@ -208,33 +208,33 @@ protected:
 	/** Variables for player input torque */
 	float TargetTorque = 0.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float TorqueRiseRate = 0.7f;
+	float TorqueRiseRate = 2.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
 	float TorqueFallRate = 0.5f;
 	bool bTensionHeld = false;
 	bool bTensionResetDone = true;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float PickMoveSpeed = 5.0f;
+	float PickMoveSpeed = 7.0f;
 	
 	/** Binding Resistance */
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float BindingResistanceMin = 0.25f;
+	float BindingResistanceMin = 0.75f;
 	
 	/** Binding Resistance */
 	UPROPERTY(EditDefaultsOnly, Category = "Lockpick|Tunables")
-	float FalseGateChance = 0.3f;
+	float FalseGateChance = 0.1f;
 	
 	/** Dwell timers */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lockpick|Tunables")
-	float SetDwellDuration = 0.15f;
+	float SetDwellDuration = 0.06f;
 
 	float SetDwellTimer = 0.0f;
 	
 	/** Timers for hint */
 	float TimeSinceProgress = 0.0f;
 		
-	float HintDelay = 8.0f;
+	float HintDelay = 5.0f;
 	
 	/** Weak pointer to target actor */
 	TWeakObjectPtr<AActor> TargetLockable = nullptr;
@@ -243,6 +243,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Lockpick|Tunables")
 	float UnlockDelay = 0.6f;
 	bool bCompleting = false;
+	double SessionStartTime = 0.0;
 	FTimerHandle CompleteTimerHandle;
 	UFUNCTION()
 	void FinishSuccess() { EndLockpickSession(true); }

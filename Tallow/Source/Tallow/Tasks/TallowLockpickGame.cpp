@@ -5,6 +5,7 @@
 #include "Interactable/IInteractable.h"
 #include "Noise/TallowNoiseSubsystem.h"
 #include "UI/TallowLockpickWidget.h"
+#include "Tallow.h"
 
 
 UTallowLockpickGame::UTallowLockpickGame()
@@ -28,7 +29,7 @@ void UTallowLockpickGame::GenerateLock(int32 PinCount)
 	TimeSinceProgress = 0.0f;
 	
 	// randomize tolerance
-	CurrentTolerance = FMath::RandRange(0.05f, 0.08f);
+	CurrentTolerance = FMath::RandRange(0.21f, 0.24f);
 	
 	// get random heights, set false gates and add to arrays 
 	for (int32 i = 0; i < PinCount; i++)
@@ -45,8 +46,8 @@ void UTallowLockpickGame::GenerateLock(int32 PinCount)
 		}
 	}
 	
-	// at least 1: randomize a pin to false gate
-	PinChambers[FMath::RandRange(0, PinCount - 1)].bHasFalseGate = true;
+	// false gates are rare now
+	// no forced false gate: a lock may have none
 	
 	// shuffle sequence so random
 	Algo::RandomShuffle(BindingSequence);
@@ -73,7 +74,7 @@ void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 P
 	if (PC && LockpickWidgetClass)
 	{
 		ActiveWidgetInstance = CreateWidget<UTallowLockpickWidget>(PC, LockpickWidgetClass);
-		ActiveWidgetInstance->AddToViewport();
+		ActiveWidgetInstance->AddToViewport(20); // above the HUD and lesson cards
 		ActiveWidgetInstance->InitializeLockpickWidget(this);
 	}
 	
@@ -88,11 +89,19 @@ void UTallowLockpickGame::StartLockpickSession(AActor* InTargetLockable, int32 P
 	bCompleting = false;
 
 	SetComponentTickEnabled(true); 
+	SessionStartTime = GetWorld()->GetTimeSeconds();
+	UE_LOG(LogTallow, Display, TEXT("TALLOW_LOCKPICK start door=%s pins=%d widget=%d"), *GetNameSafe(InTargetLockable), PinCount, ActiveWidgetInstance ? 1 : 0);
 }
 
 void UTallowLockpickGame::UpdatePickPosition(float DeltaDepth, float DeltaLift)
 {
 	if (bCompleting) { return; }
+	
+	// starting a lift from between pins: take the nearest pin, so the pick never sits where it cannot rise
+	if (DeltaLift > 0.0f && TargetPickLift <= 0.10f && TargetPickLift + DeltaLift > 0.05f)
+	{
+		TargetPickDepth = FMath::RoundToInt(TargetPickDepth);
+	}
 	
 	// pick trapped in chamber
 	if (TargetPickLift <= 0.10f)
@@ -257,6 +266,7 @@ void UTallowLockpickGame::EvaluateActiveChamber(float DeltaTime)
 		TimeSinceProgress = 0.0f;
 		Pin.PinState = EPinState::Set;
 		CurrentBindingStep++;
+		UE_LOG(LogTallow, Display, TEXT("TALLOW_LOCKPICK pin %d/%d set at %.1fs"), CurrentBindingStep, BindingSequence.Num(), GetWorld()->GetTimeSeconds() - SessionStartTime);
 		OnPinSet.Broadcast();
 				
 		// if finished
@@ -351,6 +361,8 @@ void UTallowLockpickGame::EvaluateLockState(float DeltaTime)
 
 void UTallowLockpickGame::EndLockpickSession(bool bWasSuccessful)
 {
+	UE_LOG(LogTallow, Display, TEXT("TALLOW_LOCKPICK end %s door=%s after %.1fs, %d/%d pins set"), bWasSuccessful ? TEXT("success") : TEXT("stopped"),
+		*GetNameSafe(TargetLockable.Get()), GetWorld()->GetTimeSeconds() - SessionStartTime, CurrentBindingStep, BindingSequence.Num());
 	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
 	APlayerController* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
 	

@@ -105,6 +105,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Flow") FText GetObjective() const;
 	UFUNCTION(BlueprintPure, Category="Flow") bool IsMenuOpen() const { return Menu && Menu->IsInViewport(); }
 	UFUNCTION(BlueprintCallable, Category="Flow") void TogglePause();
+	UFUNCTION(BlueprintCallable, Category="Flow") void OpenInventory();
+	/** Ends an open lockpick session (capture, pause, inventory, map). True if one was open. */
+	bool StopLockpicking();
+	void PlayMapGesture(bool bPuttingAway);
 	UFUNCTION(BlueprintCallable, Category="Flow") void SkipIntro();
 	UFUNCTION() void OnMenuAction(ETallowMenuAction Action);
 	UFUNCTION(BlueprintCallable, Category="Journal|Audio") void ToggleBackgroundReading();

@@ -323,7 +323,7 @@ void ATallowCharacter::LookInput(const FInputActionValue& Value)
 	if (LockpickComponent && LockpickComponent->IsComponentTickEnabled())
 	{
 		FVector2D LookAxisVector = Value.Get<FVector2D>();
-		LockpickComponent->UpdatePickPosition(LookAxisVector.X * 0.04f, -LookAxisVector.Y * 0.04f); // sens scalar
+		LockpickComponent->UpdatePickPosition(LookAxisVector.X * 0.08f, -LookAxisVector.Y * 0.05f); // sens scalar
 		return;
 	}
 	

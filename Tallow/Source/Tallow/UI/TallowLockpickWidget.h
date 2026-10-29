@@ -20,6 +20,12 @@ public:
 	void InitializeLockpickWidget(UTallowLockpickGame* InGameComponent);
 	
 protected:
+	/** The handmade look (TallowPaper), applied over the WBP's own widgets when it opens: panels become card, words go
+	 *  into her hand, pins and pick are inked. The layout and every binding stay exactly as designed. */
+	virtual void NativeConstruct() override;
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual int32 NativePaint(const FPaintArgs&, const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32, const FWidgetStyle&, bool) const override;
+
 	virtual void NativeTick(const FGeometry& Geometry, float InDeltaTime) override;
 	
 	virtual void NativeDestruct() override;

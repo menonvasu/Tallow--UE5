@@ -98,14 +98,11 @@ void UTallowInteractionComponent::DoHoverCheck()
 {
 	ATallowCharacter* Player = Cast<ATallowCharacter>(GetOwner());
 	
-	// minigame open: no prompt
+	// Minigames and overlays own the pointer or look input while they are open.
 	if (PC.IsValid() && (PC->IsLookInputIgnored() || PC->bShowMouseCursor))
 	{
 		CurrentHoverActor = nullptr;
-		if (HoldProgressWidgetInstance)
-		{
-			HoldProgressWidgetInstance->HidePrompt();
-		}
+		if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
 		return;
 	}
 

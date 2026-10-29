@@ -1,6 +1,7 @@
 ﻿#include "TallowFilmReelPickup.h"
 #include "Player/TallowCharacter.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 
 // Sets default values
 ATallowFilmReelPickup::ATallowFilmReelPickup()
@@ -9,6 +10,7 @@ ATallowFilmReelPickup::ATallowFilmReelPickup()
 	
 	FilmReelMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FilmReelMesh"));
 	RootComponent = FilmReelMesh;
+	FilmReelMesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Presentation/ProjectorFinal/SM_FilmReel.SM_FilmReel")));
 	FilmReelMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	FilmReelMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECR_Block);
 }
@@ -19,12 +21,7 @@ bool ATallowFilmReelPickup::CanInteract_Implementation(AActor* Interactor) const
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return false; }
 	
-	// if player holding item, cannot interact
-	if (Player->GetCarriedItem() != ECarriedItemType::None)
-	{
-		return false;
-	}
-	return true;
+	return !IsHidden() && Player->CanCollectItem(ECarriedItemType::FilmReel);
 }
 
 void ATallowFilmReelPickup::OnInteract_Implementation(AActor* Interactor)
@@ -33,11 +30,7 @@ void ATallowFilmReelPickup::OnInteract_Implementation(AActor* Interactor)
 	ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return; }
 	
-	// if not carrying item, return
-	if (Player->GetCarriedItem() != ECarriedItemType::None) { return; }
-	
-	// set carried item and broadacast change
-	Player->SetCarriedItem(ECarriedItemType::FilmReel);
+	if (IsHidden() || !Player->CollectItem(ECarriedItemType::FilmReel)) return;
 	OnFilmReelPickup.Broadcast();
 	
 	// deactivate it
@@ -51,9 +44,9 @@ FText ATallowFilmReelPickup::GetInteractionPromptText_Implementation(AActor* Int
 	const ATallowCharacter* Player = Cast<ATallowCharacter>(Interactor);
 	if (!Player) { return FText::GetEmpty(); }
 	
-	if (Player->GetCarriedItem() != ECarriedItemType::None)
+	if (!Player->CanCollectItem(ECarriedItemType::FilmReel))
 	{
-		return FText::FromString("HANDS FULL");
+		return FText::FromString("FILM REEL ALREADY TAKEN");
 	}
 	return FText::FromString("TAKE FILM REEL");
 }

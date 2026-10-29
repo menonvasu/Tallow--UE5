@@ -410,6 +410,9 @@ void ATallowPlayDirector::TogglePause()
 	if (bIntroPlaying || Scene == ETallowPlayScene::Ending) { SkipIntro(); return; }
 	if (Scene != ETallowPlayScene::Game || bLeaving) return;
 	if (IsMenuOpen()) { Menu->GoBack(); return; }
+	for (TActorIterator<ATallowEscapePoint> It(GetWorld());It;++It) if (It->GetIsCurrentlyInputtingKeypad()) { It->CloseKeypad(); return; }
+	// Like the keypad, Escape first puts the picks away.
+	if (StopLockpicking()) return;
 	if (Player)
 		if (auto* Interaction = Player->FindComponentByClass<UTallowInteractionComponent>()) Interaction->CancelInteract();
 	UGameplayStatics::SetGamePaused(this, true);
@@ -485,8 +488,25 @@ void ATallowPlayDirector::OnPlankRemoved(bool bBroken)
 	bBoardsCleared = TotalPlanks > 0 && RemovedPlanks >= TotalPlanks;
 }
 void ATallowPlayDirector::OnStill(bool bStill) { if (!bStill) StillTime = 0.f; }
+void ATallowPlayDirector::ShowCaughtMenu()
+{
+	UGameplayStatics::SetGamePaused(this,true);
+	SetMenu(ETallowMenuMode::Caught);
+}
+
+bool ATallowPlayDirector::StopLockpicking()
+{
+	auto* Lock = Player ? Player->GetLockpickComponent() : nullptr;
+	if (!Lock || !Lock->IsInMinigame()) return false;
+	Lock->EndLockpickSession(false);
+	return true;
+}
+
 void ATallowPlayDirector::OnCaught()
 {
+	// A session left open would keep the overlay up and the mouse on the pick after she wakes in the chair.
+	StopLockpicking();
+	if (NellVoice) NellVoice->FadeOut(.08f, 0.f);
 	if (Lessons) Lessons->DismissLesson();
 	ForcedClip = nullptr;
 	bCaptureTracking = true;
