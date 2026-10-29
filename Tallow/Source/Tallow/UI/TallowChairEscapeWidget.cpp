@@ -1,24 +1,7 @@
 #include "UI/TallowChairEscapeWidget.h"
 #include "Tasks/TallowChairEscape.h"
-#include "Rendering/DrawElements.h"
-#include "Styling/CoreStyle.h"
-#include "Fonts/FontMeasure.h"
-#include "Framework/Application/SlateApplication.h"
-
-namespace
-{
-	void DrawBox(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FSlateBrush* Brush, FVector2D Pos, FVector2D Size, FLinearColor Colour)
-	{
-		FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(Size, FSlateLayoutTransform(Pos)), Brush, ESlateDrawEffect::None, Colour);
-	}
-
-	void DrawLabel(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& Text, int32 Size, FVector2D Centre, FLinearColor Colour)
-	{
-		const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Bold", Size);
-		const FVector2D TextSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text, Font);
-		FSlateDrawElement::MakeText(Out, Layer, Geo.ToPaintGeometry(TextSize, FSlateLayoutTransform(Centre - TextSize * .5f)), Text, Font, ESlateDrawEffect::None, Colour);
-	}
-}
+#include "UI/Presentation/TallowPaper.h"
+#include "Input/TallowInputPrompts.h"
 
 void UTallowChairEscapeWidget::NativeConstruct()
 {

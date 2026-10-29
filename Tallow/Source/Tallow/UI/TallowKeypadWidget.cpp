@@ -29,16 +29,57 @@ void UTallowKeypadWidget::Button_DigitPressed(int32 Digit)
 	ConvertArray();	
 }
 
-void UTallowKeypadWidget::Button_ClearPressed()
+void UTallowKeypadWidget::PressPadCell()
 {
-	// clear
-	EnteredDigits.Empty();
-	if (InfoTextBlock)
-	{
-		InfoTextBlock->SetText(FText::FromString(TEXT("ENTER DIGIT")));
-		InfoTextBlock->SetColorAndOpacity(FLinearColor::White);
-	}
-	ConvertArray();
+ if (PadCell==9) Button_ClearPressed();
+ else if (PadCell==11) Button_SubmitPressed();
+ else Button_DigitPressed(PadCell==10?0:PadCell+1);
+}
+FReply UTallowKeypadWidget::NativeOnKeyDown(const FGeometry&,const FKeyEvent& Event)
+{
+ const FKey Key=Event.GetKey();
+ const ETallowPadIntent Intent=TallowUIInput::ClassifyGamepad(Key);
+ if (Intent!=ETallowPadIntent::None)
+ {
+  int32 Col=PadCell%3,Row=PadCell/3;
+  switch (Intent)
+  {
+  case ETallowPadIntent::Left: Col=(Col+2)%3; break;
+  case ETallowPadIntent::Right: Col=(Col+1)%3; break;
+  case ETallowPadIntent::Up: Row=(Row+3)%4; break;
+  case ETallowPadIntent::Down: Row=(Row+1)%4; break;
+  case ETallowPadIntent::Confirm: PressPadCell(); break;
+  case ETallowPadIntent::Secondary: if (!EnteredDigits.IsEmpty()) EnteredDigits.Pop(); bError=false; ConvertArray(); break;
+  case ETallowPadIntent::Tertiary: Button_ClearPressed(); break;
+  case ETallowPadIntent::NextTab: Button_SubmitPressed(); break;
+  case ETallowPadIntent::Back: case ETallowPadIntent::Menu:
+   if (LinkedLatch.IsValid()) LinkedLatch->CloseKeypad(); else RemoveFromParent();
+   break;
+  default: break;
+  }
+  PadCell=Row*3+Col;
+  return FReply::Handled();
+ }
+ if (Key==EKeys::Enter) Button_SubmitPressed();
+ else if (Key==EKeys::BackSpace)
+ {
+  if (!EnteredDigits.IsEmpty()) EnteredDigits.Pop();
+  bError=false;
+  ConvertArray();
+ }
+ else if (Key==EKeys::Delete || Key==EKeys::C) Button_ClearPressed();
+ else if (Key==EKeys::Escape || Key==EKeys::E)
+ {
+  if (LinkedLatch.IsValid()) LinkedLatch->CloseKeypad(); else RemoveFromParent();
+ }
+ else
+ {
+  const FKey Main[]={EKeys::Zero,EKeys::One,EKeys::Two,EKeys::Three,EKeys::Four,EKeys::Five,EKeys::Six,EKeys::Seven,EKeys::Eight,EKeys::Nine};
+  const FKey Pad[]={EKeys::NumPadZero,EKeys::NumPadOne,EKeys::NumPadTwo,EKeys::NumPadThree,EKeys::NumPadFour,EKeys::NumPadFive,EKeys::NumPadSix,EKeys::NumPadSeven,EKeys::NumPadEight,EKeys::NumPadNine};
+  for (int32 I=0;I<10;++I) if (Key==Main[I] || Key==Pad[I]) { Button_DigitPressed(I); break; }
+ }
+ // UI owns every key until it closes, including inventory, map and pause shortcuts.
+ return FReply::Handled();
 }
 
 void UTallowKeypadWidget::Button_SubmitPressed()

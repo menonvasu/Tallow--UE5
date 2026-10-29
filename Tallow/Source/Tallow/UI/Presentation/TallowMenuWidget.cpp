@@ -83,6 +83,7 @@ TOptional<ETallowMenuAction> FTallowMenuState::Activate(ETallowMenuCommand Comma
 	using A = ETallowMenuAction;
 	if (bAwaitingAction || !Commands().Contains(Command) || !IsEnabled(Command)) return {};
 	Selection = Commands().IndexOfByKey(Command);
+	if (Command == C::BabyMode || Command == C::Vibration || Command == C::InvertLook || Command == C::InvertMove || Command == C::HiddenVoice || Command == C::Volume || Command == C::Brightness) return {};
 	if (Command == C::Back || Command == C::Cancel) { ReturnHome(); return {}; }
 	if (Command == C::Confirm)
 	{

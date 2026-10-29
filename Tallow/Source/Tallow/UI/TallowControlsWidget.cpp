@@ -1,5 +1,8 @@
 #include "UI/TallowControlsWidget.h"
 #include "Player/TallowCharacter.h"
+#include "UI/Presentation/TallowPaper.h"
+#include "Input/TallowInputPrompts.h"
+#include "Input/TallowInputDeviceSubsystem.h"
 #include "Candle/TallowCandleComponent.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
@@ -24,17 +27,20 @@ int32 UTallowControlsWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	const bool bHasCandle = Candle && Candle->IsAcquired();
 	const bool bLit = bHasCandle && Candle->GetCandleState() != ECandleState::Out;
 
+	// The keyboard words stay as they were; the pad shows the PlayStation labels.
+	const bool bPad = UTallowInputDeviceSubsystem::GetCurrent(this) == ETallowInputDevice::Gamepad;
+	auto Word = [bPad](ETallowPromptAction Action, const TCHAR* Keyboard) { return bPad ? TallowInputPrompts::Get(Action, ETallowInputDevice::Gamepad).Label.ToString() : FString(Keyboard); };
 	TArray<TPair<FString, FString>> Rows;
-	if (!bHasCandle) Rows.Add({TEXT("E"), TEXT("Pick up the candle")});
+	if (!bHasCandle) Rows.Add({Word(ETallowPromptAction::Interact, TEXT("E")), TEXT("Pick up the candle")});
 	else
 	{
-		Rows.Add({TEXT("R"), bLit ? TEXT("Blow out candle (hides you)") : TEXT("Strike a match (noisy)")});
-		if (bLit) Rows.Add({TEXT("RMB"), TEXT("Cup the flame (dimmer)")});
-		Rows.Add({TEXT("E"), TEXT("Use / interact")});
+		Rows.Add({Word(ETallowPromptAction::Relight, TEXT("R")), bLit ? TEXT("Blow out candle (hides you)") : TEXT("Strike a match (noisy)")});
+		if (bLit) Rows.Add({Word(ETallowPromptAction::Cup, TEXT("RMB")), TEXT("Cup the flame (dimmer)")});
+		Rows.Add({Word(ETallowPromptAction::Interact, TEXT("E")), TEXT("Use / interact")});
 	}
-	Rows.Add({TEXT("F"), TEXT("Hold still")});
-	Rows.Add({TEXT("Shift"), bLit ? TEXT("Sprint (snuffs the candle)") : TEXT("Sprint")});
-	Rows.Add({TEXT("Ctrl"), TEXT("Crouch")});
+	Rows.Add({Word(ETallowPromptAction::HoldBreath, TEXT("F")), TEXT("Hold still")});
+	Rows.Add({Word(ETallowPromptAction::Run, TEXT("Shift")), bLit ? TEXT("Sprint (snuffs the candle)") : TEXT("Sprint")});
+	Rows.Add({Word(ETallowPromptAction::Crouch, TEXT("Ctrl")), TEXT("Crouch")});
 
 	const FSlateFontInfo KeyFont = FCoreStyle::GetDefaultFontStyle("Bold", 11);
 	const FSlateFontInfo TextFont = FCoreStyle::GetDefaultFontStyle("Regular", 11);

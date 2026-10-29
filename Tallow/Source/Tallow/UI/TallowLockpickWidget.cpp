@@ -4,6 +4,10 @@
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Tasks/TallowLockpickGame.h"
+#include "Blueprint/WidgetTree.h"
+#include "UI/Presentation/TallowPaper.h"
+#include "Input/TallowInputPrompts.h"
+#include "Input/TallowInputDeviceSubsystem.h"
 
 void UTallowLockpickWidget::InitializeLockpickWidget(UTallowLockpickGame* InGameComponent)
 {
