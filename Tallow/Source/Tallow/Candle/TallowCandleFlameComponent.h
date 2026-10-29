@@ -61,6 +61,9 @@ public:
 	float LumensOverride = 0.f;
 
 private:
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> NavigationSpill;
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> PresentationLight;
+	float SpillAlpha = 0.f;
 	UPROPERTY(Transient) TObjectPtr<UAudioComponent> Breath;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> HeldCandle;
 	UPROPERTY(Transient) TObjectPtr<UTallowControlsWidget> Controls;
@@ -70,6 +73,7 @@ private:
 	float BaseIntensity = 0.f;
 	FVector BaseLocation = FVector::ZeroVector;
 	float Gutter = 0.f;
+	float Seen = 0.f;
 	float Time = 0.f;
 	float DropoutTimer = 0.f;
 	bool bExternalPresentation = false;

@@ -29,6 +29,10 @@ public:
 	bool IsInteracting() const { return bIsHoldingInteract; }
 	UFUNCTION(BlueprintPure, Category="Interact")
 	AActor* GetInteractionTarget() const { return CurrentInteractTarget.Get(); }
+	UFUNCTION(BlueprintPure, Category="Interact")
+	float GetInteractionProgress() const { return TargetHoldDuration > 0.f ? FMath::Clamp(CurrentHoldTime / TargetHoldDuration, 0.f, 1.f) : 0.f; }
+	FVector GetContactLocation() const { return ContactLocation; }
+	FVector GetContactNormal() const { return ContactNormal; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -48,14 +52,15 @@ protected:
 	float CurrentHoldTime = 0.0f;
 	
 	float TargetHoldDuration = 0.0f;
+	mutable FHitResult LastTraceHit;
+	FVector ContactLocation = FVector::ZeroVector;
+	FVector ContactNormal = FVector::ForwardVector;
 	
 	bool bIsHoldingInteract = false;
 	
 	bool bCanInteract = false;
 	
 	bool bIsHoldType = false;
-	
-	bool bHasProgress = false;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|UI")
 	TSubclassOf<UTallowInteractWidget> HoldProgressWidgetClass;
@@ -72,8 +77,6 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interact|Tunables")
 	float HoldLookThreshold = 0.8f;
-	
-	FText CachedPrompt;
 	
 	void DoHoverCheck();
 	

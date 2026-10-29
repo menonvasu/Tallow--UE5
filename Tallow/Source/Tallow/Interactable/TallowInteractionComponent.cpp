@@ -5,8 +5,6 @@
 #include "IInteractable.h"
 #include "Player/TallowCharacter.h"
 #include "Environment/TallowHideVolume.h"
-#include "Tasks/TallowChairEscape.h"
-#include "Tasks/TallowCrowbarPickup.h"
 #include "Tasks/TallowLockpickGame.h"
 
 UTallowInteractionComponent::UTallowInteractionComponent()
@@ -88,6 +86,7 @@ AActor* UTallowInteractionComponent::RunRaycast() const
 	// if hit - return actor
 	if (bHit)
 	{
+		LastTraceHit = HitResult;
 		return HitResult.GetActor();
 	}
 	
@@ -110,87 +109,78 @@ void UTallowInteractionComponent::DoHoverCheck()
 		return;
 	}
 
-	// pick the target: hide volume if hidden, otherwise whatever the raycast hits
-	AActor* Target = nullptr;
-	bool bFromHideVolume = false;
+	// minigame open: no prompt
+	if (Player)
+	{
+		if (UTallowLockpickGame* LockpickGame = Player->GetLockpickComponent())
+		{
+			if (LockpickGame->IsInMinigame())
+			{
+				CurrentHoverActor = nullptr;
+				if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
+				return;
+			}
+		}
+	}
 	
-	// if hidden 
+	// if hidden - call hidden prompt without raycast
 	if (Player && Player->IsHiddenInSpot())
 	{
 		if (ATallowHideVolume* HideVolume = Player->GetCurrentHideVolume())
 		{
-			Target = HideVolume;
-			bFromHideVolume = true;
+			if (HideVolume == CurrentHoverActor.Get()) return;
+			CurrentHoverActor = HideVolume;
+			FText Prompt = IInteractable::Execute_GetInteractionPromptText(HideVolume, GetOwner());
+			if (HoldProgressWidgetInstance)
+			{
+				HoldProgressWidgetInstance->ShowPrompt(Prompt, false, true);	
+			}
+			return;
 		}
 	}
-	if (!Target)
-	{
-		AActor*HitActor = RunRaycast();
-		if (HitActor && HitActor->Implements<UInteractable>())
-		{
-			Target = HitActor;
-		}
-	}
 	
-	// nothing to show
-	if (!Target)
+	AActor* HitActor = RunRaycast();
+	if (HitActor && HitActor->Implements<UInteractable>())
 	{
-		CurrentHoverActor = nullptr;
-		CachedPrompt = FText::GetEmpty();
-		bHasProgress = false;
-		if (HoldProgressWidgetInstance) { HoldProgressWidgetInstance->HidePrompt(); }
-		return;
-	}
-	
-	bool bNewCanInteract = true;
-	bool bNewIsHold = false;
-	FText NewPrompt = IInteractable::Execute_GetInteractionPromptText(Target, GetOwner());
-	
-	if (!bFromHideVolume)
-	{
-		bNewCanInteract = IInteractable::Execute_CanInteract(Target, GetOwner());
-		bNewIsHold = IInteractable::Execute_GetInteractionDuration(Target) > 0.0f;
+		// Task state can change while the player keeps looking at the same actor.
+		CurrentHoverActor = HitActor;
 		
-		// force interact to false if cupping flame
-		if (Player && Player->IsHandOccupied())
+		bCanInteract = IInteractable::Execute_CanInteract(HitActor, GetOwner());
+		
+		const float HoldDuration = IInteractable::Execute_GetInteractionDuration(HitActor);
+		bIsHoldType = HoldDuration > 0.0f;
+		
+		FText Prompt = IInteractable::Execute_GetInteractionPromptText(HitActor, GetOwner());
+	
+		// force interact to false if player cupping flame
+		if (Player)
 		{
-			bNewCanInteract = false;
-			bNewIsHold = false;
-			NewPrompt = FText::FromString(TEXT("HAND OCCUPIED"));
+			if (Player->IsHandOccupied())
+			{
+				bCanInteract = false;
+				bIsHoldType = false;
+				Prompt = FText::FromString(TEXT("HAND OCCUPIED"));	
+			}
+		}
+		
+		if (HoldProgressWidgetInstance)
+		{
+			const float TaskProgress=IInteractable::Execute_GetInteractionProgress(HitActor,GetOwner());
+			HoldProgressWidgetInstance->ShowPrompt(Prompt,bIsHoldType || TaskProgress>=0.f,bCanInteract);
+			if (!bIsHoldingInteract) HoldProgressWidgetInstance->SetHoldProgress(FMath::Max(0.f,TaskProgress));
 		}
 	}
-	
-	float NewProgress = -1.0f;
-	if (!bFromHideVolume && bNewCanInteract)
+	else
 	{
-		NewProgress = IInteractable::Execute_GetInteractionProgress(Target, GetOwner());
-	}
-	const bool bNewHasProgress  = NewProgress >= 0.0f;	
-	
-	if (bNewHasProgress && !bIsHoldingInteract && HoldProgressWidgetInstance)
-	{
-		HoldProgressWidgetInstance->SetHoldProgress(NewProgress);
-	}
-	
-	// only react if something changed
-	const bool bChanged = Target != CurrentHoverActor.Get() || bNewCanInteract != bCanInteract || bNewIsHold != bIsHoldType || bNewHasProgress != bHasProgress || !NewPrompt.EqualTo(CachedPrompt);
-	if (!bChanged) { return; }
-	
-	CurrentHoverActor = Target;
-	bCanInteract = bNewCanInteract;
-	bIsHoldType = bNewIsHold;
-	bHasProgress = bNewHasProgress;
-	CachedPrompt = NewPrompt;
-	
-	if (HoldProgressWidgetInstance)
-	{
-		if (NewPrompt.IsEmpty())
+		// clear if nothing hit and actor valid
+		if (CurrentHoverActor.IsValid())
 		{
-			HoldProgressWidgetInstance->HidePrompt(); 
+			CurrentHoverActor = nullptr;
 		}
-		else
+		
+		if (HoldProgressWidgetInstance)
 		{
-			HoldProgressWidgetInstance->ShowPrompt(NewPrompt, bNewIsHold || bNewHasProgress, bNewCanInteract);
+			HoldProgressWidgetInstance->HidePrompt();
 		}
 	}
 }
@@ -206,11 +196,15 @@ void UTallowInteractionComponent::StartInteract()
 		// if < 0.0s run tap interact
 		if (Duration <= 0.0f)
 		{
-			IInteractable::Execute_OnInteract(HitActor, GetOwner());	
+			IInteractable::Execute_OnInteract(HitActor, GetOwner());
+			CurrentHoverActor=nullptr;
+			DoHoverCheck();	
 		}
 		// hold interact
 		else
 		{
+			ContactLocation = LastTraceHit.ImpactPoint;
+			ContactNormal = LastTraceHit.ImpactNormal;
 			IInteractable::Execute_OnInteractStart(HitActor, GetOwner());
 			
 			CurrentInteractTarget = HitActor;
@@ -226,7 +220,7 @@ void UTallowInteractionComponent::StartInteract()
 void UTallowInteractionComponent::UpdateHoldStep()
 {
 	// if not valid or distance too far, cancel
-	if (!CurrentInteractTarget.IsValid())
+	if (!CurrentInteractTarget.IsValid() || !IInteractable::Execute_CanInteract(CurrentInteractTarget.Get(), GetOwner()))
 	{
 		CancelInteract();
 		return;
@@ -284,6 +278,7 @@ void UTallowInteractionComponent::UpdateHoldStep()
 			CurrentHoverActor = nullptr; // Invalidate the cache
 			DoHoverCheck();
 		}
+		return;
 	}
 }
 

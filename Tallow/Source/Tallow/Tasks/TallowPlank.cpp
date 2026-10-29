@@ -56,6 +56,10 @@ void ATallowPlank::OnInteractStart_Implementation(AActor* Interactor)
 
 void ATallowPlank::OnInteractComplete_Implementation(AActor* Interactor)
 {
+	if (bBroken) return;
+	// The nail snap is real evidence, even when the final hold tick fell between noise pulses.
+	if (auto* Noise = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
+		Noise->EmitNoise(ETallowNoiseType::Pry, GetActorLocation(), Interactor, PlankPryLoudness, true);
 	// broadcast broken anim & sound
 	bBroken = true;
 	OnPlankDestroyed.Broadcast(bBroken);
@@ -67,7 +71,11 @@ void ATallowPlank::OnInteractComplete_Implementation(AActor* Interactor)
 		PlankMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECR_Ignore);
 		PlankMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 		PlankMesh->SetSimulatePhysics(true);
-		PlankMesh->AddImpulse(GetActorForwardVector() * 300.0f, NAME_None, true);
+		// Off the door, away from whoever pried it: actor forward is the plank's
+		// length on some doors, which slid broken boards sideways along the frame.
+		FVector Away = GetActorLocation() - (Interactor ? Interactor->GetActorLocation() : GetActorLocation());
+		Away.Z = 0.f;
+		PlankMesh->AddImpulse(Away.GetSafeNormal() * 300.0f + FVector(0.f, 0.f, 60.f), NAME_None, true);
 	}
 	
 	if (TargetDoor)

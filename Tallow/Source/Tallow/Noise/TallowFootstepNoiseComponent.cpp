@@ -3,6 +3,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/TallowCharacter.h"
 
 UTallowFootstepNoiseComponent::UTallowFootstepNoiseComponent()
 {
@@ -57,6 +58,9 @@ void UTallowFootstepNoiseComponent::EmitStep()
 	{
 		return;
 	}
+
+	// Holding your breath is dead silent, creeping steps included (25 Oct).
+	if (const auto* Tallow = Cast<ATallowCharacter>(OwnerCharacter); Tallow && Tallow->IsHoldingStill()) return;
 
 	ETallowNoiseType Type = ETallowNoiseType::Footstep;
 	if (OwnerCharacter->bIsCrouched)

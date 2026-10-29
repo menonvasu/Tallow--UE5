@@ -20,6 +20,7 @@ class TALLOW_API ATallowPlank : public AActor, public IInteractable
 public:
 	/** Sets default properties */
 	ATallowPlank();
+	bool IsBroken() const { return bBroken; }
 
 	virtual float GetInteractionDuration_Implementation() const override;
 	
@@ -38,6 +39,10 @@ public:
 	virtual void ResetPlankState();
 	void SetChapterRetired(bool bRetired);
 	
+	/** Optional barricades open side routes without enlarging the final escape requirement. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Barricade")
+	bool bRequiredForEscape = true;
+
 	/** Plank breaking loudness */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Plank|Tunables")
 	float PlankPryLoudness = 0.8f;

@@ -104,6 +104,15 @@ void ATallowPlayDirector::InitializeGameplay()
 	ActorSpawnedHandle = GetWorld()->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &ATallowPlayDirector::OnActorSpawned));
 	BindGameplayEvents();
 	AddFootsteps();
+	Soundscape = NewObject<UTallowSoundscapeComponent>(this, TEXT("Soundscape"));
+	Soundscape->RegisterComponent();
+	Soundscape->Setup(Player, Keeper);
+	// What a first-time player has to understand, told once by Nell, and her held breath made something you feel.
+	auto* NellNotes = NewObject<UTallowNellNotesComponent>(this, TEXT("NellNotes"));
+	AddInstanceComponent(NellNotes); NellNotes->RegisterComponent(); NellNotes->Setup(this, Player, Keeper, Soundscape);
+	auto* Breath = NewObject<UTallowBreathFeedbackComponent>(Player, TEXT("BreathFeedback"));
+	Player->AddInstanceComponent(Breath); Breath->RegisterComponent(); Breath->Setup(Player);
+	if (auto* Waltz = UTallowOpeningMusicSubsystem::GetOpeningMusic(this)) Waltz->NoteHouseBegun(Player->IsTiedToChair());
 	SetKeeperAwake(false);
 	SetPowerVisuals(false);
 	if (UTallowChapterSubsystem::ShouldRunChapters())
@@ -159,6 +168,9 @@ void ATallowPlayDirector::InitializeGameplay()
 		HeldTool->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		HeldTool->SetOnlyOwnerSee(true); HeldTool->SetCastShadow(false);
 		HeldTool->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+		// The hands and the candle sit on lighting channel 1, lit by the presentation light. The tool was left on
+		// channel 0, so the real candle light a few centimetres away blew the crowbar out to flat white.
+		HeldTool->SetLightingChannels(false, true, false);
 		Player->AddInstanceComponent(HeldTool); HeldTool->RegisterComponent();
 	}
 	if (MatchMesh && RelightClip && Presentation->SetPresentationPose(RelightClip, MatchCalibrationTime))

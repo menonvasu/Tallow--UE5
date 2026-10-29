@@ -16,12 +16,18 @@ enum class ECandleState : uint8
 	Cupped
 };
 
+UENUM(BlueprintType)
+enum class ETallowCandleFuelStage : uint8 { Full, Medium, Low, Danger, Out };
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCandleFuelChanged, float, Fraction, ETallowCandleFuelStage, Stage);
+
 // delegates for events
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleStateChanged, ECandleState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRelightStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCandleGutteringChanged, bool, bIsGuttering);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAcquireCandle);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCandleReset);
+/** Matches in the box changed (picked up a box, struck one), or a strike failed with none left. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMatchesChanged, int32, Count, bool, bTriedWithNone);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TALLOW_API UTallowCandleComponent : public UActorComponent
@@ -31,6 +37,14 @@ class TALLOW_API UTallowCandleComponent : public UActorComponent
 public:	
 	/** Sets default values for this component's properties */
 	UTallowCandleComponent();
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
+	UFUNCTION(BlueprintPure, Category="Candle|Wax") float GetWaxFraction() const { return WaxFraction; }
+	UFUNCTION(BlueprintPure, Category="Candle") bool IsRelighting() const { return GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle); }
+	UFUNCTION(BlueprintPure, Category="Candle|Wax") ETallowCandleFuelStage GetFuelStage() const;
+	UFUNCTION(BlueprintCallable, Category="Candle|Wax") void AddWax(float Fraction);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Candle|Wax", meta=(ClampMin="1")) float BurnDurationSeconds = 600.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Candle|Wax", meta=(ClampMin="0.1",ClampMax="1")) float CuppedBurnMultiplier = .6f;
+	UPROPERTY(BlueprintAssignable, Category="Candle|Events") FOnCandleFuelChanged OnFuelChanged;
 
 	/** Set candle state*/
 	UFUNCTION(BlueprintCallable, Category = "Candle")
@@ -81,12 +95,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Candle")
 	bool IsAcquired() const { return bIsAcquired; }
 
+	/** Ending B (TALLOW-LORE.md): Nell snuffs Maisie's candle and leaves it in the collection. It stays out and
+	 *  can't be relit; she is still "holding the dark" for everything that asks whether the candle is out. */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void GiveUp();
+
+	UFUNCTION(BlueprintPure, Category = "Candle")
+	bool IsGivenUp() const { return bGivenUp; }
+
 	UFUNCTION(BlueprintCallable, Category = "Candle")
 	void ResetCandle();
 
-	/** Helper: Reset match count */
+	/** A capture restarts the house, so the count goes back to none and the boxes go back out. */
 	UFUNCTION(BlueprintCallable, Category = "Candle")
-	void ResetMatchCount() { MatchCount = 3; }
+	void ResetMatchCount() { MatchCount = 0; OnMatchesChanged.Broadcast(MatchCount, false); }
+
+	/** Matchboxes around the house add to the count (25 Oct). */
+	UFUNCTION(BlueprintCallable, Category = "Candle")
+	void AddMatches(int32 Count) { MatchCount += FMath::Max(0, Count); OnMatchesChanged.Broadcast(MatchCount, false); }
+
+	UFUNCTION(BlueprintPure, Category = "Candle")
+	int32 GetMatchCount() const { return MatchCount; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
+	FOnMatchesChanged OnMatchesChanged;
 
 	/** Exposed delegate properties */
 	UPROPERTY(BlueprintAssignable, Category = "Candle|Events")
@@ -107,12 +139,16 @@ public:
     void RestoreForChapter(bool bAcquired, float Wax, int32 Matches, ECandleState State);
 
 protected:
+	UPROPERTY(VisibleInstanceOnly, Category="Candle|Wax") float WaxFraction = 1.f;
 	/** Current Candle state variable */
 	ECandleState CurrentState = ECandleState::Out;
 
 	/** Property for if acquired? */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Candle|State")
 	bool bIsAcquired = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Candle|State")
+	bool bGivenUp = false;
 
 	/** Pointers to character movement and light*/
 	UPROPERTY(VisibleAnywhere, Category = "Candle|Components")
@@ -137,8 +173,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
 	float RelightNoiseLoudness = 1.0f;
 
+	/** 25 Oct: you start with none; the matchbox by the candle gives 10 and others around the house add more. */
 	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
-	int32 MatchCount = 3;
+	int32 MatchCount = 0;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
+	bool bUnlimitedMatches = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Candle|Tuning")
 	float RelightDuration = 1.2f;

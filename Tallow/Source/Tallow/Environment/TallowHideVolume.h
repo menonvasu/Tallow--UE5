@@ -25,6 +25,13 @@ class TALLOW_API ATallowHideVolume : public AActor, public IInteractable
 public:
 	// Constructor
 	ATallowHideVolume();
+	virtual void Tick(float DeltaSeconds) override;
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	/** Also used before a capture reset, while this volume still owns the camera. */
+	UFUNCTION(BlueprintCallable, Category="Hide") void LeaveHidingSpot(bool bForce = false);
+	/** Hand camera ownership to the capture without teleporting to the normal exit. */
+	void ReleaseForCapture();
+	FVector GetEntryLocation() const { return EntryTransform.GetLocation(); }
 
 	// Hide Event
 	UPROPERTY(BlueprintAssignable, Category = "Hide|Events")
@@ -50,6 +57,11 @@ protected:
 	TWeakObjectPtr<APlayerController> CachedPC;
 
 	bool bIsHidden = false;
+	FTransform EntryTransform;
+	TEnumAsByte<ECollisionEnabled::Type> SavedCollision = ECollisionEnabled::QueryAndPhysics;
+	uint8 SavedMovementMode = 1;
+	bool bSavedControllerYaw = true;
+	bool bForceExit = false;
 
 	/** Camera limits */
 	float CachedPitchMin = 0.0f;
@@ -72,5 +84,5 @@ protected:
 	void ExitHiddenSpot(APlayerController* PC);
 
 	/** Handles rare cases */
-	void EndPlay(const EEndPlayReason::Type EndPlayReason);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };

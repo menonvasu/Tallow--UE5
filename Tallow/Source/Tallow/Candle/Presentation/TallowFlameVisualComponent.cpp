@@ -69,14 +69,17 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 		return;
 	}
 	const float Dt = FMath::Max(DeltaTime, 0.f);
-	Elapsed += Dt;
+	const auto* Holder = bStandalone ? nullptr : Cast<ATallowCharacter>(GetOwner());
+	Calm = FMath::FInterpConstantTo(Calm, Holder && Holder->IsHoldingStill() ? 1.f : 0.f, Dt, Holder && Holder->IsHoldingStill() ? 2.5f : 4.f);
+	// A held breath slows the flame's own flutter; the strain shakes it again (below).
+	Elapsed += Dt * (1.f - .8f * Calm);
 	float TargetExposure = StandaloneExposure;
 	if (!bStandalone)
 	{
 		TargetExposure = CandleSource->IsGuttering() ? 1.f : (CandleSource->IsInDraft() ? .85f : 0.f);
 		if (IsValid(GutterSource)) TargetExposure = FMath::Max(TargetExposure, GutterSource->GetGutterAmount());
 	}
-	Exposure = FMath::FInterpTo(Exposure, FMath::Clamp(TargetExposure, 0.f, 1.f), Dt, 8.f);
+	Exposure = FMath::FInterpTo(Exposure, FMath::Clamp(TargetExposure * (1.f - .55f * Calm), 0.f, 1.f), Dt, 8.f);
 	IgnitionRemaining = FMath::Max(0.f, IgnitionRemaining - Dt);
 	const auto Shape = TallowFlameVisual::Evaluate(Elapsed + PhaseOffset, Exposure, State == ECandleState::Cupped, IgnitionRemaining / .25f);
 	const float Height = FMath::Clamp(HeightCm, .1f, 20.f);

@@ -39,6 +39,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Tallow|Player Presentation")
 	void StopPresentationPlayback();
 
+	/** Scales every clip's rate: the hands go still while she holds her breath (UTallowBreathFeedbackComponent). */
+	UPROPERTY(Transient, BlueprintReadWrite, Category="Tallow|Player Presentation")
+	float PlaybackRateScale = 1.f;
+
 	/** Sample the calibrated Hold pose first. Place prop in camera space, then retain that transform on the hand. */
 	UFUNCTION(BlueprintCallable, Category="Tallow|Player Presentation")
 	bool AttachHeldCandleToHand(FName HandBone, const FTransform& CandleRelativeToCamera);
