@@ -130,6 +130,10 @@ protected:
 	float BreathRecovery = 0.f;
 	bool bBreathForced = false;
 	void UpdateHeldBreath(float DeltaSeconds);
+	/** The run that leaves her panting: how long she has sprinted, and until when she pants. */
+	void UpdatePanting(float DeltaSeconds);
+	float SprintedSeconds = 0.f;
+	double PantUntil = -100.0, NextPantNoise = 0.0;
 	/** Child-scale gait on the camera: a dip on each footfall and a slight roll from side to side. */
 	void UpdateWalkBob(float DeltaSeconds);
 	float WalkBobDistance = 0.f;
@@ -259,6 +263,17 @@ public:
 	/** 0 until the strain begins, 1 at the moment she has to let go. */
 	UFUNCTION(BlueprintPure, Category = "Player|Breath") float GetHeldStrain() const;
 	UPROPERTY(BlueprintAssignable, Category = "Player|Event") FOnBreathReleased OnBreathReleased;
+	/** 29 Oct: with Mim this close the held breath runs out faster (up to this many times quicker, right on her). */
+	UPROPERTY(EditAnywhere, Category = "Player|Breath") float BreathCloseDrain = 1.5f;
+	/** Out of breath after a run: a few seconds after she stops sprinting she pants, louder than her breathing, and
+	 *  the Keeper can hear it close by. Holding her breath (F) stops it. */
+	UPROPERTY(EditAnywhere, Category = "Player|Breath") float PantAfterSprintSeconds = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "Player|Breath") float PantLoudness = .35f;
+	UPROPERTY(EditAnywhere, Category = "Player|Breath") float PantRange = 700.f;
+	UFUNCTION(BlueprintPure, Category = "Player|Breath") bool IsPanting() const;
+	/** How far the Keeper is (cm), written by its brain every tick it thinks; stale after half a second. */
+	float KeeperDistance = 1.e6f;
+	double KeeperDistanceAt = -100.0;
 
 	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }

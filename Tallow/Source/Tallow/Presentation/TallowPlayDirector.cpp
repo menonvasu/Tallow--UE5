@@ -25,6 +25,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
+#include "AI/Hunter/TallowHunterCreature.h"
 #include "AI/Hunter/TallowHunterDirector.h"
 #include "GameMode/TallowGameMode.h"
 #include "Interactable/TallowInteractionComponent.h"
@@ -961,7 +962,9 @@ void ATallowPlayDirector::UpdateCaptureShot(float DeltaSeconds)
 	auto* Camera = Player->GetFirstPersonCameraComponent();
 	CaptureTime += DeltaSeconds;
 	const float T = CaptureTime;
-	const float Scale = Keeper->GetActorScale3D().GetAbsMin();
+	// Her drawn size (she is drawn larger than the body her movement plans for).
+	const auto* Hunter = Cast<ATallowHunterCreature>(Keeper.Get());
+	const float Scale = Hunter ? Hunter->GetVisibleBodyScale() : Keeper->GetActorScale3D().GetAbsMin();
 	const FVector BaseEye = CaptureBaseEye;
 	// Beats, in seconds from the capture (the clip's frames at 24 fps): the turn [0, Turn]; the dead-still stare
 	// from frame 8; the drive from frame 13 to the strike on frame 17, which takes the lens 15 S cm toward her and

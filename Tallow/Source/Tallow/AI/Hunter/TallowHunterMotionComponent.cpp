@@ -4,6 +4,7 @@
 #include "AI/Hunter/TallowHunterAnimInstance.h"
 #include "AI/Hunter/TallowMimAnimInstance.h"
 #include "AI/Hunter/TallowHunterCreature.h"
+#include "Audio/TallowKeeperVoiceComponent.h"
 #include "AI/Hunter/TallowHunterDirector.h"
 #include "AI/Hunter/TallowHunterTraversalComponent.h"
 #include "AI/Hunter/TallowHunterSearchAnchor.h"
@@ -2757,6 +2758,8 @@ void UTallowHunterMotionComponent::UpdatePlayback(float DeltaSeconds, float Spee
 
 void UTallowHunterMotionComponent::PlayPlant(const FVector& Where, bool bWall, float Speed)
 {
+    // A silent creep: her pats and drags stay quiet with the rest of her (the voice holds the creeping flag).
+    if (Creature && Creature->Voice && Creature->Voice->IsCreeping()) return;
     const float Now = GetWorld()->GetTimeSeconds();
     if (PlantSounds.IsEmpty())
     {
@@ -2814,7 +2817,8 @@ void UTallowHunterMotionComponent::UpdateRhythm(float Now, uint8 ModeByte)
         return;
     }
     const float Roll = FMath::FRand();
-    if (Roll < (bHunting ? .55f : .45f))
+    // Hunting a sound it stops to look less often and bursts more (it used to stop dead on most beats of a hunt).
+    if (Roll < (bHunting ? .3f : .45f))
     {
         // Stop dead, dip, and look somewhere off to the side, the way it would when it heard something.
         Rhythm = ERhythm::Pause;
@@ -2824,7 +2828,7 @@ void UTallowHunterMotionComponent::UpdateRhythm(float Now, uint8 ModeByte)
             + Creature->GetActorUpVector() * FMath::FRandRange(-60.f, 40.f);
         LookAt(PauseLook, RhythmUntil - Now);
     }
-    else if (Roll < (bHunting ? .8f : .65f))
+    else if (Roll < (bHunting ? .7f : .65f))
     {
         Rhythm = ERhythm::Burst;
         RhythmUntil = Now + FMath::FRandRange(.5f, 1.f);
@@ -2951,16 +2955,18 @@ void UTallowHunterMotionComponent::TickComponent(float DeltaSeconds, ELevelTick 
         const float NowSeconds = GetWorld()->GetTimeSeconds();
         const auto* Overseer = GetWorld()->GetSubsystem<UTallowHunterDirector>();
         const float Escalation = Overseer ? Overseer->GetSpeedMultiplier() : 1.f;
-        // The player sprints at 450. At full aggression it closes to just under that.
+        // The player sprints at 450 and walks at 250.
         const float Aggro = Overseer ? Overseer->GetAggression() : 0.f;
-        // 25 Oct: "really slow and strange when wandering, way too fast when chasing; you should be able to outrun
-        // it slightly". Exploring brisk and strong, investigating quicker, the chase under her sprint (450) and over
-        // her walk (250). Off the chase a predator's rhythm sets the pace: creep, stop and look, burst.
+        // 29 Oct: "Mim is really slow... I was running a lot and it was barely able to find me". The chase is now
+        // just over her sprint where the body fits the room (Normal posture, fit 1), under it in a tight one (fit .8)
+        // and well under it folded (Compact, fit .3 to .55): in a straight run it closes, and doors, crawls and tight
+        // turns are where she gets away. A hunt for a sound goes faster than her walk. Off the chase a predator's
+        // rhythm still sets the pace: creep, stop and look, burst.
         (void)Escalation;
         UpdateRhythm(NowSeconds, static_cast<uint8>(Mode));
         const float BaseSpeed = Mode == ETallowHuntMode::Pursue
-            ? FMath::Lerp(330.f, 345.f, Aggro) * FMath::Lerp(1.f, .93f, Fatigue) * (Hunter && Hunter->bCatchUp ? 1.15f : 1.f)
-            : (Mode == ETallowHuntMode::Investigate ? 230.f : Mode == ETallowHuntMode::Search ? 210.f
+            ? FMath::Lerp(470.f, 520.f, Aggro) * FMath::Lerp(1.f, .93f, Fatigue) * (Hunter && Hunter->bCatchUp ? 1.15f : 1.f)
+            : (Mode == ETallowHuntMode::Investigate ? 330.f : Mode == ETallowHuntMode::Search ? 260.f
                 : Mode == ETallowHuntMode::Ambush ? 200.f : 190.f)
                 * (Hunter ? Hunter->GetPaceScale() : 1.f) * RhythmScale();
         const float Pull = FMath::Lerp(.63f, 1.f, SupportStrength);
@@ -3005,7 +3011,9 @@ void UTallowHunterMotionComponent::TickComponent(float DeltaSeconds, ELevelTick 
         SmoothedMaxSpeed = FMath::FInterpTo(SmoothedMaxSpeed, DesiredSpeed, DeltaSeconds,
             DesiredSpeed < SmoothedMaxSpeed ? 12.f : (Rhythm == ERhythm::Burst ? 9.f : 4.f));
         auto* Movement = Creature->GetCharacterMovement(); Movement->MaxWalkSpeed = SmoothedMaxSpeed;
-        Movement->MaxAcceleration = (Mode == ETallowHuntMode::Pursue || Rhythm == ERhythm::Burst ? 650.f : 420.f)
+        // Off the mark fast once it has her: the old 650 (x.35 folded) took most of a second to reach a walk.
+        Movement->MaxAcceleration = (Mode == ETallowHuntMode::Pursue || Rhythm == ERhythm::Burst ? 1000.f
+            : Mode == ETallowHuntMode::Investigate ? 750.f : 420.f)
             * (bUsingMim ? FMath::Lerp(.35f, 1.f, FitSpeed) : 1.f);
         // It used to turn at 72 degrees a second, like a barge. It should whip round corners.
         Movement->RotationRate = FRotator(0, (Mode == ETallowHuntMode::Pursue ? 320.f

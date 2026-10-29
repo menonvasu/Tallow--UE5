@@ -66,6 +66,8 @@ struct FTallowArcTuning
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pacing") bool bAllowLies = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pacing") bool bAllowPassBy = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pacing") bool bAllowWatch = true;
+    /** The close call: it may be sent to search the room she keeps still in (once a hunt, never two hunts running). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pacing") bool bAllowCloseCall = false;
 };
 
 /** Chooses areas and encounter pacing. It never supplies a target actor to the hunter. */
@@ -111,6 +113,18 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") int32 Watches = 0;
     void NoteHiding();
     UFUNCTION(BlueprintPure, Category="Hunter") float GetAggression() const { return Aggression; }
+    /** The close call (29 Oct): she keeps dark (candle out or shielded), still and holding her breath, and it is
+     *  sent to search the room she is in, for real. The director chooses only the room, the way it chooses areas; it
+     *  never says where in the room she is, and the hunter's own senses decide what it finds. At most once a hunt, from
+     *  the fuse hunt (chapter two) on, never in two hunts running, never inside a protected moment, never at the peak. */
+    bool WantsCloseCall(const ATallowCharacter* Player) const;
+    bool TakeCloseCallRoom(const ATallowCharacter* Player, FName& OutRoom) const;
+    void NoteCloseCall();
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") int32 CloseCalls = 0;
+    /** Each rise out of the dormant house (a chapter's hunt, or its retry after a capture) is a new hunt. */
+    UFUNCTION(BlueprintPure, Category="Hunter|Pacing") int32 GetHuntNumber() const { return HuntNumber; }
+    /** Reviews only (the close-call check): forget the last close call, so the next hunt may have one. */
+    UFUNCTION(BlueprintCallable, Category="Hunter|Review") void ResetCloseCallsForReview() { LastCloseCallHunt = -10; }
 
     // --- The evening's arc (pacing pass) -------------------------------------------------------------
     static FTallowArcTuning TuningForAct(ETallowStoryAct InAct);
@@ -153,7 +167,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") int32 Hides = 0;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") float Menace = 0.f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") bool bBreather = false;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hunter") float MaxAbsenceSeconds = 28.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hunter") float MaxAbsenceSeconds = 20.f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") ETallowTensionPhase Phase = ETallowTensionPhase::Quiet;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter|Pacing") ETallowStoryAct Act = ETallowStoryAct::Dormant;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hunter") int32 PassBys = 0;
@@ -177,6 +191,7 @@ private:
     float NextDistanceQuery = 0.f;
     float WalkingDistance = 100000.f;
     int32 HintNumber = 0;
+    int32 HuntNumber = 0, LastCloseCallHunt = -10;
     float ProtectedUntil = 0.f;
     bool bReviewPinned = false, bActPinned = false;
     UPROPERTY() TMap<ETallowStoryAct, FTallowArcTuning> ActTuning;

@@ -197,7 +197,7 @@ float ATallowHunterAIController::UpdateClosing(float Distance, float DeltaSecond
     return AmbushClosing;
 }
 
-bool ATallowHunterAIController::HandleNoiseInAmbush(const FVector& Where, float Perceived)
+bool ATallowHunterAIController::HandleNoiseInAmbush(const FVector& Where, float Perceived, bool bLoud)
 {
     // Lying in wait it still answers every sound. One coming its way is her walking into it: it holds still and
     // turns its attention. One far off pulls it out to go and see.
@@ -208,7 +208,17 @@ bool ATallowHunterAIController::HandleNoiseInAmbush(const FVector& Where, float 
     // A heap or a hold does not turn its head to a sound (the body's heard turn would give the shape away).
     if (!bWaiting) FireEvent(ETallowKeeperEvent::Heard);
     Creature->HunterMotion->LookAt(Where + FVector(0, 0, 55), 1.2f);
-    if (Away < 1100.f)
+    // Her running round the house is not her walking into it (29 Oct: it sat waiting while he ran rings round
+    // it). A covered wait breaks and comes for anything loud that is not right on top of it; a heap or a hold keeps
+    // still for her unless she runs past well out of reach.
+    if (bLoud && !bWaiting && Away > 300.f)
+    {
+        bTravellingToAmbush = false; AmbushUntil = 0.f;
+        EnterMode(ETallowHuntMode::Investigate);
+        LastDecision = TEXT("Heard her run: leaving the ambush");
+        return false;
+    }
+    if (Away < (bLoud ? 700.f : 1100.f))
     {
         LastDecision = bWaiting ? TEXT("Heard her coming: holding still") : TEXT("Heard her: still going to wait for her");
         return true;
