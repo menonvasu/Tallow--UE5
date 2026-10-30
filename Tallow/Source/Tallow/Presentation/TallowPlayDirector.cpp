@@ -1408,6 +1408,7 @@ void ATallowPlayDirector::EndPlay(const EEndPlayReason::Type Reason)
 	if (PowerHum) PowerHum->Stop();
 	if (NellVoice) NellVoice->Stop();
 	if (ActorSpawnedHandle.IsValid()) GetWorld()->RemoveOnActorSpawnedHandler(ActorSpawnedHandle);
+	if (VignetteSpawnHandle.IsValid()) GetWorld()->RemoveOnActorSpawnedHandler(VignetteSpawnHandle);
 	if (SequencePlayer) { SequencePlayer->OnFinished.RemoveAll(this); SequencePlayer->Stop(); }
 	if (Presentation) Presentation->DisablePresentation();
 	if (Menu) Menu->RemoveFromParent();

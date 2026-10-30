@@ -13,6 +13,14 @@
 #include "Kismet/GameplayStatics.h"
 #include "Rendering/DrawElements.h"
 #include "Widgets/Layout/SBox.h"
+#include "HAL/IConsoleManager.h"
+
+namespace
+{
+	// 30 Oct playtest: no "it sees me" / "i can hear it" status in the corner any more; Mim's call, the candle and the
+	// house carry it. Kept for debugging only.
+	TAutoConsoleVariable<int32> CVarMimStatusHUD(TEXT("tallow.MimStatusHUD"), 0, TEXT("1 shows the old top-right Mim status words (debug only)."));
+}
 
 TSharedRef<SWidget> UTallowRunWidget::RebuildWidget()
 { SetVisibility(ESlateVisibility::HitTestInvisible); return SNew(SBox); }
@@ -79,7 +87,7 @@ int32 UTallowRunWidget::NativePaint(const FPaintArgs& A, const FGeometry& G, con
 		DrawThread(O,++L,G,At+FVector2D(-70,58)*S,At+FVector2D(70,57)*S,23,Alpha);L+=2;
 	}
 	// The cue responds to movement that exists in the world; no random danger flashes.
-	if (Mim.IsValid() && !Player->IsTiedToChair())
+	if (CVarMimStatusHUD.GetValueOnGameThread() != 0 && Mim.IsValid() && !Player->IsTiedToChair())
 	{
 		const float Distance=FVector::Dist(Mim->GetActorLocation(),Player->GetActorLocation());
 		// The eye means live sight only: the hunter writes bSeenByKeeper from a fresh clear
