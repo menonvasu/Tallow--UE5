@@ -19,4 +19,7 @@ public:
 
 	/** Constructor */
 	ATallowCameraManager();
+
+	/** No vignette anywhere (30 Oct): whatever a volume or the view target's camera asks for, the last word is zero. */
+	virtual void ApplyCameraModifiers(float DeltaTime, FMinimalViewInfo& InOutPOV) override;
 };

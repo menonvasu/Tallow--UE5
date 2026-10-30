@@ -295,6 +295,9 @@ private:
 	FTransform FilmReelHandTransform;
 	float ProjectorGestureUntil=0.f, ProjectorGestureDuration=.55f;
 	FDelegateHandle ActorSpawnedHandle;
+	/** No vignette in any map (30 Oct): volumes and cameras are zeroed at start, cameras a sequence spawns as they come. */
+	void ClearVignettes(AActor* Only = nullptr);
+	FDelegateHandle VignetteSpawnHandle;
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> Wick;
 	UPROPERTY(Transient) TObjectPtr<ULevelSequencePlayer> SequencePlayer;
 	UPROPERTY(Transient) TObjectPtr<ALevelSequenceActor> SequenceActor;

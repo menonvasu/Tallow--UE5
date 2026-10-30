@@ -85,6 +85,11 @@ void UTallowBeatPresenter::OnWorldBeginPlay(UWorld& InWorld)
         }
     // Loaded now, not at the first writing: a decal drawn before its shaders are ready shows as a black box.
     BloodMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatBloodWriting.M_BeatBloodWriting"));
+    // The eyelids too, and both finished now: a post-process pass used before its shaders are ready drew a blurred brown
+    // frame round the view for seconds (30 Oct), right as the restraint, the release and the chair game began.
+    if (BloodMaterial) BloodMaterial->EnsureIsComplete();
+    if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatEyelids.M_BeatEyelids")))
+    { Material->EnsureIsComplete(); Lids = UMaterialInstanceDynamic::Create(Material, this); }
 #if !UE_BUILD_SHIPPING
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsRehearse"))) RehearseStep = 0;
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsWords"))) { RehearseStep = 0; WordsChapter = 0; }
@@ -395,7 +400,8 @@ void UTallowBeatPresenter::StageRestraint(float T)
     const bool bTremble = (T > 2.f && T < 3.5f) || (T > 5.6f && T < 7.6f);
     // Warm with the light through them while they move; black once shut a moment; warm again as they part.
     const float Dark = FMath::Clamp((T - 3.8f) / .8f, 0.f, 1.f) * (1.f - FMath::Clamp((T - 5.45f) / .4f, 0.f, 1.f));
-    SetLids(Lid(RestraintLids, T), bTremble ? 1.f : 0.f, .45f, Dark, T > 5.6f ? 1.f - FMath::Clamp((T - 5.6f) / 2.2f, 0.f, 1.f) : 0.f);
+    // The lower lid opens with the upper one, and the waking blur is gone with them.
+    SetLids(Lid(RestraintLids, T), bTremble ? 1.f : 0.f, 5.f, Dark, T > 5.6f ? 1.f - FMath::Clamp((T - 5.6f) / .8f, 0.f, 1.f) : 0.f);
     if (Once(T, 1.6f)) SetMix(Muffle, true);
     if (Once(T, 1.8f) && TallowNellVoice::AllowVocalFx(TEXT("P_Gasp_01 restraint"))) Play(TEXT("/Game/Audio/Player/P_Gasp_01"), .35f, nullptr, .9f);
     if (Once(T, RestraintCut)) Cut();

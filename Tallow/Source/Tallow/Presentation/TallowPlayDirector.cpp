@@ -11,6 +11,8 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/PostProcessComponent.h"
+#include "Engine/PostProcessVolume.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Candle/Presentation/TallowFlameVisualComponent.h"
 #include "Candle/TallowCandleFlameComponent.h"
@@ -150,6 +152,12 @@ void ATallowPlayDirector::InitializeScene()
 
 	PC = UGameplayStatics::GetPlayerController(this, 0);
 	if (!PC || !PC->IsLocalController()) return;
+	ClearVignettes();
+	VignetteSpawnHandle = GetWorld()->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateWeakLambda(this, [this](AActor* Actor)
+	{
+		const TWeakObjectPtr<AActor> Spawned(Actor);
+		GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this, Spawned] { if (Spawned.IsValid()) ClearVignettes(Spawned.Get()); }));
+	}));
 	EnableInput(PC);
 	InputComponent->Priority = 10;
 	auto& PauseKey = InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ATallowPlayDirector::TogglePause);
@@ -338,6 +346,31 @@ void ATallowPlayDirector::ApplyPickupVisual(AActor* Actor, bool bPlaceOnSurface)
 	Visual->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	Visual->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
 	Visual->SetCollisionResponseToChannel(ECC_Pawn,ECR_Ignore);
+}
+
+void ATallowPlayDirector::ClearVignettes(AActor* Only)
+{
+	// The playable map's volumes ask for .08 (under the look's own zero) and the ending's cameras for .45. No vignette on
+	// anything, so every one of them is zeroed; in the game the camera manager also has the last word.
+	int32 Cleared = 0;
+	auto Clear = [&Cleared](FPostProcessSettings& Settings)
+	{
+		if (Settings.bOverride_VignetteIntensity && Settings.VignetteIntensity <= 0.f) return;
+		Settings.bOverride_VignetteIntensity = true; Settings.VignetteIntensity = 0.f; ++Cleared;
+	};
+	auto Visit = [&Clear](AActor* Actor)
+	{
+		if (!Actor) return;
+		if (auto* Volume = Cast<APostProcessVolume>(Actor)) Clear(Volume->Settings);
+		for (UActorComponent* Component : TInlineComponentArray<UActorComponent*>(Actor))
+		{
+			if (auto* Camera = Cast<UCameraComponent>(Component)) Clear(Camera->PostProcessSettings);
+			else if (auto* Post = Cast<UPostProcessComponent>(Component)) Clear(Post->Settings);
+		}
+	};
+	if (Only) Visit(Only);
+	else for (TActorIterator<AActor> It(GetWorld()); It; ++It) Visit(*It);
+	if (!Only || Cleared) UE_LOG(LogTemp, Display, TEXT("TALLOW_LOOK vignette cleared on %d settings%s"), Cleared, Only ? *FString::Printf(TEXT(" (%s)"), *Only->GetName()) : TEXT(""));
 }
 
 void ATallowPlayDirector::OnActorSpawned(AActor* Actor)

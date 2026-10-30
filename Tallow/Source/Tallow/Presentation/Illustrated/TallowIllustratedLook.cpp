@@ -18,6 +18,9 @@
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "GPUProfiler.h"
+#include "MaterialShared.h"
+#include "SceneInterface.h"
+#include "Materials/MaterialInterface.h"
 
 static TAutoConsoleVariable<int32> CVarIllustratedPreset(TEXT("Tallow.Illustrated.Preset"), -1,
     TEXT("-1 editor profile; 0 off; 1 subtle; 2 illustrated; 3 expressionist."));
@@ -87,8 +90,13 @@ void ATallowIllustratedLook::BeginPlay()
         Resolve = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Presentation/Illustrated10/M_TallowIllustrated.M_TallowIllustrated"));
     }
     if (!Tensor || !Resolve) { PostProcess->BlendWeight = 0.f; SetActorTickEnabled(false); return; }
+    // Finish their shaders now, under the load's black, instead of on first use (until then the engine draws the frame).
+    Tensor->EnsureIsComplete(); Resolve->EnsureIsComplete();
     Painter = UMaterialInstanceDynamic::Create(Resolve, this);
-    PostProcess->AddOrUpdateBlendable(Tensor, 1.f); PostProcess->AddOrUpdateBlendable(Painter, 1.f);
+    TensorPass = Tensor;
+    // Both passes wait at no weight until their shaders are ready (Tick); the grade itself applies at once.
+    PostProcess->AddOrUpdateBlendable(Tensor, 0.f); PostProcess->AddOrUpdateBlendable(Painter, 0.f);
+    bPainterlyLive = false; PainterlyWaitFrom = FPlatformTime::Seconds();
     ApplyGradeSettings();
     ProtectSubjects();
 }
@@ -114,9 +122,35 @@ void ATallowIllustratedLook::ProtectSubjects()
     }
 }
 
+bool ATallowIllustratedLook::ArePainterlyShadersReady() const
+{
+    const UWorld* World = GetWorld();
+    const EShaderPlatform Platform = World && World->Scene ? World->Scene->GetShaderPlatform() : GMaxRHIShaderPlatform;
+    for (const UMaterialInterface* Pass : {static_cast<const UMaterialInterface*>(TensorPass.Get()), static_cast<const UMaterialInterface*>(Painter.Get())})
+    {
+        // Caching from the shader cache and compiling both finished. (The "complete" flag never sets in the editor,
+        // where only the shaders a pass actually needs are compiled.)
+        const FMaterialResource* Resource = Pass ? const_cast<UMaterialInterface*>(Pass)->GetMaterialResource(Platform) : nullptr;
+        if (!Resource || !Resource->GetGameThreadShaderMap() || !Resource->IsCompilationFinished()) return false;
+    }
+    return true;
+}
+
 void ATallowIllustratedLook::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds); if (!Painter) return;
+    if (!bPainterlyLive)
+    {
+        const double Now = FPlatformTime::Seconds(), Waited = Now - PainterlyWaitFrom;
+        if (!ArePainterlyShadersReady()) QuietSince = -1.0;
+        else if (QuietSince < 0.0) QuietSince = Now;
+        if ((QuietSince >= 0.0 && Now - QuietSince >= .5) || Waited > PainterlyWaitSeconds)
+        {
+            bPainterlyLive = true;
+            PostProcess->AddOrUpdateBlendable(TensorPass, 1.f); PostProcess->AddOrUpdateBlendable(Painter, 1.f);
+            UE_LOG(LogTemp, Display, TEXT("TALLOW_LOOK painterly passes live after %.1fs%s"), Waited, Waited > PainterlyWaitSeconds ? TEXT(" (waited out)") : TEXT(""));
+        }
+    }
     const int32 Override = CVarIllustratedPreset.GetValueOnGameThread();
     const int32 Index = Override >= 0 ? FMath::Clamp(Override, 0, 3) : static_cast<int32>(Preset);
     PostProcess->BlendWeight = Index == 0 ? 0.f : 1.f;
