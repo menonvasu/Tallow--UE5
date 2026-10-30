@@ -42,7 +42,8 @@ void UTallowInventoryWidget::BuildEntries()
  if(const auto* C=Player->GetCandleComponent();C && C->IsAcquired())
  {
   const TCHAR* Wax=C->GetWaxFraction()>.65f?TEXT("full"):C->GetWaxFraction()>.35f?TEXT("medium"):C->GetWaxFraction()>.15f?TEXT("low"):TEXT("almost gone");
-  const FString Description=C->GetWaxFraction()<=0.f?TEXT("Burned down to the holder.\nFind a spare candle."):
+  const FString Description=!C->bBurnsDown?FString(C->GetCandleState()==ECandleState::Out?TEXT("The wick is black.\n[ {Relight} ]  strike a match"):TEXT("[ {Cup} ]  shield the flame\n[ {Relight} ]  put it out\n\nA shielded flame is harder to see.")):
+   C->GetWaxFraction()<=0.f?TEXT("Burned down to the holder.\nFind a spare candle."):
    FString::Printf(TEXT("wax: %s\n\n"),Wax)+(C->GetCandleState()==ECandleState::Out?TEXT("The wick is black.\n[ {Relight} ]  strike a match"):TEXT("[ {Cup} ]  shield the flame\n[ {Relight} ]  put it out\n\nShielding it saves wax."));
   Add(TEXT("the candle"),Description,M::Candle);Entries.Last().Amount=C->GetCandleState()==ECandleState::Out?0.f:1.f;
   Add(TEXT("matches"),FString::Printf(TEXT("%d left in the box.\n\nA struck match is loud.\nChoose your moment."),C->GetMatchCount()),M::Match);

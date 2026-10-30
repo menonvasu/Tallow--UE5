@@ -26,7 +26,7 @@ ETallowCandleFuelStage UTallowCandleComponent::GetFuelStage() const
 void UTallowCandleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
 {
     Super::TickComponent(DeltaTime,TickType,TickFunction);
-    if (!bIsAcquired || bGivenUp || CurrentState==ECandleState::Out) return;
+    if (!bIsAcquired || bGivenUp || CurrentState==ECandleState::Out || !bBurnsDown) return;
     const float Rate=CurrentState==ECandleState::Cupped ? FMath::Clamp(CuppedBurnMultiplier,.1f,1.f) : 1.f;
     WaxFraction=FMath::Max(0.f,WaxFraction-FMath::Max(DeltaTime,0.f)*Rate/FMath::Max(BurnDurationSeconds,1.f));
     if (WaxFraction<=0.f)
@@ -334,7 +334,8 @@ void UTallowCandleComponent::RestoreForChapter(bool bAcquired, float Wax, int32 
         Timers.ClearTimer(RelightTimerHandle); Timers.ClearTimer(SprintExtinguishTimerHandle); Timers.ClearTimer(DraftExtinguishTimerHandle);
     }
     bIsAcquired = bAcquired; bGivenUp = false; MatchStruckAt = -100.0;
-    WaxFraction = FMath::Clamp(Wax, 0.f, 1.f); MatchCount = FMath::Max(0, Matches);
+    // A save from before 31 Oct can carry a part-burned candle; with burning off it comes back whole.
+    WaxFraction = bBurnsDown ? FMath::Clamp(Wax, 0.f, 1.f) : 1.f; MatchCount = FMath::Max(0, Matches);
     ActiveDraftCount = 0;
     CurrentState = bAcquired && WaxFraction > 0.f ? State : ECandleState::Out;
     if (CachedMovementComponent) CachedMovementComponent->MaxWalkSpeed = DefaultWalkSpeed;
