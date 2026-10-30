@@ -98,7 +98,7 @@ private:
  void RevealNextCode();
  void PlaceDecal();
  void SetDigitVisible(bool bVisible);
- void EmitOperationNoise(AActor* Instigator, float Loudness);
+ void EmitOperationNoise(AActor* NoiseMaker, float Loudness);
  bool HasPower() const;
  EProjectorState CurrentState = EProjectorState::Empty;
  float ThreadProgress = 0.f, TimeSinceLastTap = 0.f, LockoutEndTime = 0.f;

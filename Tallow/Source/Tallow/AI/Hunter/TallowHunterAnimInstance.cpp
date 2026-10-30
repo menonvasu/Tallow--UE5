@@ -15,13 +15,13 @@
 #include "TwoBoneIK.h"
 
 bool UTallowHunterAnimInstance::PlayMotionClip(UAnimSequence* Clip, bool bLoop,
-    float Rate, float BlendSeconds, bool bMatchPhase)
+    float PlayRate, float BlendSeconds, bool bMatchPhase)
 {
     if (!Clip) return false;
     const bool Changed = GetActiveClip() != Clip;
     UAnimSequence* Previous = GetActiveClip();
     const float PreviousTime = GetPlaybackPosition();
-    if (!PlayClip(Clip, bLoop, Rate, BlendSeconds)) return false;
+    if (!PlayClip(Clip, bLoop, PlayRate, BlendSeconds)) return false;
     if (Changed)
     {
         bInterrupted = TransitionAge < TransitionDuration;
@@ -32,7 +32,7 @@ bool UTallowHunterAnimInstance::PlayMotionClip(UAnimSequence* Clip, bool bLoop,
         if (bMatchPhase && Previous && Previous->GetPlayLength() > UE_SMALL_NUMBER)
             SetPlaybackPosition((PreviousTime / Previous->GetPlayLength()) * Clip->GetPlayLength());
     }
-    MotionClip = Clip; MotionRate = Rate; bMotionLoop = bLoop;
+    MotionClip = Clip; MotionRate = PlayRate; bMotionLoop = bLoop;
     return true;
 }
 

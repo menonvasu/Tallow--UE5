@@ -96,7 +96,7 @@ USoundBase* UTallowScareDirector::LoadSound(const FString& Path)
 void UTallowScareDirector::PlayAt(const TCHAR* Path, const FVector& Where, float Volume, float Delay, bool bSilent)
 {
     if (bSilent) return;
-    PendingCues.Add({GetWorld()->GetTimeSeconds() + Delay, Path, Where, Volume});
+    PendingCues.Add({float(GetWorld()->GetTimeSeconds() + Delay), Path, Where, Volume});
 }
 
 bool UTallowScareDirector::PlaceSight(ETallowScarePlace Place, const FView& View, FSightPick& Out)

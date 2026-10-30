@@ -2071,7 +2071,7 @@ void ATallowHunterAIController::CacheDoors()
             {
                 // The actor sits at the hinge corner, 80 cm off the doorway; measure from the frame's centre instead.
                 const FVector Center = It->GetRootComponent() ? It->GetRootComponent()->Bounds.Origin : It->GetActorLocation();
-                Doors.Add({*It, Part, Part->GetRelativeRotation().Yaw, Center});
+                Doors.Add({*It, Part, float(Part->GetRelativeRotation().Yaw), Center});
             }
     // The power-locked route gates: their leaf blocks it and its sight, but the navmesh runs through them.
     for (TActorIterator<ATallowRouteGate> It(GetWorld()); It; ++It)

@@ -177,13 +177,13 @@ struct FTallowMimAnimProxy : FAnimInstanceProxy
             const int32 EyeRight = Mesh->GetBoneIndex(TEXT("eye_r"));
             if (HeadMesh && HeadMeshIndex != INDEX_NONE && EyeLeft != INDEX_NONE && EyeRight != INDEX_NONE)
             {
-                const FReferenceSkeleton& Skeleton = HeadMesh->GetRefSkeleton();
-                const auto& Reference = Skeleton.GetRefBonePose();
+                const FReferenceSkeleton& RefSkeleton = HeadMesh->GetRefSkeleton();
+                const auto& Reference = RefSkeleton.GetRefBonePose();
                 auto ReferenceCS = [&](int32 Index)
                 {
                     FTransform Transform = Reference[Index];
-                    for (int32 Parent = Skeleton.GetParentIndex(Index); Parent != INDEX_NONE;
-                        Parent = Skeleton.GetParentIndex(Parent)) Transform = Transform * Reference[Parent];
+                    for (int32 Parent = RefSkeleton.GetParentIndex(Index); Parent != INDEX_NONE;
+                        Parent = RefSkeleton.GetParentIndex(Parent)) Transform = Transform * Reference[Parent];
                     return Transform;
                 };
                 const FVector EyeCenter = (ReferenceCS(EyeLeft).GetLocation()
