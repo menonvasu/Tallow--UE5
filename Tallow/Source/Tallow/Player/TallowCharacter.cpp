@@ -467,7 +467,8 @@ void ATallowCharacter::DoCupEnd()
 
 void ATallowCharacter::DoRelight()
 {
-	if (!CandleComponent || !CandleComponent->IsAcquired()) return;
+	// Tied to the chair her hands are bound: no match (a strike here flared with no match in view).
+	if (!CandleComponent || !CandleComponent->IsAcquired() || IsTiedToChair()) return;
 	// R toggles: blow the candle out to hide from the Keeper, or strike a match to relight it
 	if (CandleComponent->GetCandleState() == ECandleState::Out) CandleComponent->StartRelighting();
 	else CandleComponent->SetCandleState(ECandleState::Out);

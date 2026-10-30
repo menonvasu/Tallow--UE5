@@ -60,6 +60,10 @@ public:
 	UStaticMeshComponent* GetVisualMesh() const { return Visual; }
 
 private:
+	/** 30 Oct: the candle's flame shows in the same frame its state changes, not on the next stepped (12 fps) tick, so its
+	 *  light (which the candle switches on in that frame) can never be seen ahead of it. */
+	UFUNCTION() void OnCandleState(ECandleState NewState);
+	void LogVisibility(bool bVisible) const;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Visual;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> Material;
 	float Elapsed = 0.f;

@@ -315,7 +315,9 @@ void ATallowPlayDirector::InitializeGameplay()
 	auto* Contact=NewObject<UTallowToolContactComponent>(Player,TEXT("ToolContact"));
 	Player->AddInstanceComponent(Contact);Contact->RegisterComponent();Contact->Setup(Player,Presentation,HeldTool);
 	UpdatePlayerAnimation();
-	if (PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.2f, FColor::Black, false, false);
+	// A Continue to a checkpoint stays black until the chapter has built the round there (it fades in itself).
+	const auto* Resuming = GetWorld()->GetSubsystem<UTallowChapterSubsystem>();
+	if (PC->PlayerCameraManager && !(Resuming && Resuming->IsHoldingViewForResume())) PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.2f, FColor::Black, false, false);
 }
 
 void ATallowPlayDirector::ApplyPickupVisual(AActor* Actor, bool bPlaceOnSurface)
@@ -747,7 +749,11 @@ void ATallowPlayDirector::OnRelight()
 	ForcedClip = RelightClip; ForcedUntil = GetWorld()->GetTimeSeconds() + 1.2f;
 	// Scratch and flare as the hand comes in; the wick takes when the match meets it (MatchCalibrationTime).
 	PlayCue(TEXT("P_Match_Strike"), .9f);   // recorded quiet (-33 dB RMS)
-	GetWorldTimerManager().SetTimer(CatchHandle, FTimerDelegate::CreateWeakLambda(this, [this] { PlayCue(TEXT("P_Candle_Catch"), .4f); }), MatchCalibrationTime, false);
+	GetWorldTimerManager().SetTimer(CatchHandle, FTimerDelegate::CreateWeakLambda(this, [this]
+	{
+		PlayCue(TEXT("P_Candle_Catch"), .4f);
+		UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE match at the wick f=%llu t=%.3f"), (unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
+	}), MatchCalibrationTime, false);
 }
 void ATallowPlayDirector::OnPower()
 {
