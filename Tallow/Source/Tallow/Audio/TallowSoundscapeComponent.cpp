@@ -273,7 +273,7 @@ void UTallowSoundscapeComponent::TickComponent(float DeltaTime, ELevelTick TickT
 		{
 			bPendingRelease=false;
 			AfterUntil=Now+ReliefSeconds;NoLiesUntil=FMath::Max(NoLiesUntil,AfterUntil+8.f);
-			if(Now-LastBreath>4.f){PlayPlayer(TEXT("P_Breath_Out"),.16f);LastBreath=Now;}
+			if(Now-LastBreath>4.f){TallowNellVoice::NoteBreath(TEXT("P_Breath_Out relief"));PlayPlayer(TEXT("P_Breath_Out"),.16f);LastBreath=Now;}
 		}
 	}
 	if(Level==ETallowTension::After) NoLiesUntil=FMath::Max(NoLiesUntil,Now+8.f);
@@ -607,7 +607,9 @@ void UTallowSoundscapeComponent::Gasp(float Now)
 	int32 Index = FMath::RandRange(0, 4);
 	if (Index == LastGaspIndex) Index = (Index + 1) % 5;
 	LastGaspIndex = Index; LastGasp = Now;
-	PlayPlayer(FString::Printf(TEXT("P_Gasp_%02d"), Index),.22f);
+	// Her gasps include the whimper and the alarm cry: voiced reactions, off with the rest of her noises (30 Oct).
+	const FString Name = FString::Printf(TEXT("P_Gasp_%02d"), Index);
+	if (TallowNellVoice::AllowVocalFx(*Name)) PlayPlayer(Name, .22f);
 }
 
 void UTallowSoundscapeComponent::UpdateVoice(float Now)
@@ -631,7 +633,9 @@ void UTallowSoundscapeComponent::NotifyCandleOut()
 
 void UTallowSoundscapeComponent::PlayEffort()
 {
-	if(!bCaught)PlayPlayer(FString::Printf(TEXT("P_Effort_%02d"),FMath::RandRange(0,2)),.16f);
+	if (bCaught) return;
+	const FString Name = FString::Printf(TEXT("P_Effort_%02d"), FMath::RandRange(0, 2));
+	if (TallowNellVoice::AllowVocalFx(*Name)) PlayPlayer(Name, .16f);
 }
 
 void UTallowSoundscapeComponent::NotifyCaught()

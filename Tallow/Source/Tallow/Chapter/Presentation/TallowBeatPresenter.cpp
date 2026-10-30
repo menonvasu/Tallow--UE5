@@ -1,4 +1,5 @@
 #include "Chapter/Presentation/TallowBeatPresenter.h"
+#include "Audio/TallowAudioPolicy.h"
 #include "Chapter/Presentation/TallowBloodWriting.h"
 #include "Chapter/TallowChapterSubsystem.h"
 #include "Chapter/TallowChairSpot.h"
@@ -395,10 +396,10 @@ void UTallowBeatPresenter::StageRestraint(float T)
     const float Dark = FMath::Clamp((T - 3.8f) / .8f, 0.f, 1.f) * (1.f - FMath::Clamp((T - 5.45f) / .4f, 0.f, 1.f));
     SetLids(Lid(RestraintLids, T), bTremble ? 1.f : 0.f, .45f, Dark, T > 5.6f ? 1.f - FMath::Clamp((T - 5.6f) / 2.2f, 0.f, 1.f) : 0.f);
     if (Once(T, 1.6f)) SetMix(Muffle, true);
-    if (Once(T, 1.8f)) Play(TEXT("/Game/Audio/Player/P_Gasp_01"), .35f, nullptr, .9f);
+    if (Once(T, 1.8f) && TallowNellVoice::AllowVocalFx(TEXT("P_Gasp_01 restraint"))) Play(TEXT("/Game/Audio/Player/P_Gasp_01"), .35f, nullptr, .9f);
     if (Once(T, RestraintCut)) Cut();
     // Under the lids: only her breath, and the house a long way off.
-    if (Once(T, 3.9f)) Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f);
+    if (Once(T, 3.9f)) { TallowNellVoice::NoteBreath(TEXT("P_Breath_Out restraint")); Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f); }
     if (Once(T, 5.4f)) SetMix(Muffle, false);
     if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .065f);
     if (T >= RestraintEnd) Finish();
