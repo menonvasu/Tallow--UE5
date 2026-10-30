@@ -501,6 +501,8 @@ void UTallowChapterSubsystem::ApplyBeatCut(const FTallowBeatContext& Context)
     {
         CloseOverlays(); ChosenChairTransform=Context.ChairTransform; Chair->ReleasePlayerQuietly();
         Chair->SetActorTransform(ChosenChairTransform,false,nullptr,ETeleportType::TeleportPhysics);
+        // Its meter and key stay hidden, and rocking does nothing, until Mim has gone (the release beat's end).
+        Chair->SetMinigameReady(false);
         Chair->SetRequiredRocks(GetChapterDefinition()->RestraintChairRocks); Chair->TiePlayerToChair(Player);
         auto* Candle=Player->GetCandleComponent();
         Candle->RestoreForChapter(Candle->IsAcquired(),Candle->GetWaxFraction(),Candle->GetMatchCount(),ECandleState::Out);
@@ -543,6 +545,10 @@ void UTallowChapterSubsystem::NotifyBeatFinished(ETallowChapterBeat Beat, int32 
         SetPhase(ETallowChapterPhase::Restraint,TEXT("TransformationFinished")); RequestBeat(ETallowChapterBeat::Restraint); break;
     case ETallowChapterBeat::Restraint:
         SetPhase(ETallowChapterPhase::HuntPreparation,TEXT("RestraintFinished")); RequestBeat(ETallowChapterBeat::HuntRelease); break;
+    case ETallowChapterBeat::HuntRelease:
+        // Mim has gone and the beat has let go of her: now the chair's meter and key fade in.
+        if (Chair && Director->GetPlayerCharacter()->IsTiedToChair()) Chair->SetMinigameReady(true);
+        break;
     case ETallowChapterBeat::FuseEvent:
         SetPhase(ETallowChapterPhase::ChapterTransition,TEXT("FuseEventFinished")); RequestBeat(ETallowChapterBeat::ChapterReset); break;
     case ETallowChapterBeat::FinalIntro: SetPhase(ETallowChapterPhase::ActiveHunt,TEXT("FinalIntroFinished")); break;

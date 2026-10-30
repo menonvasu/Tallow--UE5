@@ -614,6 +614,14 @@ void ATallowCharacter::UpdateHeldBreath(float DeltaSeconds)
 	DoStillnessEnd();
 }
 
+void ATallowCharacter::ClearKeeperAwareness()
+{
+	KeeperSight = 0.f; bSeenByKeeper = false; KeeperSeenFrom = FVector::ZeroVector; SeenCallAt = -100.f;
+	KeeperDistance = 1.e6f; KeeperDistanceAt = -100.0;
+	SprintedSeconds = 0.f; PantUntil = -100.0;
+	if (auto* Flame = FindComponentByClass<UTallowCandleFlameComponent>()) Flame->ClearSeen();
+}
+
 void ATallowCharacter::UpdatePanting(float DeltaSeconds)
 {
 	if (IsTiedToChair()) { SprintedSeconds = 0.f; PantUntil = -100.0; return; }
