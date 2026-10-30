@@ -1274,7 +1274,9 @@ float ATallowPlayDirector::SayAt(const FString& Name, const FString& Fallback, c
 	USoundBase* Line = Load(Name, TEXT("VO"));
 	if (!Line && !Fallback.IsEmpty()) Line = Load(Fallback, TEXT("Creature"));
 	if (!Line) return 0.f;
-	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s"), *Line->GetName());
+	// Her scripted lines from the dark get the same lift as everything else she says (30 Oct).
+	if (const auto* Voice = Keeper ? Keeper->FindComponentByClass<UTallowKeeperVoiceComponent>() : nullptr) Volume *= Voice->GetSpokenLift();
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s vol=%.2f"), *Line->GetName(), Volume);
 	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Line->GetFName(), Line->GetDuration(), ETallowSubtitleVoice::Mim);
 	UGameplayStatics::PlaySoundAtLocation(this, Line, Where, Volume, 1.f, 0.f, CueAttenuation);
 	return Line->GetDuration();

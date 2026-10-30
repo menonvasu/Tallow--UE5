@@ -45,7 +45,8 @@ namespace
         return Keys.Last().Y;
     }
     // Restraint: two heavy half-blinks that come back up, then the lids go all the way. Shut while she is tied. They
-    // part from a slit, the upper lid first, sink once, then hold open.
+    // part once, sink once, and are open. 30 Oct: they used to take two seconds to part from a slit, with the lower lid
+    // and the blur lagging behind, a dark frame round the chair as its game began that read as a vignette.
     const FVector2f RestraintLids[] = {{0.f, 0.f}, {.45f, 0.f}, {.9f, .52f}, {1.3f, .06f}, {1.7f, .1f}, {2.15f, .58f}, {2.45f, .5f},
         {2.8f, .16f}, {3.05f, .2f}, {3.6f, 1.f}, {5.6f, 1.f}, {5.95f, .9f}, {6.6f, .36f}, {6.95f, .46f}, {7.6f, 0.f}};
     constexpr float RestraintCut = 3.65f, RestraintEnd = 8.2f;

@@ -261,9 +261,11 @@ bool UTallowKeeperVoiceComponent::Say(ETallowKeeperLine Line, bool bForce)
 	}
 	if (!Cue) return false;
 	if (const float* Last = PlayedAt.Find(Cue->GetFName())) if (Now - *Last <= RepeatBlock) return false;
-	if (!Speak(Cue, Pool->Volume, FMath::FRandRange(.985f, 1.015f))) return false;
+	// Her words come up; the wordless breath pool stays at its level.
+	const float Volume = Pool->Volume * (Line == ETallowKeeperLine::Breath ? 1.f : SpokenLift());
+	if (!Speak(Cue, Volume, FMath::FRandRange(.985f, 1.015f))) return false;
 	if (bDemon) NextDemon = Now + Cue->GetDuration() + DemonCooldown;
-	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE %s %s"), *UEnum::GetValueAsString(Line), *Cue->GetName());
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE %s %s vol=%.2f"), *UEnum::GetValueAsString(Line), *Cue->GetName(), Volume);
 	PlayedAt.Add(Cue->GetFName(), Now);
 	Pool->Ready = Now + Pool->Gap * FMath::FRandRange(.8f, 1.4f);
 	if (!IsMoment(Line)) NextOrdinary = Now + OrdinaryGap * FMath::FRandRange(1.f, 1.5f);
@@ -278,8 +280,8 @@ bool UTallowKeeperVoiceComponent::SayLine(const FString& Name, const FString& Fa
 	USoundBase* Cue = Sound(Name);
 	if (!Cue && !Fallback.IsEmpty()) Cue = Sound(Fallback);
 	if (!Cue) return false;
-	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE Scripted %s"), *Cue->GetName());
-	if (!Speak(Cue, Volume)) return false;
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE Scripted %s vol=%.2f"), *Cue->GetName(), Volume * SpokenLift());
+	if (!Speak(Cue, Volume * SpokenLift())) return false;
 	NextAny = GetWorld()->GetTimeSeconds() + Cue->GetDuration() + 3.f;
 	return Speaking != nullptr;
 }
@@ -394,9 +396,11 @@ void UTallowKeeperVoiceComponent::PlayCapture()
 	{
 		if(!bCapturing)return;
 		USoundBase* Scream = Sound(TEXT("K_Mim_Capture_Scream"));
-		if (Scream) Speak(Scream, .25f);
-		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE CaptureStrike %s lead %.2fs class %s"), *GetNameSafe(Scream), ScreamLeadSeconds,
-			Speaking ? *GetNameSafe(Speaking->SoundClassOverride) : TEXT("none (no audio device)"));
+		// .25 before the 30 Oct lift; with the strike sting (peak 0 dBFS at .25) the frame peaks near -5 dBFS.
+		const float ScreamVolume = .25f * SpokenLift();
+		if (Scream) Speak(Scream, ScreamVolume);
+		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE CaptureStrike %s lead %.2fs class %s vol=%.2f"), *GetNameSafe(Scream), ScreamLeadSeconds,
+			Speaking ? *GetNameSafe(Speaking->SoundClassOverride) : TEXT("none (no audio device)"), ScreamVolume);
 		// Let the impact and scream end in silence. A spoken punchline or
 		// follow-up giggle turns the capture into a routine announcement.
 	};
@@ -415,7 +419,7 @@ void UTallowKeeperVoiceComponent::PlayCaptureGiggle()
 	const float Left = CaptureEndsAt - GetWorld()->GetTimeSeconds();
 	if (Laugh && Laugh->GetDuration() + .15f < Left)
 	{
-		Speak(Laugh, .54f);
+		Speak(Laugh, .54f * SpokenLift());
 		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE CaptureGiggle %s"), *Laugh->GetName());
 		GetWorld()->GetTimerManager().SetTimer(CaptureLineHandle, this,
 			&UTallowKeeperVoiceComponent::PlayCaptureLine, Laugh->GetDuration() + .2f, false);
@@ -430,7 +434,7 @@ void UTallowKeeperVoiceComponent::PlayCaptureLine()
 	const float Left = CaptureEndsAt - GetWorld()->GetTimeSeconds();
 	if (Mine && Mine->GetDuration() + .15f < Left)
 	{
-		Speak(Mine, Pools[ETallowKeeperLine::Capture].Volume);
+		Speak(Mine, Pools[ETallowKeeperLine::Capture].Volume * SpokenLift());
 		UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE CaptureHold %s"), *Mine->GetName());
 	}
 }
