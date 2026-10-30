@@ -12,6 +12,8 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	static UTallowSaveSubsystem* Get(const UObject* WorldContext);
 	UFUNCTION(BlueprintPure, Category="Save") bool HasContinue() const;
+	/** Which checkpoint Continue resumes at (None: the saved chapter's start). */
+	UFUNCTION(BlueprintPure, Category="Save") ETallowCheckpoint GetSavedCheckpoint() const { HasContinue(); return SavedCheckpoint; }
 	UFUNCTION(BlueprintCallable, Category="Save") bool PrepareContinue();
 	UFUNCTION(BlueprintCallable, Category="Save") void PrepareNewGame(int32 Seed = 0);
 	UFUNCTION(BlueprintCallable, Category="Save") void PrepareRestart(bool bFromEnding);
@@ -28,5 +30,6 @@ protected:
 	FString SaveDirectory;
 	mutable bool bContinueAvailable = false;
 	mutable bool bAvailabilityKnown = false;
+	mutable ETallowCheckpoint SavedCheckpoint = ETallowCheckpoint::None;
 	void RefreshAvailability();
 };

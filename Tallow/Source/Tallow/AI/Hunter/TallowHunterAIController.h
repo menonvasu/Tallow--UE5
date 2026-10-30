@@ -70,6 +70,10 @@ public:
     virtual void OnPossess(APawn* InPawn) override;
     virtual void Tick(float DeltaSeconds) override;
     UFUNCTION(BlueprintCallable, Category="Hunter") void ResetHunt();
+    /** Every round restart, rebuild and checkpoint load (30 Oct): the whole hunt state goes, not just its mode. Out of a
+     *  capture she used to keep Captured, her sight and evidence and the player's "seen" until the next hunt began.
+     *  Does not pause or resume the brain (the chapter's SetMimForm and StartHunt own that). */
+    UFUNCTION(BlueprintCallable, Category="Hunter") void ResetForRound();
     UFUNCTION(BlueprintCallable, Category="Hunter") void SetHuntEnabled(bool bEnabled);
     /** Stage locomotion reviews only while autonomous decisions are paused. */
     UFUNCTION(BlueprintCallable, Category="Hunter|Review") bool SetReviewMovementMode(ETallowHuntMode Mode);

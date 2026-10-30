@@ -632,6 +632,17 @@ void ATallowHunterAIController::ResetHunt()
     if (auto* Director = GetWorld()->GetSubsystem<UTallowHunterDirector>()) Director->ResetPressure();
 }
 
+void ATallowHunterAIController::ResetForRound()
+{
+    const bool bWasCaptured = HuntMode == ETallowHuntMode::Captured;
+    ResetHunt();
+    bWaitingForDoor = bPlayerWasHiding = bCatchUp = false; LastClearAt = -1000.f;
+    IntentEvent.Type = ETallowKeeperEvent::None;   // Count keeps rising: the motion component compares it
+    if (Creature && Creature->Voice) { Creature->Voice->SetLurking(false); Creature->Voice->SetCreeping(false); Creature->Voice->ResetVoice(); }
+    if (Player) Player->ClearKeeperAwareness();
+    UE_LOG(LogTemp, Display, TEXT("HUNTER_RESET round was_captured=%d mode=%d seen=%d"), bWasCaptured ? 1 : 0, int32(HuntMode), Player && Player->bSeenByKeeper ? 1 : 0);
+}
+
 void ATallowHunterAIController::SetHuntEnabled(bool bEnabled)
 {
     if (bEnabled) HunterBrain->ResumeLogic(TEXT("Preview enabled"));
