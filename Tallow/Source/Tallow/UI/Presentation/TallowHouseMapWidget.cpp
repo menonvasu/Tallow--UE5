@@ -67,8 +67,20 @@ public:
    if(R.Floor!=Floor.Get())continue;
    const bool Known=bReview||Map->KnowsRoom(R.Id);const FVector2D A=Point({R.Min.X,R.Max.Y})+FVector2D(4,4),B=Point({R.Max.X,R.Min.Y})-FVector2D(4,4);
    FLinearColor Ink=TallowPaper::Ink;Ink.A=Known?.95f:.32f;
-   
-   Text(Known?R.Label:TEXT("?"),(A+B)*.5f,Known?16:24,Ink,true);
+   // 31 Oct: the room she needs next is circled in red and named, seen or not. The room, never the spot in it.
+   const bool Marked=!bReview&&Map.IsValid()&&R.Id==Map->GetMarkedRoom();
+   if(Marked)
+   {
+    const FVector2D Mid=(A+B)*.5f,Radius=(B-A)*.5f+FVector2D(2,2);TArray<FVector2D>Loop;
+    // One quick pencil loop that runs past where it started.
+    for(int32 I=0;I<=26;++I)
+    {
+     const float T=-.6f+I*(2.f*PI+.45f)/26.f,Wobble=1.f+.05f*FMath::Sin(I*1.9f)+.04f*float(I)/26.f;
+     Loop.Add(Mid+FVector2D(FMath::Cos(T)*Radius.X*Wobble,FMath::Sin(T)*Radius.Y*Wobble));
+    }
+    FSlateDrawElement::MakeLines(O,L+3,G.ToPaintGeometry(),Loop,ESlateDrawEffect::None,MapRed,true,2.4f);
+   }
+   Text(Known||Marked?R.Label:TEXT("?"),(A+B)*.5f,Known||Marked?16:24,Marked?MapRed:Ink,true);
    if(Map.IsValid())if(const auto* Search=UTallowRoomSearchSubsystem::Get(Map.Get());Search&&Search->IsRunning()&&Search->GetRoomState(R.Id).bSearched)
     for(int32 I=0;I<3;++I)Line(FVector2D(B.X-24+I*6,A.Y+16),FVector2D(B.X-18+I*6,A.Y+6),MapPencil,1.2f);
    if(Map.IsValid()&&R.Id==Map->GetCurrentRoom())
@@ -157,7 +169,11 @@ TSharedRef<SWidget> UTallowHouseMapWidget::RebuildWidget()
  [SNew(SButton).ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder")).ContentPadding(0)
  .OnClicked_Lambda([this,I](){Floor=I;return FReply::Handled();})
  [SNew(SVerticalBox)
-  +SVerticalBox::Slot().AutoHeight()[SNew(STallowKeys).Text(FString::Printf(TEXT("[ %d ]  %s"),I+1,Names[I])).Font(Fell(Pt::Body)).Colour_Lambda([this,I](){return Floor==I?Ivory:Pencil;}).KeyColour_Lambda([this,I](){return Floor==I?Ivory:Pencil;})]
+  +SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
+   +SHorizontalBox::Slot().AutoWidth()[SNew(STallowKeys).Text(FString::Printf(TEXT("[ %d ]  %s"),I+1,Names[I])).Font(Fell(Pt::Body)).Colour_Lambda([this,I](){return Floor==I?Ivory:Pencil;}).KeyColour_Lambda([this,I](){return Floor==I?Ivory:Pencil;})]
+   // The floor that holds the circled room carries the same red o.
+   +SHorizontalBox::Slot().AutoWidth().Padding(10,0,0,0)[SNew(STextBlock).Text(FText::FromString(TEXT("o"))).Font(Child(Pt::Body)).ColorAndOpacity(MapRed)
+    .Visibility_Lambda([this,I](){const FTallowRoomDef* R=Map.IsValid()?TallowHouseRooms::Find(Map->GetMarkedRoom()):nullptr;return R&&R->Floor==I?EVisibility::HitTestInvisible:EVisibility::Collapsed;})]]
   +SVerticalBox::Slot().AutoHeight().Padding(40,2,0,0)[SNew(SBox).HeightOverride(8)[SNew(STallowThread).Seed(40+I).Shown_Lambda([this,I](){return Floor==I;})]]]];
  auto Page=SNew(SVerticalBox)
  +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,6)[SNew(STextBlock).Text(FText::FromString(TEXT("A PLAN OF THE HOUSE"))).Font(Caps(Pt::Label)).ColorAndOpacity(Pencil)]
@@ -166,7 +182,7 @@ TSharedRef<SWidget> UTallowHouseMapWidget::RebuildWidget()
  +SVerticalBox::Slot().FillHeight(1).Padding(0,18)
  [SNew(SHorizontalBox)+SHorizontalBox::Slot().FillWidth(.7f)[SNew(SScaleBox).Stretch(EStretch::ScaleToFit)[SNew(SHouseScribble).Map(Map).Review(bReview).Floor_Lambda([this](){return Floor;})]]
  +SHorizontalBox::Slot().FillWidth(.3f).Padding(36,28,0,0)[SNew(STextBlock).Text_Lambda([this](){return Map.IsValid()?FText::FromString(Map->GetClue()):FText::GetEmpty();}).Font(Child(Pt::Lead+2)).AutoWrapText(true).ColorAndOpacity(Ink)]]
- +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,16)[SNew(STextBlock).Text(FText::FromString(TEXT("x  locked        ///  boarded        tick  open        ?  not seen yet"))).Font(FellItalic(Pt::Small)).ColorAndOpacity(Pencil)]
+ +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,16)[SNew(STextBlock).Text(FText::FromString(TEXT("x  locked        ///  boarded        tick  open        ?  not seen yet        o  what i need"))).Font(FellItalic(Pt::Small)).ColorAndOpacity(Pencil)]
  +SVerticalBox::Slot().AutoHeight()[SNew(SHorizontalBox)
   +SHorizontalBox::Slot().FillWidth(1)[SNew(STallowKeys).Text_Lambda([this](){return FString::Printf(TEXT("[ %s ]  [ %s ]  another floor"),*TallowInputPrompts::GetCurrent(this,ETallowPromptAction::FloorPrev).Label.ToString(),*TallowInputPrompts::GetCurrent(this,ETallowPromptAction::FloorNext).Label.ToString());}).Font(FellItalic(Pt::Small)).Colour(Pencil).KeyColour(Ink)]
   +SHorizontalBox::Slot().AutoWidth()[SNew(SButton).OnClicked_Lambda([this](){Close();return FReply::Handled();}).ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder")).ContentPadding(0)

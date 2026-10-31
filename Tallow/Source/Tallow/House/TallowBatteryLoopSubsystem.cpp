@@ -54,7 +54,8 @@ void UTallowBatteryLoopSubsystem::PrepareRound(const FTallowChapterLayout& L,int
     }
     const auto* Player=Cast<ATallowCharacter>(UGameplayStatics::GetPlayerPawn(this,0)); PreviousCarried=Player?Player->GetInventoryCount(ECarriedItemType::Fuse):0;
     GetWorld()->GetTimerManager().SetTimer(InventoryTimer,this,&UTallowBatteryLoopSubsystem::PollInventory,.2f,true);
-    UE_LOG(LogTemp,Display,TEXT("TALLOW_BATTERY prepared installed=%d actor=%s spot=%s"),Installed,*GetNameSafe(Battery.Get()),*L.BatterySpot.ToString());
+    UE_LOG(LogTemp,Display,TEXT("TALLOW_BATTERY prepared installed=%d actor=%s spot=%s room=%s"),Installed,*GetNameSafe(Battery.Get()),*L.BatterySpot.ToString(),
+        *(BatterySpot.IsValid()?TallowHouseRooms::RoomAt(BatteryTransform.GetLocation()).ToString():FString(TEXT("none"))));
 }
 void UTallowBatteryLoopSubsystem::SeatBattery()
 {

@@ -9,6 +9,11 @@
 #include "CollisionQueryParams.h"
 #include "Candle/TallowCandleComponent.h"
 #include "House/TallowHouseRooms.h"
+#include "Chapter/TallowChapterSubsystem.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<float> CVarTallowGuardEvery(TEXT("tallow.GuardEvery"), 55.f,
+    TEXT("Seconds between Mim's walks through the room that holds what Nell needs next (0 = she never guards it)."), ECVF_Default);
 
 FTallowArcTuning UTallowHunterDirector::TuningForAct(ETallowStoryAct InAct)
 {
@@ -193,6 +198,8 @@ void UTallowHunterDirector::ResetPressure()
     LastNearby = Now;
     WalkingDistance = 100000.f;
     HintNumber = 0;
+    // A grace at the start of every hunt before the first guard walk.
+    NextGuardAt = Now + 30.f;
     PendingRelaxAt = CloseSince = -1.f;
     bWasClose = false;
     ProtectedUntil = 0.f;
@@ -458,6 +465,34 @@ void UTallowHunterDirector::UpdatePressure(float DeltaTime, ATallowCreature* Kee
     if (Phase != ETallowTensionPhase::Relax && Menace >= .93f && !bSeen) SetPhase(ETallowTensionPhase::Relax, Now);
 }
 
+bool UTallowHunterDirector::TakeGuardHint(ATallowCreature* Keeper, ATallowCharacter* Player, FVector& OutArea)
+{
+    // The map circles the room she needs, so it knows that room too. It walks through and moves on (the next hint
+    // comes a second after it arrives), never camps, never more than once a minute or so, only while it is calm or
+    // building, and never while she is already close to that room: it guards the place, it is not sent to her.
+    const float Every = CVarTallowGuardEvery.GetValueOnGameThread();
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (Every <= 0.f || Now < NextGuardAt || bBreather || IsReturnOverdue() || (Phase != ETallowTensionPhase::Quiet && Phase != ETallowTensionPhase::Build)) return false;
+    const auto* Chapters = UTallowChapterSubsystem::GetActive(this);
+    ETallowGuideKind Kind = ETallowGuideKind::None;
+    const AActor* Objective = Chapters ? Chapters->GetGuideObjective(Kind) : nullptr;
+    if (!Objective || (Kind != ETallowGuideKind::Battery && Kind != ETallowGuideKind::FuseBox)) return false;
+    const FTallowRoomDef* Room = TallowHouseRooms::Find(TallowHouseRooms::RoomAt(Objective->GetActorLocation()));
+    if (!Room) return false;
+    // Try again in a little while if this one does not work out.
+    NextGuardAt = Now + 10.f;
+    const FVector Area = Room->Anchor();
+    UNavigationPath* PlayerPath = UNavigationSystemV1::FindPathToLocationSynchronously(this, Area, Player->GetActorLocation(), Keeper->GetController());
+    if (!PlayerPath || !PlayerPath->IsValid() || PlayerPath->IsPartial() || PlayerPath->GetPathLength() < 500.f) return false;
+    UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(this, Keeper->GetActorLocation(), Area, Keeper->GetController());
+    if (!Path || !Path->IsValid() || Path->IsPartial() || Path->GetPathLength() < 300.f) return false;
+    NextGuardAt = Now + Every * FMath::FRandRange(.8f, 1.25f);
+    OutArea = Area;
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_GUARD walk room=%s kind=%s her=%.0f next=%.0f"), *Room->Id.ToString(),
+        Kind == ETallowGuideKind::Battery ? TEXT("battery") : TEXT("box"), PlayerPath->GetPathLength(), NextGuardAt - Now);
+    return true;
+}
+
 bool UTallowHunterDirector::TakeAreaHint(ATallowCreature* Keeper, ATallowCharacter* Player,
                                        FVector& OutArea, bool& bOutRetreat)
 {
@@ -466,6 +501,7 @@ bool UTallowHunterDirector::TakeAreaHint(ATallowCreature* Keeper, ATallowCharact
     if (Now < NextHint) return false;
     // It knows which part of the house she is in, never where exactly: hints come more often as the evening builds.
     NextHint = Now + (bBreather ? 11.f : Phase == ETallowTensionPhase::Peak ? 5.f : Phase == ETallowTensionPhase::Build ? 8.f : 14.f);
+    if (TakeGuardHint(Keeper, Player, OutArea)) { ++HintNumber; bOutRetreat = false; return true; }
     const bool bOverdue = IsReturnOverdue();
     float BestScore = -MAX_flt;
     bool bFound = false;
