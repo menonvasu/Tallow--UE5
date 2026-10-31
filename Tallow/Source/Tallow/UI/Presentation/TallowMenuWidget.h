@@ -33,6 +33,8 @@ struct TALLOW_API FTallowMenuState
 	int32 Selection = 1;
 	bool bAwaitingAction = false;
 	bool bContinueAvailable = false;
+	/** The save holds a checkpoint (the chair or the chase), not only a chapter's start. */
+	bool bCheckpointSaved = false;
 	TOptional<ETallowMenuAction> PendingConfirmation;
 
 	void Show(ETallowMenuMode InMode);

@@ -86,15 +86,28 @@ public:
     FString BuildRoundFingerprint() const;
     FString DescribeState() const;
     void SkipBeat();
-    ETallowChapterBeat GetActiveBeat() const { return BeatState.Context.Beat; }
+    UFUNCTION(BlueprintPure, Category="Chapter|Beats") ETallowChapterBeat GetActiveBeat() const { return BeatState.Context.Beat; }
     float GetHuntStartWalkingDistance() const { return HuntStartWalkingDistance; }
     FTransform GetChapterStart() const;
     FTransform ResolveChairTransform();
     void RunWatchdogs();
+    UFUNCTION(BlueprintPure, Category="Chapter") ETallowCheckpoint GetCheckpoint() const { return Campaign.Checkpoint; }
+    /** A Continue to a checkpoint keeps the view black until the round is built where the checkpoint was taken. */
+    bool IsHoldingViewForResume() const { return bHoldViewForResume; }
 
 protected:
     bool BuildRound(ETallowRestartReason Reason);
     void SetPhase(ETallowChapterPhase Next, FName Reason);
+    /** A checkpoint resumes mid-chapter, where the ordinary transitions from the round's start do not reach. */
+    void SetPhaseDirect(ETallowChapterPhase Next, FName Reason);
+    /** 30 Oct: the chair after the transformation, then the start of the chase; a capture, a retry and Continue go back
+     *  to the last one reached in this chapter instead of the chapter's opening (the tape, the writing, the plush). */
+    void RecordCheckpoint(ETallowCheckpoint Kind);
+    bool RestoreCheckpoint(ETallowRestartReason Reason);
+    void ClearCheckpoint();
+    /** Every rebuild (a retry after a capture included) starts the hunter and the player's fear from nothing. */
+    void ResetHunterForRound();
+    void StageMimAtChair(const FTransform& ChairTransform);
     void RequestBeat(ETallowChapterBeat Beat);
     void ApplyBeatCut(const FTallowBeatContext& Context);
     void SetMimForm(ETallowMimForm Form, bool bHunting = false);
@@ -125,6 +138,7 @@ protected:
     FTallowCampaignState CommittedCampaign;
     FTallowChapterLayout CommittedLayout;
     bool bAwaitingNavigation = false;
+    bool bHoldViewForResume = false;
     ETallowRestartReason PendingBuildReason = ETallowRestartReason::NewCampaign;
     double NavigationWaitStarted = 0.0;
     bool bHuntEnabled = false;

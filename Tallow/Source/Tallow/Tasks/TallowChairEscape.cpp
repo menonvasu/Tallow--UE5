@@ -167,7 +167,7 @@ void ATallowChairEscape::AttemptRock()
 	UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>();
 	bool bNoiseSystem = (NoiseSubsystem != nullptr);
 
-	if (!bIsTied) return;
+	if (!bIsTied || !bMinigameReady) return;
 
 	APlayerController* PC = TiedPlayerCharacter ? TiedPlayerCharacter->GetController<APlayerController>() : nullptr;
 
@@ -232,12 +232,7 @@ void ATallowChairEscape::TiePlayerToChair(ATallowCharacter* InPlayer)
 	const float ChairYaw = (ChairMesh ? ChairMesh->GetComponentRotation().Yaw : GetActorRotation().Yaw) + MeshFrontYaw;
 	
 	APlayerController* PC = InPlayer->GetController<APlayerController>();
-	if (ChairOverlayWidgetClass && PC && !ActiveOverlayWidget)
-	{
-		ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
-		if (UTallowChairEscapeWidget* Meter = Cast<UTallowChairEscapeWidget>(ActiveOverlayWidget)) Meter->Chair = this;
-		ActiveOverlayWidget->AddToViewport();
-	}
+	if (bMinigameReady) ShowOverlay(PC);
 
 	
 	if (PC && PC->PlayerCameraManager)
@@ -459,6 +454,7 @@ void ATallowChairEscape::ReleasePlayerQuietly()
         TiedPlayerCharacter = nullptr;
     }
     if (ActiveOverlayWidget) { ActiveOverlayWidget->RemoveFromParent(); ActiveOverlayWidget = nullptr; }
+    bMinigameReady = true;
     bIsTied = false; CurrentRockCount = 0; CurrentSwingAngle = 0.f; AngularVelocity = 0.f;
     RockingPivot->SetRelativeRotation(FRotator::ZeroRotator);
     SetActorTickEnabled(false);
@@ -467,3 +463,34 @@ FTransform ATallowChairEscape::GetExitTransform() const { return EscapeExitPoint
 FTransform ATallowChairEscape::GetExitRelativeTransform() const { return EscapeExitPoint->GetRelativeTransform(); }
 FTransform ATallowChairEscape::GetStandingMeshRelativeTransform() const { return InitialChairRelativeTransform; }
 FTransform ATallowChairEscape::GetSeatRelativeTransform() const { return SeatAttachPoint->GetRelativeTransform() * InitialChairRelativeTransform; }
+
+void ATallowChairEscape::ShowOverlay(APlayerController* PC)
+{
+	if (!ChairOverlayWidgetClass || !PC || ActiveOverlayWidget) return;
+	ActiveOverlayWidget = CreateWidget<UUserWidget>(PC, ChairOverlayWidgetClass);
+	if (UTallowChairEscapeWidget* Meter = Cast<UTallowChairEscapeWidget>(ActiveOverlayWidget)) Meter->Chair = this;
+	ActiveOverlayWidget->AddToViewport();
+	OverlayShownAt = GetWorld()->GetTimeSeconds();
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAIR meter fades in over %.1fs"), OverlayFadeSeconds);
+}
+
+void ATallowChairEscape::SetMinigameReady(bool bReady)
+{
+	if (bReady == bMinigameReady) return;
+	bMinigameReady = bReady;
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAIR minigame %s tied=%d"), bReady ? TEXT("ready") : TEXT("waiting for Mim to go"), bIsTied ? 1 : 0);
+	if (!bReady)
+	{
+		if (ActiveOverlayWidget) { ActiveOverlayWidget->RemoveFromParent(); ActiveOverlayWidget = nullptr; }
+		CurrentRockCount = 0;
+		return;
+	}
+	if (bIsTied && TiedPlayerCharacter) ShowOverlay(TiedPlayerCharacter->GetController<APlayerController>());
+}
+
+float ATallowChairEscape::GetOverlayAlpha() const
+{
+	if (!GetWorld()) return 1.f;
+	return FMath::SmoothStep(0.f, 1.f, float(GetWorld()->GetTimeSeconds() - OverlayShownAt) / FMath::Max(OverlayFadeSeconds, .01f));
+}
+

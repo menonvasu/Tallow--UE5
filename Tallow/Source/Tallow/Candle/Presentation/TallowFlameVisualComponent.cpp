@@ -26,6 +26,7 @@ bool UTallowFlameVisualComponent::InitializeVisual()
 	{
 		if (!CandleSource) CandleSource = GetOwner()->FindComponentByClass<UTallowCandleComponent>();
 		if (!GutterSource) GutterSource = GetOwner()->FindComponentByClass<UTallowCandleFlameComponent>();
+		if (CandleSource) CandleSource->OnCandleStateChanged.AddUniqueDynamic(this, &UTallowFlameVisualComponent::OnCandleState);
 	}
 	if (!FlameMesh) FlameMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Presentation/Flame/SM_TallowFlame.SM_TallowFlame"));
 	if (!FlameMaterial) FlameMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Presentation/Flame/M_TallowFlame.M_TallowFlame"));
@@ -61,6 +62,7 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	const bool bVisible = IsValid(WickAnchor) && bHasSource && State != ECandleState::Out
 		&& (bStandalone || CandleSource->IsAcquired());
 	Visual->SetVisibility(bVisible);
+	if (bVisible != bWasVisible) LogVisibility(bVisible);
 	if (bVisible && !bWasVisible) IgnitionRemaining = .25f;
 	bWasVisible = bVisible;
 	if (!bVisible)
@@ -155,6 +157,32 @@ void UTallowFlameVisualComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	Material->SetScalarParameterValue(TEXT("BendX"), (Shape.BendX + SeenBend.X) * Height);
 	Material->SetScalarParameterValue(TEXT("BendY"), (Shape.BendY + SeenBend.Y) * Height);
 	Material->SetScalarParameterValue(TEXT("Emission"), 4.f * Shape.Emission * SeenEmission);
+}
+
+void UTallowFlameVisualComponent::OnCandleState(ECandleState NewState)
+{
+	if (!Visual || !Material || bStandalone || !IsValid(CandleSource)) return;
+	const bool bVisible = IsValid(WickAnchor) && NewState != ECandleState::Out && CandleSource->IsAcquired();
+	if (bVisible == bWasVisible) return;
+	Visual->SetVisibility(bVisible);
+	LogVisibility(bVisible);
+	bWasVisible = bVisible;
+	if (!bVisible) { IgnitionRemaining = 0.f; Exposure = 0.f; return; }
+	// The first frame of the catch, as the next tick would draw it.
+	IgnitionRemaining = .25f;
+	const auto Shape = TallowFlameVisual::Evaluate(Elapsed + PhaseOffset, Exposure, NewState == ECandleState::Cupped, 1.f);
+	const float Height = FMath::Clamp(HeightCm, .1f, 20.f) * FMath::Lerp(.48f, 1.f, FMath::Clamp(CandleSource->GetWaxFraction() / .35f, 0.f, 1.f));
+	Material->SetScalarParameterValue(TEXT("HeightCm"), Height * Shape.Height);
+	Material->SetScalarParameterValue(TEXT("WidthCm"), FMath::Clamp(WidthCm, .05f, 10.f) * Shape.Width);
+	Material->SetScalarParameterValue(TEXT("BendX"), Shape.BendX * Height);
+	Material->SetScalarParameterValue(TEXT("BendY"), Shape.BendY * Height);
+	Material->SetScalarParameterValue(TEXT("Emission"), 4.f * Shape.Emission);
+}
+
+void UTallowFlameVisualComponent::LogVisibility(bool bVisible) const
+{
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE flame %s %s f=%llu t=%.3f"), bVisible ? TEXT("on") : TEXT("off"), *GetName(),
+		(unsigned long long)GFrameCounter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f);
 }
 
 void UTallowFlameVisualComponent::EndPlay(const EEndPlayReason::Type Reason)

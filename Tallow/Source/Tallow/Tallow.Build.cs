@@ -7,6 +7,8 @@ public class Tallow : ModuleRules
 	public Tallow(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		// Visual Studio stops the build on a name that hides a class member, which the Linux compiler can't see; warn instead.
+		CppCompileWarningSettings.ShadowVariableWarningLevel = WarningLevel.Warning;
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",

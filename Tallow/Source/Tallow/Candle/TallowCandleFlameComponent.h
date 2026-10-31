@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Candle/TallowCandleBetrayal.h"
+#include "Candle/TallowCandleComponent.h"
 #include "TallowCandleFlameComponent.generated.h"
 
 class UPointLightComponent;
@@ -40,6 +41,10 @@ public:
 	/** The integrated presentation owns the prop and wick; retain this component's existing gutter/light rules. */
 	UFUNCTION(BlueprintCallable, Category="Candle|Flame")
 	void UseExternalPresentation(USceneComponent* Wick, float LightIntensity = 18.f);
+	/** A round restart, rebuild or checkpoint: drop the cold "seen" tint and dip at once instead of letting them fade. */
+	void ClearSeen() { Seen = 0.f; }
+	/** How long the light takes to come up as the flame catches (the flame's own ignition is .25 s). */
+	UPROPERTY(EditAnywhere, Category = "Candle|Flame") float CatchSeconds = .25f;
 
 	/** Beyond this distance (cm) the Keeper has no effect on the flame */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Candle|Flame")
@@ -151,4 +156,9 @@ private:
 	FVector AwayTarget = FVector::ForwardVector;
 	FVector TowardNell = FVector::ForwardVector;
 	bool bFlareShown = false;
+	/** 30 Oct: the light follows the flame. Set the moment the candle catches; the light grows from nothing with it. */
+	UFUNCTION() void OnCandleState(ECandleState NewState);
+	ECandleState LastCandleState = ECandleState::Out;
+	double CaughtAt = -100.0;
+	bool bWarnedLitWhileOut = false;
 };

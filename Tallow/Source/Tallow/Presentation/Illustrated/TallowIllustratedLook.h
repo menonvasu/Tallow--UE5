@@ -51,6 +51,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Illustrated|Candle", meta=(ClampMin="50")) float DarkReachCm=320.f;
     /** Fixed manual exposure for every gameplay camera; no adaptation. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Illustrated|Grade") float ExposureBias=-1.2f;
+    UPROPERTY(EditAnywhere, Category="Illustrated") float PainterlyWaitSeconds=20.f;
     UFUNCTION(BlueprintCallable, Category="Illustrated") void SetPreset(ETallowIllustratedPreset Value);
     UFUNCTION(BlueprintPure, Category="Illustrated|Review") float GetGPUFrameMilliseconds() const;
 private:
@@ -58,6 +59,14 @@ private:
     void ProtectSubjects();
     void ReleaseSubjects();
     UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> Painter;
+    /** 30 Oct: for the first seconds after a map loads (shaders still being prepared) the two passes did not run as a
+     *  pair and the resolve drew a blurred brown frame round the whole view, the "vignette" at the start of the chair
+     *  game. Their shaders are finished during the load (EnsureIsComplete) and the passes join only once both are ready
+     *  (or after PainterlyWaitSeconds). */
+    UPROPERTY(Transient) TObjectPtr<UMaterialInterface> TensorPass;
+    bool bPainterlyLive = false;
+    double PainterlyWaitFrom = 0.0, QuietSince = -1.0;
+    bool ArePainterlyShadersReady() const;
     struct FStencilLease { TWeakObjectPtr<UPrimitiveComponent> Mesh; bool Rendered=false; int32 Value=0; int32 Applied=0; };
     TArray<FStencilLease> Protected;
     float RefreshAt=0.f;

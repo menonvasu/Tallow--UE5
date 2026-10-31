@@ -1,4 +1,25 @@
 #include "Audio/TallowAudioPolicy.h"
+#include "HAL/IConsoleManager.h"
+
+namespace
+{
+	TAutoConsoleVariable<int32> CVarNellVocalFx(TEXT("tallow.NellVocalFx"), 0,
+		TEXT("1 brings back Nell's gasps, efforts, whimper and pant (off since the 30 Oct playtest; her lines and breathing always play)."));
+}
+
+bool TallowNellVoice::VocalFxOn() { return CVarNellVocalFx.GetValueOnGameThread() != 0; }
+
+bool TallowNellVoice::AllowVocalFx(const TCHAR* Cue)
+{
+	const bool bAllow = VocalFxOn();
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE Nell%s %s"), bAllow ? TEXT("Fx") : TEXT("Muted"), Cue);
+	return bAllow;
+}
+
+void TallowNellVoice::NoteBreath(const TCHAR* Cue)
+{
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_VOICE NellBreath %s"), Cue);
+}
 
 FTallowAudioProfile FTallowAudioProfile::For(ETallowTension State, bool bListening, bool bReading, bool bLate)
 {

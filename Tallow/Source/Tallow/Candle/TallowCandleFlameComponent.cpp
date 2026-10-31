@@ -93,6 +93,11 @@ void UTallowCandleFlameComponent::BeginPlay()
 	Super::BeginPlay();
 	Light = GetOwner()->FindComponentByClass<UPointLightComponent>();
 	Candle = GetOwner()->FindComponentByClass<UTallowCandleComponent>();
+	if (Candle.IsValid())
+	{
+		LastCandleState = Candle->GetCandleState();
+		Candle->OnCandleStateChanged.AddUniqueDynamic(this, &UTallowCandleFlameComponent::OnCandleState);
+	}
 	Keeper = Cast<ATallowCreature>(UGameplayStatics::GetActorOfClass(this, ATallowCreature::StaticClass()));
 	// The Blueprint parks the candle mesh far below the camera, out of frame. Hold it in view instead,
 	// with the flame light just above its wick.
@@ -217,21 +222,23 @@ void UTallowCandleFlameComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	const float Wax=Candle.IsValid()?Candle->GetWaxFraction():1.f;
 	const float WaxStrength=FMath::Lerp(.28f,1.f,FMath::Clamp(Wax/.35f,0.f,1.f));
 	if(Wax<.15f) Scale*=.4f+.6f*FMath::Abs(FMath::PerlinNoise1D(Time*13.f));
-	Light->SetIntensity((LumensOverride > 0.f ? LumensOverride : BaseIntensity) * FMath::Max(0.02f, Scale)*WaxStrength);
-	// A struck match flares bright for a moment, whether the candle is out or not, and Mim can see her by it
-	// (UTallowCandleComponent::GetMatchFlare). Out, the candle's light is shown for the flare and hidden after.
+	// The light follows the flame: from nothing as the wick catches, up to full as the flame stands (CatchSeconds).
+	const float Catch = FMath::SmoothStep(0.f, 1.f, float(GetWorld()->GetTimeSeconds() - CaughtAt) / FMath::Max(CatchSeconds, .01f));
+	Light->SetIntensity((LumensOverride > 0.f ? LumensOverride : BaseIntensity) * FMath::Max(0.02f, Scale)*WaxStrength*Catch);
+	// A struck match flares bright for a moment and Mim can see her by it (UTallowCandleComponent::GetMatchFlare). Until
+	// 30 Oct that flare also switched the candle's own light on at the wick the frame the match was struck, before the
+	// match had even come into view: once the candle was out (from the restraint on), every relight lit the room before
+	// any flame was there. The candle's light now comes only with the candle's flame; Mim still sees the flare.
 	const float Flare = Candle.IsValid() && Candle->IsAcquired() && !Candle->IsGivenUp() ? Candle->GetMatchFlare() : 0.f;
 	const bool bCandleOut = !Candle.IsValid() || Candle->GetCandleState() == ECandleState::Out;
-	if (Flare > 0.f)
-	{
-		if (bCandleOut) { Light->SetVisibility(true); bFlareShown = true; }
-		Light->SetIntensity(FMath::Max(Light->Intensity, (LumensOverride > 0.f ? LumensOverride : BaseIntensity) * MatchFlareBoost * Flare));
-	}
-	else if (bFlareShown)
-	{
-		bFlareShown = false;
-		if (bCandleOut) Light->SetVisibility(false);
-	}
+	if (Flare > 0.f && !bCandleOut)
+		Light->SetIntensity(FMath::Max(Light->Intensity, (LumensOverride > 0.f ? LumensOverride : BaseIntensity) * MatchFlareBoost * Flare * Catch));
+	if (bFlareShown) { bFlareShown = false; if (bCandleOut) Light->SetVisibility(false); }
+	// Never expected: a check for the log, so a light without a flame shows up in a run.
+	const bool bLitWhileOut = bCandleOut && Light->IsVisible() && LumensOverride <= 0.f;
+	if (bLitWhileOut && !bWarnedLitWhileOut)
+		UE_LOG(LogTemp, Warning, TEXT("TALLOW_CANDLE light visible while the candle is out f=%llu t=%.3f"), (unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
+	bWarnedLitWhileOut = bLitWhileOut;
 	// The flame leans and trembles; the light source moves a few millimetres with it, and is pushed a little away from
 	// the way the Keeper is coming.
 	const FVector Lean(FMath::PerlinNoise1D(Time * 2.1f + 3.f), FMath::PerlinNoise1D(Time * 2.3f + 7.f), 0.f);
@@ -251,7 +258,7 @@ void UTallowCandleFlameComponent::TickComponent(float DeltaTime, ELevelTick Tick
 		// The projected first-person mesh sits centimetres from the emitter.
 		// Its separate lighting channel prevents clipped hands without weakening
 		// the actual candle that illuminates the house and informs Mim's routing.
-		const bool bLit = Candle.IsValid() && Candle->IsAcquired() && (Candle->GetCandleState() != ECandleState::Out || Flare > 0.f);
+		const bool bLit = Candle.IsValid() && Candle->IsAcquired() && Candle->GetCandleState() != ECandleState::Out;
 		PresentationLight->SetVisibility(bLit);
 		PresentationLight->SetWorldLocation(Light->GetComponentLocation());
 		PresentationLight->SetIntensity(Light->Intensity * .04f);
@@ -429,4 +436,18 @@ float UTallowCandleFlameComponent::GetLayDownAmount() const
 	const float T = LayDownSeconds > 0.f ? (Time - LayDownStarted) / LayDownSeconds : 2.f;
 	if (T < 0.f || T >= 1.f) return 0.f;
 	return T < .1f ? FMath::SmoothStep(0.f, .1f, T) : T < .55f ? 1.f : 1.f - FMath::SmoothStep(.55f, 1.f, T);
+}
+
+void UTallowCandleFlameComponent::OnCandleState(ECandleState NewState)
+{
+	const bool bWasOut = LastCandleState == ECandleState::Out;
+	LastCandleState = NewState;
+	if (!bWasOut || NewState == ECandleState::Out || !GetWorld()) return;
+	// Broadcast before the candle shows its light (UTallowCandleComponent::SetCandleState), so the light comes on at
+	// nothing in the frame the flame appears and grows with it, never ahead of it.
+	CaughtAt = GetWorld()->GetTimeSeconds();
+	if (Light.IsValid()) Light->SetIntensity(0.f);
+	if (PresentationLight) PresentationLight->SetIntensity(0.f);
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE light rises with the flame (from 0 over %.2fs) f=%llu t=%.3f"), CatchSeconds,
+		(unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
 }

@@ -41,6 +41,7 @@ bool UTallowSaveSubsystem::HasContinue() const
 	{
 		FTallowCampaignState State;
 		bContinueAvailable = LoadCampaign(State);
+		SavedCheckpoint = bContinueAvailable ? State.Checkpoint : ETallowCheckpoint::None;
 		bAvailabilityKnown = true;
 	}
 	return bContinueAvailable;
@@ -50,6 +51,7 @@ void UTallowSaveSubsystem::RefreshAvailability()
 {
 	FTallowCampaignState State;
 	bContinueAvailable = LoadCampaign(State);
+	SavedCheckpoint = bContinueAvailable ? State.Checkpoint : ETallowCheckpoint::None;
 	bAvailabilityKnown = true;
 	OnSaveChanged.Broadcast();
 }
@@ -60,6 +62,7 @@ bool UTallowSaveSubsystem::PrepareContinue()
 	PendingState = {};
 	const bool bLoaded = LoadCampaign(PendingState);
 	bContinueAvailable = bLoaded;
+	SavedCheckpoint = bLoaded ? PendingState.Checkpoint : ETallowCheckpoint::None;
 	bAvailabilityKnown = true;
 	if (bLoaded) Pending = ETallowPendingStart::Continue;
 	OnSaveChanged.Broadcast();
@@ -97,7 +100,7 @@ bool UTallowSaveSubsystem::SaveCampaign(const FTallowCampaignState& State)
 	int32 Bytes = 0;
 	FString Reason;
 	const bool bWrote = FTallowSaveStore(GetSaveDirectory()).Write(Save, Bytes, Reason);
-	if (bWrote) { UE_LOG(LogTemp, Display, TEXT("TALLOW_SAVE wrote ch=%d seed=%d bytes=%d"), State.ChapterIndex, State.CampaignSeed, Bytes); }
+	if (bWrote) { UE_LOG(LogTemp, Display, TEXT("TALLOW_SAVE wrote ch=%d seed=%d checkpoint=%d bytes=%d"), State.ChapterIndex, State.CampaignSeed, int32(State.Checkpoint), Bytes); }
 	else { UE_LOG(LogTemp, Warning, TEXT("TALLOW_SAVE rejected write: %s"), *Reason); }
 	RefreshAvailability();
 	return bWrote;
@@ -113,7 +116,7 @@ bool UTallowSaveSubsystem::LoadCampaign(FTallowCampaignState& OutState) const
 		return false;
 	}
 	OutState = Save->Campaign;
-	UE_LOG(LogTemp, Display, TEXT("TALLOW_SAVE loaded %s ch=%d seed=%d"), *Reason, OutState.ChapterIndex, OutState.CampaignSeed);
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_SAVE loaded %s ch=%d seed=%d checkpoint=%d"), *Reason, OutState.ChapterIndex, OutState.CampaignSeed, int32(OutState.Checkpoint));
 	return true;
 }
 

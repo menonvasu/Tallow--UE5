@@ -11,6 +11,8 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/PostProcessComponent.h"
+#include "Engine/PostProcessVolume.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Candle/Presentation/TallowFlameVisualComponent.h"
 #include "Candle/TallowCandleFlameComponent.h"
@@ -150,6 +152,12 @@ void ATallowPlayDirector::InitializeScene()
 
 	PC = UGameplayStatics::GetPlayerController(this, 0);
 	if (!PC || !PC->IsLocalController()) return;
+	ClearVignettes();
+	VignetteSpawnHandle = GetWorld()->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateWeakLambda(this, [this](AActor* Actor)
+	{
+		const TWeakObjectPtr<AActor> Spawned(Actor);
+		GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this, Spawned] { if (Spawned.IsValid()) ClearVignettes(Spawned.Get()); }));
+	}));
 	EnableInput(PC);
 	InputComponent->Priority = 10;
 	auto& PauseKey = InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ATallowPlayDirector::TogglePause);
@@ -307,7 +315,9 @@ void ATallowPlayDirector::InitializeGameplay()
 	auto* Contact=NewObject<UTallowToolContactComponent>(Player,TEXT("ToolContact"));
 	Player->AddInstanceComponent(Contact);Contact->RegisterComponent();Contact->Setup(Player,Presentation,HeldTool);
 	UpdatePlayerAnimation();
-	if (PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.2f, FColor::Black, false, false);
+	// A Continue to a checkpoint stays black until the chapter has built the round there (it fades in itself).
+	const auto* Resuming = GetWorld()->GetSubsystem<UTallowChapterSubsystem>();
+	if (PC->PlayerCameraManager && !(Resuming && Resuming->IsHoldingViewForResume())) PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.2f, FColor::Black, false, false);
 }
 
 void ATallowPlayDirector::ApplyPickupVisual(AActor* Actor, bool bPlaceOnSurface)
@@ -338,6 +348,31 @@ void ATallowPlayDirector::ApplyPickupVisual(AActor* Actor, bool bPlaceOnSurface)
 	Visual->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	Visual->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
 	Visual->SetCollisionResponseToChannel(ECC_Pawn,ECR_Ignore);
+}
+
+void ATallowPlayDirector::ClearVignettes(AActor* Only)
+{
+	// The playable map's volumes ask for .08 (under the look's own zero) and the ending's cameras for .45. No vignette on
+	// anything, so every one of them is zeroed; in the game the camera manager also has the last word.
+	int32 Cleared = 0;
+	auto Clear = [&Cleared](FPostProcessSettings& Settings)
+	{
+		if (Settings.bOverride_VignetteIntensity && Settings.VignetteIntensity <= 0.f) return;
+		Settings.bOverride_VignetteIntensity = true; Settings.VignetteIntensity = 0.f; ++Cleared;
+	};
+	auto Visit = [&Clear](AActor* Actor)
+	{
+		if (!Actor) return;
+		if (auto* Volume = Cast<APostProcessVolume>(Actor)) Clear(Volume->Settings);
+		for (UActorComponent* Component : TInlineComponentArray<UActorComponent*>(Actor))
+		{
+			if (auto* Camera = Cast<UCameraComponent>(Component)) Clear(Camera->PostProcessSettings);
+			else if (auto* Post = Cast<UPostProcessComponent>(Component)) Clear(Post->Settings);
+		}
+	};
+	if (Only) Visit(Only);
+	else for (TActorIterator<AActor> It(GetWorld()); It; ++It) Visit(*It);
+	if (!Only || Cleared) UE_LOG(LogTemp, Display, TEXT("TALLOW_LOOK vignette cleared on %d settings%s"), Cleared, Only ? *FString::Printf(TEXT(" (%s)"), *Only->GetName()) : TEXT(""));
 }
 
 void ATallowPlayDirector::OnActorSpawned(AActor* Actor)
@@ -714,7 +749,11 @@ void ATallowPlayDirector::OnRelight()
 	ForcedClip = RelightClip; ForcedUntil = GetWorld()->GetTimeSeconds() + 1.2f;
 	// Scratch and flare as the hand comes in; the wick takes when the match meets it (MatchCalibrationTime).
 	PlayCue(TEXT("P_Match_Strike"), .9f);   // recorded quiet (-33 dB RMS)
-	GetWorldTimerManager().SetTimer(CatchHandle, FTimerDelegate::CreateWeakLambda(this, [this] { PlayCue(TEXT("P_Candle_Catch"), .4f); }), MatchCalibrationTime, false);
+	GetWorldTimerManager().SetTimer(CatchHandle, FTimerDelegate::CreateWeakLambda(this, [this]
+	{
+		PlayCue(TEXT("P_Candle_Catch"), .4f);
+		UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE match at the wick f=%llu t=%.3f"), (unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
+	}), MatchCalibrationTime, false);
 }
 void ATallowPlayDirector::OnPower()
 {
@@ -1274,7 +1313,9 @@ float ATallowPlayDirector::SayAt(const FString& Name, const FString& Fallback, c
 	USoundBase* Line = Load(Name, TEXT("VO"));
 	if (!Line && !Fallback.IsEmpty()) Line = Load(Fallback, TEXT("Creature"));
 	if (!Line) return 0.f;
-	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s"), *Line->GetName());
+	// Her scripted lines from the dark get the same lift as everything else she says (30 Oct).
+	if (const auto* Voice = Keeper ? Keeper->FindComponentByClass<UTallowKeeperVoiceComponent>() : nullptr) Volume *= Voice->GetSpokenLift();
+	UE_LOG(LogTemp, Display, TEXT("TALLOW_STORY say %s vol=%.2f"), *Line->GetName(), Volume);
 	if (auto* Subtitles = UTallowSubtitleSubsystem::Get(this)) Subtitles->Begin(Line->GetFName(), Line->GetDuration(), ETallowSubtitleVoice::Mim);
 	UGameplayStatics::PlaySoundAtLocation(this, Line, Where, Volume, 1.f, 0.f, CueAttenuation);
 	return Line->GetDuration();
@@ -1406,6 +1447,7 @@ void ATallowPlayDirector::EndPlay(const EEndPlayReason::Type Reason)
 	if (PowerHum) PowerHum->Stop();
 	if (NellVoice) NellVoice->Stop();
 	if (ActorSpawnedHandle.IsValid()) GetWorld()->RemoveOnActorSpawnedHandler(ActorSpawnedHandle);
+	if (VignetteSpawnHandle.IsValid()) GetWorld()->RemoveOnActorSpawnedHandler(VignetteSpawnHandle);
 	if (SequencePlayer) { SequencePlayer->OnFinished.RemoveAll(this); SequencePlayer->Stop(); }
 	if (Presentation) Presentation->DisablePresentation();
 	if (Menu) Menu->RemoveFromParent();

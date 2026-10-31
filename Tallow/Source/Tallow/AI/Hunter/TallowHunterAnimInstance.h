@@ -9,7 +9,7 @@ class TALLOW_API UTallowHunterAnimInstance : public UTallowPresentationAnimInsta
 {
     GENERATED_BODY()
 public:
-    bool PlayMotionClip(UAnimSequence* Clip, bool bLoop, float Rate, float BlendSeconds, bool bMatchPhase);
+    bool PlayMotionClip(UAnimSequence* Clip, bool bLoop, float PlayRate, float BlendSeconds, bool bMatchPhase);
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
     virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
     virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* Proxy) override;

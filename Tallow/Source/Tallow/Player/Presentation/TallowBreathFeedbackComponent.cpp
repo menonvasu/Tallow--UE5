@@ -1,6 +1,7 @@
 #include "Player/Presentation/TallowBreathFeedbackComponent.h"
 
 #include "AI/TallowCreature.h"
+#include "Audio/TallowAudioPolicy.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameMode/TallowGameMode.h"
 #include "Kismet/GameplayStatics.h"
@@ -68,6 +69,7 @@ void UTallowBreathFeedbackComponent::OnStill(bool bStill)
 {
 	if (!bStill || !Player.IsValid() || Player->IsTiedToChair()) return;
 	// The sharp intake, then the world closes in.
+	TallowNellVoice::NoteBreath(TEXT("VO_Nell_Effort_02 hold"));
 	Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_02.VO_Nell_Effort_02")), IntakeVolume);
 	NextBeat = Time + .55f; bStrainSounded = false; NearestDuringHold = MimDistance();
 	SetMuffled(true);
@@ -83,15 +85,22 @@ void UTallowBreathFeedbackComponent::OnReleased(bool bForced)
 	const float Distance = MimDistance();
 	const float Held = (1.f - Player->GetHeldAir()) * Player->BreathHoldSeconds;
 	if (bForced)
+	{
+		TallowNellVoice::NoteBreath(TEXT("VO_Nell_Effort_15 forced release"));
 		Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_15.VO_Nell_Effort_15")), GaspVolume);   // one broken breath, gulped
+	}
 	else if (NearestDuringHold < 700.f && Distance > 850.f)
 	{
 		// It came close and went on by without hearing her: the relief beat, and Nell's notes take it down.
+		TallowNellVoice::NoteBreath(TEXT("VO_Nell_Effort_07 release relief"));
 		Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_07.VO_Nell_Effort_07")), ExhaleVolume * 1.1f);
 		bHeldPast = true; LastPastAt = GetWorld()->GetTimeSeconds();
 	}
 	else if (Held > 1.2f)
+	{
+		TallowNellVoice::NoteBreath(TEXT("VO_Nell_Effort_08 release"));
 		Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_08.VO_Nell_Effort_08")), ExhaleVolume * (Distance < 850.f ? .6f : 1.f));
+	}
 	UE_LOG(LogTemp, Display, TEXT("TALLOW_BREATH release forced=%d held=%.1f nearest=%.0f mim=%.0f beats=%d"),
 		bForced ? 1 : 0, Held, NearestDuringHold, Distance, Beats);
 }
@@ -117,18 +126,28 @@ void UTallowBreathFeedbackComponent::TickComponent(float DeltaTime, ELevelTick T
 		const FVector Shake(FMath::PerlinNoise1D(Time * 23.f), FMath::PerlinNoise1D(Time * 19.f + 5.f), FMath::PerlinNoise1D(Time * 29.f + 9.f));
 		Candle->SetRelativeLocation(CandleBase + Shake * .32f * Strain);
 	}
-	// Out of breath after a run: she hears herself pant (the Keeper hears it too, close by: ATallowCharacter).
-	if (!bHolding && Player->IsPanting() && Time >= NextPant)
+	// Out of breath after a run she used to pant aloud: a voiced exhale (Effort_07 or _08) every second for three to seven
+	// seconds after any run, the "eh eh" I kept hearing and could not place (30 Oct). Off with her other noises; the
+	// Keeper still hears the panting close by (ATallowCharacter), as it hears her steps.
+	const bool bPanting = !bHolding && Player->IsPanting();
+	if (bPanting && Time >= NextPant)
 	{
 		NextPant = Time + FMath::FRandRange(.8f, 1.1f);
-		Play(Sound(FMath::RandBool() ? TEXT("/Game/Audio/VO/VO_Nell_Effort_07.VO_Nell_Effort_07") : TEXT("/Game/Audio/VO/VO_Nell_Effort_08.VO_Nell_Effort_08")), ExhaleVolume * .8f);
+		const bool bFirst = FMath::RandBool();
+		// Logged once per spell of panting, not every breath.
+		if (!bPantLogged) { TallowNellVoice::AllowVocalFx(TEXT("pant VO_Nell_Effort_07/08")); bPantLogged = true; }
+		if (TallowNellVoice::VocalFxOn())
+			Play(Sound(bFirst ? TEXT("/Game/Audio/VO/VO_Nell_Effort_07.VO_Nell_Effort_07") : TEXT("/Game/Audio/VO/VO_Nell_Effort_08.VO_Nell_Effort_08")), ExhaleVolume * .8f);
 	}
+	if (!bPanting) bPantLogged = false;
 	if (!bHolding) return;
 	NearestDuringHold = FMath::Min(NearestDuringHold, MimDistance());
 	if (Strain > .35f && !bStrainSounded)
 	{
 		bStrainSounded = true;   // a small sound she can't keep in; only a warning, no noise for the Keeper
-		Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_17.VO_Nell_Effort_17")), StrainVolume);
+		// A voiced whimper, not a breath: off with her other noises (30 Oct). The shaking flame still warns.
+		if (TallowNellVoice::AllowVocalFx(TEXT("strain VO_Nell_Effort_17")))
+			Play(Sound(TEXT("/Game/Audio/VO/VO_Nell_Effort_17.VO_Nell_Effort_17")), StrainVolume);
 	}
 	// Her heartbeat: soft at first, quicker and louder the longer she holds it (72 to about 130 a minute).
 	if (Time >= NextBeat)

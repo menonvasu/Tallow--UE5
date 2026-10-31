@@ -274,6 +274,9 @@ public:
 	/** How far the Keeper is (cm), written by its brain every tick it thinks; stale after half a second. */
 	float KeeperDistance = 1.e6f;
 	double KeeperDistanceAt = -100.0;
+	/** A round restart, rebuild or checkpoint (30 Oct): forget being seen or heard, so nothing she sees or hears carries
+	 *  the last hunt's "it sees you" into the new one (the cold light, the flame's bow, the heartbeat, the out of breath). */
+	virtual void ClearKeeperAwareness();
 
 	/** Set and check hide volume */
 	void SetCurrentHideVolume(ATallowHideVolume* InVolume) { CurrentHideVolume = InVolume; }

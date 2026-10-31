@@ -28,6 +28,9 @@ UENUM(BlueprintType) enum class ETallowSpotKind : uint8 { Battery, Crowbar, Matc
 UENUM(BlueprintType) enum class ETallowRestraintCandle : uint8 { KeepInHandOut, PlaceBesideChair };
 UENUM(BlueprintType) enum class ETallowPlushState : uint8 { Hidden, Perched, Watching, Relocating, Guiding, Scaring, Transforming, Retired };
 UENUM(BlueprintType) enum class ETallowPendingStart : uint8 { None, NewCampaign, Continue };
+/** Where a retry, a capture or Continue picks the chapter up (30 Oct): the chair after the transformation, or the start
+ *  of the chase. None is the chapter's own opening (the tape and the writing). */
+UENUM(BlueprintType) enum class ETallowCheckpoint : uint8 { None, Chair, Hunt };
 
 USTRUCT(BlueprintType) struct TALLOW_API FTallowDoorRules
 {
@@ -234,6 +237,15 @@ USTRUCT(BlueprintType) struct TALLOW_API FTallowCampaignState
 	UPROPERTY(BlueprintReadOnly) FTallowResourceSnapshot Resources;
 	UPROPERTY(BlueprintReadOnly) float PlaySeconds = 0.f;
 	UPROPERTY(BlueprintReadOnly) bool bComplete = false;
+	/** The last checkpoint reached in ChapterIndex. Resources then hold what she had at that moment, not at the
+	 *  chapter's start. Saves from before checkpoints load with None and start the chapter as they always did. */
+	UPROPERTY(BlueprintReadOnly) ETallowCheckpoint Checkpoint = ETallowCheckpoint::None;
+	UPROPERTY(BlueprintReadOnly) int32 CheckpointChapter = -1;
+	UPROPERTY(BlueprintReadOnly) FName CheckpointChairRoom;
+	UPROPERTY(BlueprintReadOnly) FName CheckpointChairSpot;
+	UPROPERTY(BlueprintReadOnly) FTransform CheckpointChairTransform;
+	/** The candle was set down beside the chair for the restraint and not yet picked up. */
+	UPROPERTY(BlueprintReadOnly) bool bCheckpointCandleBesideChair = false;
 };
 
 USTRUCT(BlueprintType) struct TALLOW_API FTallowBeatContext

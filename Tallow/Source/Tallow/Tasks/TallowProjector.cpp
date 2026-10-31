@@ -140,10 +140,10 @@ void ATallowProjector::SetState(EProjectorState NewState)
  }
 }
 
-void ATallowProjector::EmitOperationNoise(AActor* Instigator,float Loudness)
+void ATallowProjector::EmitOperationNoise(AActor* NoiseMaker,float Loudness)
 {
  if (auto* Noise=GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
-  Noise->EmitNoise(ETallowNoiseType::Projector,GetActorLocation(),Instigator?Instigator:this,Loudness,true);
+  Noise->EmitNoise(ETallowNoiseType::Projector,GetActorLocation(),NoiseMaker?NoiseMaker:this,Loudness,true);
 }
 
 void ATallowProjector::OnInteract_Implementation(AActor* Interactor)

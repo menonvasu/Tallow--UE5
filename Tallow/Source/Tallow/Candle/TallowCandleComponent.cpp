@@ -80,6 +80,7 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
 	if (bGivenUp && NewState != ECandleState::Out) return;     // left in the collection: it stays out
 	if (WaxFraction<=0.f && NewState!=ECandleState::Out) return;
 
+	const ECandleState OldState = CurrentState;
 	CurrentState = NewState;
 
     // If the flame goes out or is cupped, cancel any active struggle:
@@ -152,6 +153,10 @@ void UTallowCandleComponent::SetCandleState(ECandleState NewState)
         }
         break;
     }
+    // The order of match, flame and light for the log (30 Oct: the light used to come on before any flame).
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE state %d->%d light=%d intensity=%.2f f=%llu t=%.3f"), int32(OldState), int32(CurrentState),
+        CachedLightComponent && CachedLightComponent->IsVisible() ? 1 : 0, CachedLightComponent ? CachedLightComponent->Intensity : 0.f,
+        (unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
 }
 
 void UTallowCandleComponent::StartRelighting()
@@ -176,6 +181,8 @@ void UTallowCandleComponent::StartRelighting()
 
     // the match head flares as it catches (GetMatchFlare)
     MatchStruckAt = GetWorld()->GetTimeSeconds();
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CANDLE strike light=%d f=%llu t=%.3f"), CachedLightComponent && CachedLightComponent->IsVisible() ? 1 : 0,
+        (unsigned long long)GFrameCounter, GetWorld()->GetTimeSeconds());
 
     // report candle lit noise
     if (UTallowNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<UTallowNoiseSubsystem>())
@@ -337,6 +344,8 @@ void UTallowCandleComponent::RestoreForChapter(bool bAcquired, float Wax, int32 
     WaxFraction = FMath::Clamp(Wax, 0.f, 1.f); MatchCount = FMath::Max(0, Matches);
     ActiveDraftCount = 0;
     CurrentState = bAcquired && WaxFraction > 0.f ? State : ECandleState::Out;
+    // The light goes with the restored state; a light left on from before the restore would shine with no flame.
+    if (CachedLightComponent) CachedLightComponent->SetVisibility(CurrentState != ECandleState::Out);
     if (CachedMovementComponent) CachedMovementComponent->MaxWalkSpeed = DefaultWalkSpeed;
     OnCandleGutteringChanged.Broadcast(false);
     OnMatchesChanged.Broadcast(MatchCount, false);

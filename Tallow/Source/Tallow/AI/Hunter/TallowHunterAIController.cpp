@@ -632,6 +632,17 @@ void ATallowHunterAIController::ResetHunt()
     if (auto* Director = GetWorld()->GetSubsystem<UTallowHunterDirector>()) Director->ResetPressure();
 }
 
+void ATallowHunterAIController::ResetForRound()
+{
+    const bool bWasCaptured = HuntMode == ETallowHuntMode::Captured;
+    ResetHunt();
+    bWaitingForDoor = bPlayerWasHiding = bCatchUp = false; LastClearAt = -1000.f;
+    IntentEvent.Type = ETallowKeeperEvent::None;   // Count keeps rising: the motion component compares it
+    if (Creature && Creature->Voice) { Creature->Voice->SetLurking(false); Creature->Voice->SetCreeping(false); Creature->Voice->ResetVoice(); }
+    if (Player) Player->ClearKeeperAwareness();
+    UE_LOG(LogTemp, Display, TEXT("HUNTER_RESET round was_captured=%d mode=%d seen=%d"), bWasCaptured ? 1 : 0, int32(HuntMode), Player && Player->bSeenByKeeper ? 1 : 0);
+}
+
 void ATallowHunterAIController::SetHuntEnabled(bool bEnabled)
 {
     if (bEnabled) HunterBrain->ResumeLogic(TEXT("Preview enabled"));
@@ -2071,7 +2082,7 @@ void ATallowHunterAIController::CacheDoors()
             {
                 // The actor sits at the hinge corner, 80 cm off the doorway; measure from the frame's centre instead.
                 const FVector Center = It->GetRootComponent() ? It->GetRootComponent()->Bounds.Origin : It->GetActorLocation();
-                Doors.Add({*It, Part, Part->GetRelativeRotation().Yaw, Center});
+                Doors.Add({*It, Part, float(Part->GetRelativeRotation().Yaw), Center});
             }
     // The power-locked route gates: their leaf blocks it and its sight, but the navmesh runs through them.
     for (TActorIterator<ATallowRouteGate> It(GetWorld()); It; ++It)

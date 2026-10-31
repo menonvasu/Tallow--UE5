@@ -467,7 +467,8 @@ void ATallowCharacter::DoCupEnd()
 
 void ATallowCharacter::DoRelight()
 {
-	if (!CandleComponent || !CandleComponent->IsAcquired()) return;
+	// Tied to the chair her hands are bound: no match (a strike here flared with no match in view).
+	if (!CandleComponent || !CandleComponent->IsAcquired() || IsTiedToChair()) return;
 	// R toggles: blow the candle out to hide from the Keeper, or strike a match to relight it
 	if (CandleComponent->GetCandleState() == ECandleState::Out) CandleComponent->StartRelighting();
 	else CandleComponent->SetCandleState(ECandleState::Out);
@@ -611,6 +612,14 @@ void ATallowCharacter::UpdateHeldBreath(float DeltaSeconds)
 		Noise->EmitCustomNoise(FirstPersonCameraComponent->GetComponentLocation(), this, BreathGaspLoudness, BreathGaspRange);
 	bBreathForced = true;
 	DoStillnessEnd();
+}
+
+void ATallowCharacter::ClearKeeperAwareness()
+{
+	KeeperSight = 0.f; bSeenByKeeper = false; KeeperSeenFrom = FVector::ZeroVector; SeenCallAt = -100.f;
+	KeeperDistance = 1.e6f; KeeperDistanceAt = -100.0;
+	SprintedSeconds = 0.f; PantUntil = -100.0;
+	if (auto* Flame = FindComponentByClass<UTallowCandleFlameComponent>()) Flame->ClearSeen();
 }
 
 void ATallowCharacter::UpdatePanting(float DeltaSeconds)

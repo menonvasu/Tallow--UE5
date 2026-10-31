@@ -57,5 +57,5 @@ private:
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<USoundBase>> Sounds;
 	float Hold = 0.f, NextBeat = 0.f, NextPant = 0.f, Time = 0.f, NearestDuringHold = 1e7f, LastPastAt = -100.f;
 	int32 Beats = 0;
-	bool bMuffled = false, bStrainSounded = false, bHeldPast = false;
+	bool bMuffled = false, bStrainSounded = false, bHeldPast = false, bPantLogged = false;
 };

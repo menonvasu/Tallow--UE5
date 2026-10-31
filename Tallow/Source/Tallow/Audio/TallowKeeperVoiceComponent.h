@@ -52,6 +52,12 @@ public:
 	float DemonChance = .4f;
 	UPROPERTY(EditAnywhere, Category="Keeper|Voice", meta=(ClampMin="10"))
 	float DemonCooldown = 12.f;
+	/** 30 Oct playtest: when she rarely says something it should land hard, then she goes quiet again. Every spoken line
+	 *  (and the capture scream) plays this much louder; her breath, hums, foley and steps stay where they were.
+	 *  Measured headroom: the hottest line (chase_01, peak -2.7 dBFS at .6 through the master's .78) peaks at -4.3 dBFS. */
+	UPROPERTY(EditAnywhere, Category="Keeper|Voice", meta=(ClampMin="0", ClampMax="6"))
+	float SpokenLiftDb = 5.f;
+	float GetSpokenLift() const { return SpokenLift(); }
 
 	/** Speak now if this pool is off cooldown and nothing else of it is playing. Returns whether it spoke. */
 	UFUNCTION(BlueprintCallable, Category = "Keeper|Voice")
@@ -100,6 +106,7 @@ public:
 
 private:
 	bool bRecoveryQuiet=false;
+	float SpokenLift() const { return FMath::Pow(10.f, SpokenLiftDb / 20.f); }
 	USoundBase* Sound(const FString& Name);
 	USoundBase* Next(ETallowKeeperLine Line);
 	void UpdateVoice(float Now);

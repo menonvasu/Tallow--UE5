@@ -1,4 +1,5 @@
 #include "Chapter/Presentation/TallowBeatPresenter.h"
+#include "Audio/TallowAudioPolicy.h"
 #include "Chapter/Presentation/TallowBloodWriting.h"
 #include "Chapter/TallowChapterSubsystem.h"
 #include "Chapter/TallowChairSpot.h"
@@ -44,9 +45,10 @@ namespace
         return Keys.Last().Y;
     }
     // Restraint: two heavy half-blinks that come back up, then the lids go all the way. Shut while she is tied. They
-    // part from a slit, the upper lid first, sink once, then hold open.
+    // part once, sink once, and are open. 30 Oct: they used to take two seconds to part from a slit, with the lower lid
+    // and the blur lagging behind, a dark frame round the chair as its game began that read as a vignette.
     const FVector2f RestraintLids[] = {{0.f, 0.f}, {.45f, 0.f}, {.9f, .52f}, {1.3f, .06f}, {1.7f, .1f}, {2.15f, .58f}, {2.45f, .5f},
-        {2.8f, .16f}, {3.05f, .2f}, {3.6f, 1.f}, {5.6f, 1.f}, {5.95f, .9f}, {6.6f, .36f}, {6.95f, .46f}, {7.6f, 0.f}};
+        {2.8f, .16f}, {3.05f, .2f}, {3.6f, 1.f}, {5.6f, 1.f}, {5.85f, .5f}, {6.05f, .58f}, {6.4f, 0.f}};
     constexpr float RestraintCut = 3.65f, RestraintEnd = 8.2f;
     // Release: she cannot look away from it, and then she blinks.
     const FVector2f ReleaseLids[] = {{0.f, 0.f}, {2.9f, 0.f}, {3.f, .3f}, {3.1f, 1.f}, {3.38f, 1.f}, {3.62f, 0.f}};
@@ -83,6 +85,11 @@ void UTallowBeatPresenter::OnWorldBeginPlay(UWorld& InWorld)
         }
     // Loaded now, not at the first writing: a decal drawn before its shaders are ready shows as a black box.
     BloodMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatBloodWriting.M_BeatBloodWriting"));
+    // The eyelids too, and both finished now: a post-process pass used before its shaders are ready drew a blurred brown
+    // frame round the view for seconds (30 Oct), right as the restraint, the release and the chair game began.
+    if (BloodMaterial) BloodMaterial->EnsureIsComplete();
+    if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FinalPass/Beats/M_BeatEyelids.M_BeatEyelids")))
+    { Material->EnsureIsComplete(); Lids = UMaterialInstanceDynamic::Create(Material, this); }
 #if !UE_BUILD_SHIPPING
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsRehearse"))) RehearseStep = 0;
     if (FParse::Param(FCommandLine::Get(), TEXT("TallowBeatsWords"))) { RehearseStep = 0; WordsChapter = 0; }
@@ -393,12 +400,13 @@ void UTallowBeatPresenter::StageRestraint(float T)
     const bool bTremble = (T > 2.f && T < 3.5f) || (T > 5.6f && T < 7.6f);
     // Warm with the light through them while they move; black once shut a moment; warm again as they part.
     const float Dark = FMath::Clamp((T - 3.8f) / .8f, 0.f, 1.f) * (1.f - FMath::Clamp((T - 5.45f) / .4f, 0.f, 1.f));
-    SetLids(Lid(RestraintLids, T), bTremble ? 1.f : 0.f, .45f, Dark, T > 5.6f ? 1.f - FMath::Clamp((T - 5.6f) / 2.2f, 0.f, 1.f) : 0.f);
+    // The lower lid opens with the upper one, and the waking blur is gone with them.
+    SetLids(Lid(RestraintLids, T), bTremble ? 1.f : 0.f, 5.f, Dark, T > 5.6f ? 1.f - FMath::Clamp((T - 5.6f) / .8f, 0.f, 1.f) : 0.f);
     if (Once(T, 1.6f)) SetMix(Muffle, true);
-    if (Once(T, 1.8f)) Play(TEXT("/Game/Audio/Player/P_Gasp_01"), .35f, nullptr, .9f);
+    if (Once(T, 1.8f) && TallowNellVoice::AllowVocalFx(TEXT("P_Gasp_01 restraint"))) Play(TEXT("/Game/Audio/Player/P_Gasp_01"), .35f, nullptr, .9f);
     if (Once(T, RestraintCut)) Cut();
     // Under the lids: only her breath, and the house a long way off.
-    if (Once(T, 3.9f)) Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f);
+    if (Once(T, 3.9f)) { TallowNellVoice::NoteBreath(TEXT("P_Breath_Out restraint")); Play(TEXT("/Game/Audio/Player/P_Breath_Out"), .3f, nullptr, .85f); }
     if (Once(T, 5.4f)) SetMix(Muffle, false);
     if (Once(T, 6.55f)) Play(*FString::Printf(TEXT("%sS_Beat_StingLow9"), Stings), .065f);
     if (T >= RestraintEnd) Finish();

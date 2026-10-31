@@ -89,6 +89,7 @@ public:
     float HunterAwareness = 0.f;
     /** Time until which the HUD tells the player the hunter has locked onto their noise. */
     float HunterAlertUntil = 0.f;
+    virtual void ClearKeeperAwareness() override;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Tallow|Stealth")
     bool bKeepStoryTransformationEvent = true;
     /** 25 Oct: no on-screen notes ("IT HEARD YOU", "SEEN"). Being seen is felt instead (UpdateAwarenessFeedback). */

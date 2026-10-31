@@ -52,6 +52,13 @@ public:
 
     void SetRequiredRocks(int32 Rocks);
     void ReleasePlayerQuietly();
+    /** 30 Oct: the chair game after the transformation shows nothing and takes no rocks until Mim has gone; then its
+     *  meter and key fade in. Ready by default (the opening chair), and again after every release. */
+    void SetMinigameReady(bool bReady);
+    bool IsMinigameReady() const { return bMinigameReady; }
+    /** 0..1: how far the meter has faded in since the game became ready (the widget reads it). */
+    float GetOverlayAlpha() const;
+    UPROPERTY(EditAnywhere, Category = "Chair|UI") float OverlayFadeSeconds = .9f;
     FTransform GetStartTransform() const { return StartTransform; }
     UStaticMeshComponent* GetChairMesh() const { return ChairMesh; }
     FTransform GetExitTransform() const;
@@ -182,6 +189,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chair|UI")
 	UUserWidget* ActiveOverlayWidget;
+
+	bool bMinigameReady = true;
+	double OverlayShownAt = -100.0;
+	void ShowOverlay(APlayerController* PC);
 
 };
 

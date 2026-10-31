@@ -200,6 +200,7 @@ void UTallowMenuWidget::ShowMenu(ETallowMenuMode Mode)
 {
 	const auto* Save = UTallowSaveSubsystem::Get(this);
 	State.bContinueAvailable = Save && Save->HasContinue();
+	State.bCheckpointSaved = State.bContinueAvailable && Save->GetSavedCheckpoint() != ETallowCheckpoint::None;
 	State.Show(Mode);
 	SetVisibility(ESlateVisibility::Visible);
 	Refresh();
@@ -286,7 +287,9 @@ FText UTallowMenuWidget::Body() const
 	if (State.Page == ETallowMenuPage::Confirm)
 	{
 		if (State.PendingConfirmation == ETallowMenuAction::Start) return LOCTEXT("ReplaceSave", "A new game will replace your saved chapter.");
+		if (State.PendingConfirmation == ETallowMenuAction::Restart && State.bCheckpointSaved) return LOCTEXT("RestartCheckpoint", "Go back to your last checkpoint?");
 		if (State.PendingConfirmation == ETallowMenuAction::Restart && State.bContinueAvailable) return LOCTEXT("RestartChapter", "Return to the start of your saved chapter?");
+		if (State.bCheckpointSaved) return LOCTEXT("LoseCheckpointProgress", "Your progress since your last checkpoint will be lost.");
 		return State.bContinueAvailable ? LOCTEXT("LoseChapterProgress", "Your progress since the start of this chapter will be lost.") : LOCTEXT("LoseProgress", "Your progress in this run will be lost.");
 	}
 	if (State.Page == ETallowMenuPage::Home && State.Mode == ETallowMenuMode::Caught) return LOCTEXT("CaughtLine", "It carried you back to the chair.");
@@ -319,7 +322,7 @@ FText UTallowMenuWidget::Label(ETallowMenuCommand Command) const
 	case C::Cancel: return State.Mode == ETallowMenuMode::Main ? LOCTEXT("CancelNew", "Cancel") : LOCTEXT("Cancel", "Keep playing");
 	case C::Confirm:
 		if (State.PendingConfirmation == ETallowMenuAction::Start) return LOCTEXT("ConfirmStart", "New game");
-		if (State.PendingConfirmation == ETallowMenuAction::Restart) return State.bContinueAvailable ? LOCTEXT("ConfirmRestartChapter", "Restart chapter") : LOCTEXT("ConfirmRestart", "Restart this run");
+		if (State.PendingConfirmation == ETallowMenuAction::Restart) return State.bCheckpointSaved ? LOCTEXT("ConfirmRestartCheckpoint", "Back to checkpoint") : State.bContinueAvailable ? LOCTEXT("ConfirmRestartChapter", "Restart chapter") : LOCTEXT("ConfirmRestart", "Restart this run");
 		if (State.PendingConfirmation == ETallowMenuAction::Quit) return LOCTEXT("ConfirmQuit", "Quit game");
 		return LOCTEXT("ConfirmMenu", "Return to main menu");
 	default: return FText::GetEmpty();

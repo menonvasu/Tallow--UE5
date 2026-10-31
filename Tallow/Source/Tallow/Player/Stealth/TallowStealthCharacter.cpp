@@ -310,6 +310,13 @@ void ATallowStealthCharacter::UpdateAwarenessFeedback(float DeltaSeconds)
     }
 }
 
+void ATallowStealthCharacter::ClearKeeperAwareness()
+{
+    Super::ClearKeeperAwareness();
+    bSeenByHunter = false; HunterAwareness = 0.f; HunterAlertUntil = 0.f; WatchedLook = 0.f;
+    if (LookParams) UKismetMaterialLibrary::SetScalarParameterValue(this, LookParams, TEXT("Watched"), 0.f);
+}
+
 void ATallowStealthCharacter::UpdatePresentation(float DeltaSeconds)
 {
     if (!Presentation.IsValid())

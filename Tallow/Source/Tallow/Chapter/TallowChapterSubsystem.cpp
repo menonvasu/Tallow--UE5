@@ -144,6 +144,9 @@ void UTallowChapterSubsystem::Activate(ATallowPlayDirector* InDirector)
     {
         bAwaitingNavigation=true; PendingBuildReason=Reason; NavigationWaitStarted=GetWorld()->GetTimeSeconds();
         SetMimForm(ETallowMimForm::Absent); SetBeatInputLocked(true);
+        // Continuing to a checkpoint: not a glimpse of the opening chair (or its meter) before she is put back there.
+        bHoldViewForResume = Reason == ETallowRestartReason::Continue && Campaign.Checkpoint != ETallowCheckpoint::None;
+        if (bHoldViewForResume) Chair->SetMinigameReady(false);
         UE_LOG(LogTemp,Display,TEXT("TALLOW_CHAPTER waiting-for-navigation"));
     }
     else BuildRound(Reason);
@@ -222,6 +225,7 @@ bool UTallowChapterSubsystem::BuildRound(ETallowRestartReason Reason)
     HandledEvents.Reset(); bWaitingForRoom = false; bWritingDone = false;
     bHuntStartPending = false; bChairRoomCommitted = false; bChairUnavailable = false;
     SetMimForm(ETallowMimForm::Absent);
+    ResetHunterForRound();
     auto* Doors = UTallowDoorLayoutSubsystem::Get(this);
     const FName StartRoom = TallowHouseRooms::RoomAt(Def->bStartsInChair ? Chair->GetStartTransform().GetLocation() : GetChapterStart().GetLocation());
     SolverInput = {}; if (Doors) Doors->GatherSolverInput(StartRoom, SolverInput);
@@ -258,6 +262,11 @@ bool UTallowChapterSubsystem::BuildRound(ETallowRestartReason Reason)
     if (Layout.ChairRoom.IsNone()) Layout.ChairRoom = StartRoom;
     if (Doors) { Doors->SetChapterControl(true); Doors->ApplyLayout(Layout); }
     if (auto* Battery = UTallowBatteryLoopSubsystem::Get(this)) Battery->PrepareRound(Layout, Campaign.InstalledFuses, CampaignDef->GetBatteryChapterCount(), Def->BatteryNoun);
+    if (Reason == ETallowRestartReason::NewCampaign || Reason == ETallowRestartReason::NextChapter) ClearCheckpoint();
+    // A retry, a capture or Continue past a checkpoint picks up there (RestoreCheckpoint, once the round is built).
+    const bool bResume = (Reason == ETallowRestartReason::Caught || Reason == ETallowRestartReason::Continue
+        || Reason == ETallowRestartReason::Recovery || Reason == ETallowRestartReason::Debug)
+        && Def->Kind == ETallowChapterKind::Hunt && Campaign.Checkpoint != ETallowCheckpoint::None && Campaign.CheckpointChapter == Campaign.ChapterIndex;
     if (Reason == ETallowRestartReason::NextChapter) Campaign.Resources = FTallowChapterResources::ForNewChapter(Carried, Def->Resources);
     else if (Reason == ETallowRestartReason::NewCampaign) Campaign.Resources = FTallowChapterResources::ForNewChapter(Campaign.Resources, Def->Resources);
     PlaceResources(Campaign.Resources);
@@ -265,7 +274,8 @@ bool UTallowChapterSubsystem::BuildRound(ETallowRestartReason Reason)
     { It->ResetForRound(); It->SetAvailable(*It == FindNamed(Layout.StoryObject)); }
     Chair->ReleasePlayerQuietly();
     Chair->SetActorTransform(Chair->GetStartTransform(), false, nullptr, ETeleportType::TeleportPhysics);
-    if (Def->bStartsInChair)
+    // A resumed round never sits her in the opening chair: the checkpoint puts her where it was taken.
+    if (Def->bStartsInChair && !bResume)
     {
         Chair->SetActorTransform(Chair->GetStartTransform(), false, nullptr, ETeleportType::TeleportPhysics);
         Chair->SetRequiredRocks(Def->FirstChairRocks); Chair->TiePlayerToChair(Player);
@@ -317,11 +327,14 @@ bool UTallowChapterSubsystem::BuildRound(ETallowRestartReason Reason)
         if (auto* Save = UTallowSaveSubsystem::Get(this)) Save->SaveCampaign(Campaign);
     Phase = ETallowChapterPhase::None;
     if (Def->Kind == ETallowChapterKind::Final) RequestBeat(ETallowChapterBeat::FinalIntro);
-    else SetPhase(Def->bStartsInChair ? ETallowChapterPhase::InitialRestraint : ETallowChapterPhase::Exploration, TEXT("BuildRound"));
+    else if (!bResume) SetPhase(Def->bStartsInChair ? ETallowChapterPhase::InitialRestraint : ETallowChapterPhase::Exploration, TEXT("BuildRound"));
     OnRoundReset.Broadcast(Campaign.ChapterIndex, Reason);
     OnChapterEvent.Broadcast(Reason == ETallowRestartReason::NewCampaign || Reason == ETallowRestartReason::NextChapter ? ETallowChapterEvent::ChapterStarted : ETallowChapterEvent::RoundRebuilt, Def->ChapterId);
     CommittedCampaign=Campaign; CommittedLayout=Layout; bHasCommittedRound=true;
-    UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAPTER rebuilt ch=%d seed=%d reason=%d"), Campaign.ChapterIndex, Campaign.ChapterSeed, int32(Reason));
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAPTER rebuilt ch=%d seed=%d reason=%d checkpoint=%d"), Campaign.ChapterIndex, Campaign.ChapterSeed, int32(Reason), bResume ? int32(Campaign.Checkpoint) : 0);
+    // After OnRoundReset, which ends any staged beat: the chair checkpoint requests one of its own.
+    if (bResume && !RestoreCheckpoint(Reason))
+        SetPhase(Def->bStartsInChair ? ETallowChapterPhase::InitialRestraint : ETallowChapterPhase::Exploration, TEXT("BuildRound"));
     return true;
 }
 void UTallowChapterSubsystem::PersistDiscoveries()
@@ -413,7 +426,7 @@ void UTallowChapterSubsystem::NotifyEvent(ETallowChapterEvent Event, FName Detai
     if (Event == E::Caught) { BeatState.Reset(); SetBeatInputLocked(false); }
     SetPhase(Next, FName(*StaticEnum<ETallowChapterEvent>()->GetNameStringByValue(int64(Event))));
     HandledEvents.Add(Event); OnChapterEvent.Broadcast(Event, Detail);
-    if (Next == P::ActiveHunt && Event == E::ChairEscaped) StartHunt();
+    if (Next == P::ActiveHunt && Event == E::ChairEscaped) { StartHunt(); RecordCheckpoint(ETallowCheckpoint::Hunt); }
     if (Next == P::FuseSequence) RequestBeat(ETallowChapterBeat::FuseEvent);
     if (Next == P::FinalSequence)
     { Campaign.bComplete=true; if (auto* Save=UTallowSaveSubsystem::Get(this)) Save->MarkCampaignComplete(); SetMimForm(ETallowMimForm::Absent); }
@@ -501,6 +514,8 @@ void UTallowChapterSubsystem::ApplyBeatCut(const FTallowBeatContext& Context)
     {
         CloseOverlays(); ChosenChairTransform=Context.ChairTransform; Chair->ReleasePlayerQuietly();
         Chair->SetActorTransform(ChosenChairTransform,false,nullptr,ETeleportType::TeleportPhysics);
+        // Its meter and key stay hidden, and rocking does nothing, until Mim has gone (the release beat's end).
+        Chair->SetMinigameReady(false);
         Chair->SetRequiredRocks(GetChapterDefinition()->RestraintChairRocks); Chair->TiePlayerToChair(Player);
         auto* Candle=Player->GetCandleComponent();
         Candle->RestoreForChapter(Candle->IsAcquired(),Candle->GetWaxFraction(),Candle->GetMatchCount(),ECandleState::Out);
@@ -514,6 +529,7 @@ void UTallowChapterSubsystem::ApplyBeatCut(const FTallowBeatContext& Context)
                 Candle->RestoreForChapter(false,Candle->GetWaxFraction(),Candle->GetMatchCount(),ECandleState::Out);
             }
         }
+        RecordCheckpoint(ETallowCheckpoint::Chair);
         break;
     }
     case ETallowChapterBeat::HuntRelease: SetMimForm(ETallowMimForm::Absent); break;
@@ -543,6 +559,10 @@ void UTallowChapterSubsystem::NotifyBeatFinished(ETallowChapterBeat Beat, int32 
         SetPhase(ETallowChapterPhase::Restraint,TEXT("TransformationFinished")); RequestBeat(ETallowChapterBeat::Restraint); break;
     case ETallowChapterBeat::Restraint:
         SetPhase(ETallowChapterPhase::HuntPreparation,TEXT("RestraintFinished")); RequestBeat(ETallowChapterBeat::HuntRelease); break;
+    case ETallowChapterBeat::HuntRelease:
+        // Mim has gone and the beat has let go of her: now the chair's meter and key fade in.
+        if (Chair && Director->GetPlayerCharacter()->IsTiedToChair()) Chair->SetMinigameReady(true);
+        break;
     case ETallowChapterBeat::FuseEvent:
         SetPhase(ETallowChapterPhase::ChapterTransition,TEXT("FuseEventFinished")); RequestBeat(ETallowChapterBeat::ChapterReset); break;
     case ETallowChapterBeat::FinalIntro: SetPhase(ETallowChapterPhase::ActiveHunt,TEXT("FinalIntroFinished")); break;
@@ -712,6 +732,7 @@ bool UTallowChapterSubsystem::JumpToChapter(int32 Index, ETallowChapterPhase Tar
     Campaign.InstalledFuses=FMath::Min(Index,CampaignDef->GetBatteryChapterCount());
     // A jump skips the chapter that would have recorded the doors to keep, so the jumped round rolls its own.
     Campaign.History.PreviousDoors.Reset(); Campaign.History.PreviousDoorHash=0;
+    ClearCheckpoint();
     if (!BuildRound(ETallowRestartReason::Debug)) return false;
     if (Target!=ETallowChapterPhase::None && Target!=ETallowChapterPhase::Paused)
     {
@@ -728,9 +749,19 @@ void UTallowChapterSubsystem::Tick(float DeltaTime)
     if (bAwaitingNavigation)
     {
         if (!UNavigationSystemV1::IsNavigationBeingBuilt(GetWorld()))
-        { bAwaitingNavigation=false; bActive=true; BuildRound(PendingBuildReason); }
+        {
+            bAwaitingNavigation=false; bActive=true; BuildRound(PendingBuildReason);
+            if (bHoldViewForResume)
+            {
+                bHoldViewForResume=false;
+                if (auto* PC=UGameplayStatics::GetPlayerController(this,0); PC && PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.f,0.f,1.2f,FColor::Black,false,false);
+            }
+        }
         else if (GetWorld()->GetTimeSeconds()-NavigationWaitStarted>15.f)
-        { bAwaitingNavigation=false; SetBeatInputLocked(false); UE_LOG(LogTemp,Error,TEXT("TALLOW_CHAPTER build-failed navigation unavailable")); }
+        {
+            bAwaitingNavigation=false; SetBeatInputLocked(false); UE_LOG(LogTemp,Error,TEXT("TALLOW_CHAPTER build-failed navigation unavailable"));
+            if (bHoldViewForResume) { bHoldViewForResume=false; if (auto* PC=UGameplayStatics::GetPlayerController(this,0); PC && PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.f,0.f,1.2f,FColor::Black,false,false); }
+        }
         return;
     }
     if (!bActive || bRebuilding || bBuildFailed || UGameplayStatics::IsGamePaused(this)) return;
@@ -878,3 +909,106 @@ FString UTallowChapterSubsystem::DescribeState() const
     const auto* Pacing=GetWorld()->GetSubsystem<UTallowHunterDirector>();
     return FString::Printf(TEXT("TALLOW_CHAPTER ch=%d phase=%d serial=%d campaign=%d seed=%d attempt=%d story=%s chair=%s battery=%s beat=%d mim=%d act=%d tension=%d aggression=%.3f walk=%.0f\n%s"),Campaign.ChapterIndex,int32(Phase),Serial,Campaign.CampaignSeed,Campaign.ChapterSeed,Campaign.Attempt,*Layout.StoryObject.ToString(),*Layout.ChairRoom.ToString(),*Layout.BatterySpot.ToString(),int32(BeatState.Context.Beat),int32(MimForm),Pacing ? int32(Pacing->GetAct()) : -1,Pacing ? int32(Pacing->GetPhase()) : -1,Pacing ? Pacing->GetAggression() : 0.f,Pacing ? Pacing->GetWalkingDistance() : 0.f,*BuildRoundFingerprint());
 }
+
+void UTallowChapterSubsystem::ResetHunterForRound()
+{
+    auto* Keeper = Director ? Director->GetKeeper() : nullptr;
+    if (auto* Hunter = Keeper ? Cast<ATallowHunterAIController>(Keeper->GetController()) : nullptr) Hunter->ResetForRound();
+    else if (auto* Player = Director ? Director->GetPlayerCharacter() : nullptr) Player->ClearKeeperAwareness();
+}
+void UTallowChapterSubsystem::SetPhaseDirect(ETallowChapterPhase Next, FName Reason)
+{
+    const auto Old = Phase;
+    Phase = Next; ++Serial; PhaseStartedAt = GetWorld()->GetTimeSeconds(); HandledEvents.Reset();
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CHAPTER ch=%d phase=%d->%d serial=%d reason=%s"), Campaign.ChapterIndex,int32(Old),int32(Next),Serial,*Reason.ToString());
+    if (auto* Scares = UTallowScareDirector::Get(this)) Scares->SetPhase(Phase);
+    OnPhaseChanged.Broadcast(Old, Phase);
+}
+void UTallowChapterSubsystem::ClearCheckpoint()
+{
+    Campaign.Checkpoint = ETallowCheckpoint::None; Campaign.CheckpointChapter = -1;
+    Campaign.CheckpointChairRoom = Campaign.CheckpointChairSpot = NAME_None;
+    Campaign.CheckpointChairTransform = FTransform::Identity; Campaign.bCheckpointCandleBesideChair = false;
+}
+void UTallowChapterSubsystem::RecordCheckpoint(ETallowCheckpoint Kind)
+{
+    const auto* Def = GetChapterDefinition();
+    auto* Player = Director ? Director->GetPlayerCharacter() : nullptr;
+    if (!Def || !Player || Def->Kind != ETallowChapterKind::Hunt || Kind == ETallowCheckpoint::None) return;
+    Campaign.Checkpoint = Kind; Campaign.CheckpointChapter = Campaign.ChapterIndex;
+    Campaign.CheckpointChairRoom = Layout.ChairRoom; Campaign.CheckpointChairSpot = Layout.ChairSpot;
+    Campaign.CheckpointChairTransform = ChosenChairTransform;
+    // What she has now, not what she had at the chapter's start: the matches she found, the map, the crowbar.
+    Campaign.Resources = FTallowChapterResources::Capture(Player);
+    const auto* Pickup = One<ATallowCandlePickup>(this);
+    Campaign.bCheckpointCandleBesideChair = Def->RestraintCandle == ETallowRestraintCandle::PlaceBesideChair && !Campaign.Resources.bHasCandle
+        && Pickup && !Pickup->IsHidden();
+    if (auto* Story = GetWorld()->GetGameInstance()->GetSubsystem<UTallowStorySubsystem>()) Campaign.LoreRead = Story->GetReadKeys();
+    if (auto* Search = UTallowRoomSearchSubsystem::Get(this)) Campaign.VisitedRooms = Search->GetVisited();
+    // A rejected rebuild falls back to this, so it must hold the checkpoint too.
+    CommittedCampaign = Campaign;
+    bool bSaved = false;
+    if (!bUsingContractLayout) if (auto* Save = UTallowSaveSubsystem::Get(this)) bSaved = Save->SaveCampaign(Campaign);
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CHECKPOINT reached %s ch=%d room=%s spot=%s matches=%d candle=%d beside=%d saved=%d"),
+        Kind == ETallowCheckpoint::Chair ? TEXT("chair") : TEXT("hunt"), Campaign.ChapterIndex, *Layout.ChairRoom.ToString(), *Layout.ChairSpot.ToString(),
+        Campaign.Resources.Matches, Campaign.Resources.bHasCandle ? 1 : 0, Campaign.bCheckpointCandleBesideChair ? 1 : 0, bSaved ? 1 : 0);
+}
+void UTallowChapterSubsystem::StageMimAtChair(const FTransform& ChairTransform)
+{
+    // Where the transformation left her: standing over the chair, facing Nell.
+    auto* Keeper = Director->GetKeeper(); auto* Player = Director->GetPlayerCharacter();
+    if (!Keeper || !Player) return;
+    float Clearance; FString Problem; FVector Mim;
+    FVector At = ChairTransform.GetLocation() + ChairTransform.GetRotation().GetForwardVector() * 220.f + FVector(0, 0, 100);
+    if (ATallowChairSpot::ValidatePlacement(GetWorld(), Chair, ChairTransform, true, Clearance, Problem, &Mim)) At = Mim;
+    Keeper->SetActorLocation(At, false, nullptr, ETeleportType::TeleportPhysics);
+    Keeper->SetActorRotation((Player->GetActorLocation() - At).GetSafeNormal2D().Rotation());
+}
+bool UTallowChapterSubsystem::RestoreCheckpoint(ETallowRestartReason Reason)
+{
+    const auto* Def = GetChapterDefinition();
+    auto* Player = Director ? Director->GetPlayerCharacter() : nullptr;
+    if (!Def || !Player || !Chair) return false;
+    const ETallowCheckpoint Kind = Campaign.Checkpoint;
+    // The tape has played and the writing is on the wall: none of the chapter's opening runs again.
+    bWritingDone = true; bWaitingForRoom = false; bChairRoomCommitted = true;
+    if (!Campaign.CheckpointChairRoom.IsNone()) Layout.ChairRoom = Campaign.CheckpointChairRoom;
+    if (!Campaign.CheckpointChairSpot.IsNone()) Layout.ChairSpot = Campaign.CheckpointChairSpot;
+    ChosenChairTransform = Campaign.CheckpointChairTransform.GetLocation().IsNearlyZero() ? ResolveChairTransform() : Campaign.CheckpointChairTransform;
+    for (TActorIterator<ATallowStoryObject> It(GetWorld()); It; ++It) It->SetAvailable(false);
+    if (Campaign.bCheckpointCandleBesideChair && !Campaign.Resources.bHasCandle)
+        if (auto* Pickup = One<ATallowCandlePickup>(this))
+        {
+            FVector Where = ChosenChairTransform.TransformPosition(FVector(40, 65, 0));
+            if (auto* Spot = Cast<ATallowChairSpot>(FindNamed(Layout.ChairSpot))) Where = Spot->CandlePlace->GetComponentLocation();
+            Pickup->SetActorLocation(Where); Pickup->SetTakenForChapter(false);
+        }
+    Chair->ReleasePlayerQuietly();
+    Chair->SetActorTransform(ChosenChairTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    if (Kind == ETallowCheckpoint::Chair)
+    {
+        // Tied again where the transformation left her, Mim over her. The release beat sends Mim away, then the chair
+        // game fades in (NotifyBeatFinished).
+        Chair->SetMinigameReady(false);
+        Chair->SetRequiredRocks(Def->RestraintChairRocks); Chair->TiePlayerToChair(Player);
+        SetMimForm(ETallowMimForm::Full);
+        StageMimAtChair(ChosenChairTransform);
+        SetPhaseDirect(ETallowChapterPhase::HuntPreparation, TEXT("CheckpointChair"));
+        RequestBeat(ETallowChapterBeat::HuntRelease);
+    }
+    else
+    {
+        // Out of the chair, where she stepped from it, and the chase begins again.
+        Chair->TiePlayerToChair(Player); Chair->ReleasePlayerQuietly();
+        const FTransform Exit = Chair->GetExitTransform();
+        Player->TeleportTo(Exit.GetLocation(), Exit.Rotator(), false, true);
+        if (auto* PC = Player->GetController<APlayerController>()) PC->SetControlRotation(Exit.Rotator());
+        SetPhaseDirect(ETallowChapterPhase::ActiveHunt, TEXT("CheckpointHunt"));
+        StartHunt();
+    }
+    UE_LOG(LogTemp, Display, TEXT("TALLOW_CHECKPOINT restored %s reason=%d ch=%d room=%s matches=%d candle=%d"),
+        Kind == ETallowCheckpoint::Chair ? TEXT("chair") : TEXT("hunt"), int32(Reason), Campaign.ChapterIndex, *Layout.ChairRoom.ToString(),
+        Campaign.Resources.Matches, Campaign.Resources.bHasCandle ? 1 : 0);
+    return true;
+}
+

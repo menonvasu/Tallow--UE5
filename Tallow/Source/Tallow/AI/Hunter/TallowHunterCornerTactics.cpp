@@ -169,8 +169,8 @@ bool ATallowHunterAIController::UpdateCornerTactics(float Now)
                 }
                 bWalls &= Grips >= (bLoose ? 7 : 9);
             }
-            if (bWalls) Candidates.Add({Corner, A, B, Exposure + .001f * FVector::Dist2D(Here, Corner)
-                + .0005f * FVector::Dist2D(EvidenceLocation, Corner)});
+            if (bWalls) Candidates.Add({Corner, A, B, float(Exposure + .001f * FVector::Dist2D(Here, Corner)
+                + .0005f * FVector::Dist2D(EvidenceLocation, Corner))});
             else ++NoBrace;
         }
     }
