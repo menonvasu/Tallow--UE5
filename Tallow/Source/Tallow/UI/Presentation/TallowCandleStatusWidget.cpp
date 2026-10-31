@@ -34,7 +34,8 @@ void UTallowCandleStatusWidget::ConfigureReview(ETallowCandleFuelStage InStage, 
 {bReview=true;ReviewStage=InStage;bReviewLit=bLit;}
 #endif
 
-bool UTallowCandleStatusWidget::IsShown() const {return bReview||(Candle.IsValid()&&Candle->IsAcquired()&&!Candle->IsGivenUp());}
+// The wax plate only means something while the candle burns down (off since 31 Oct), so it stays hidden.
+bool UTallowCandleStatusWidget::IsShown() const {return bReview||(Candle.IsValid()&&Candle->bBurnsDown&&Candle->IsAcquired()&&!Candle->IsGivenUp());}
 bool UTallowCandleStatusWidget::IsLit() const {return bReview?bReviewLit:Candle.IsValid()&&Candle->GetCandleState()!=ECandleState::Out;}
 ETallowCandleFuelStage UTallowCandleStatusWidget::Stage() const {return bReview?ReviewStage:Candle.IsValid()?Candle->GetFuelStage():ETallowCandleFuelStage::Out;}
 TSharedRef<SWidget> UTallowCandleStatusWidget::RebuildWidget()

@@ -44,6 +44,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Candle") bool IsRelighting() const { return GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(RelightTimerHandle); }
 	UFUNCTION(BlueprintPure, Category="Candle|Wax") ETallowCandleFuelStage GetFuelStage() const;
 	UFUNCTION(BlueprintCallable, Category="Candle|Wax") void AddWax(float Fraction);
+	/** 31 Oct: off. The candle never burns down; matches are the only thing she can run out of. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Candle|Wax") bool bBurnsDown = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Candle|Wax", meta=(ClampMin="1")) float BurnDurationSeconds = 600.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Candle|Wax", meta=(ClampMin="0.1",ClampMax="1")) float CuppedBurnMultiplier = .6f;
 	UPROPERTY(BlueprintAssignable, Category="Candle|Events") FOnCandleFuelChanged OnFuelChanged;
