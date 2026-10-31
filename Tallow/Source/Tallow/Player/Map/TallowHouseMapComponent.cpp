@@ -49,6 +49,8 @@ void UTallowHouseMapComponent::TickComponent(float Dt,ELevelTick T,FActorCompone
 {
  Super::TickComponent(Dt,T,F);if(!Player.IsValid())return;
  const FName Here=GetCurrentRoom();if(!Here.IsNone())Discovered.Add(Here);
+ if(const FName Mark=GetMarkedRoom();Mark!=LoggedMark)
+ {LoggedMark=Mark;UE_LOG(LogTemp,Display,TEXT("TALLOW_MAP marked room=%s"),Mark.IsNone()?TEXT("none"):*Mark.ToString());}
  const FVector Eye=Player->GetFirstPersonCameraComponent()->GetComponentLocation();
  FCollisionQueryParams Q(SCENE_QUERY_STAT(HouseMapDoor),false,Player.Get());
  for(TActorIterator<ATallowDoor>It(GetWorld());It;++It)
@@ -79,9 +81,28 @@ void UTallowHouseMapComponent::ToggleMap()
 void UTallowHouseMapComponent::OnCaught(){if(Widget)Widget->Close(true);}
 void UTallowHouseMapComponent::PlayGesture(bool bPuttingAway)
 {TActorIterator<ATallowPlayDirector>It(GetWorld());if(It)It->PlayMapGesture(bPuttingAway);}
+FName UTallowHouseMapComponent::GetMarkedRoom()const
+{
+ const auto* Chapters=UTallowChapterSubsystem::GetActive(this);if(!Chapters)return NAME_None;
+ ETallowGuideKind Kind;const AActor* Objective=Chapters->GetGuideObjective(Kind);
+ return Objective?TallowHouseRooms::RoomAt(Objective->GetActorLocation()):NAME_None;
+}
 FString UTallowHouseMapComponent::GetClue()const
 {
- if (const auto* Chapters = UTallowChapterSubsystem::GetActive(this)) { const FText Clue = Chapters->GetMapClue(); if (!Clue.IsEmpty()) return Clue.ToString(); }
+ if (const auto* Chapters = UTallowChapterSubsystem::GetActive(this))
+ {
+  const FText Clue = Chapters->GetMapClue(); if (!Clue.IsEmpty()) return Clue.ToString();
+  // 31 Oct: the map names the room, never the spot in it. It knows the room too (UTallowHunterDirector::TakeGuardHint).
+  ETallowGuideKind Kind; const AActor* Objective = Chapters->GetGuideObjective(Kind);
+  if (const FTallowRoomDef* Room = Objective ? TallowHouseRooms::Find(TallowHouseRooms::RoomAt(Objective->GetActorLocation())) : nullptr)
+  {
+   const TCHAR* Floors[] = {TEXT("in the cellar"), TEXT("on the ground floor"), TEXT("upstairs")};
+   const FString Where = FString::Printf(TEXT("%s,\n%s."), *Room->Label, Floors[FMath::Clamp(Room->Floor, 0, 2)]);
+   if (Kind == ETallowGuideKind::Tape) return TEXT("something is hissing.\na tape, waiting for me.\n\n") + Where;
+   if (Kind == ETallowGuideKind::Battery) return TEXT("the battery hums.\ni circled where.\n\n") + Where + TEXT("\n\nit goes there too.\nwait for it to pass.");
+   if (Kind == ETallowGuideKind::FuseBox) return TEXT("take it to the humming box.\n\n") + Where + TEXT("\n\nit knows where i am going.");
+  }
+ }
  TActorIterator<ATallowFuseBox>Box(GetWorld());const int32 Fitted=Box?Box->CurrentFuses:0;
  if(Fitted>=3)
  {

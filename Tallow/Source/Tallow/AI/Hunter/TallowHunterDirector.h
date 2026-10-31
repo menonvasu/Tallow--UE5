@@ -174,6 +174,9 @@ public:
 private:
     void SetPhase(ETallowTensionPhase NewPhase, float Now);
     float ClampAggression(float Value) const;
+    /** The guard (31 Oct): now and then it walks through the room that holds what she needs next, then moves on. */
+    bool TakeGuardHint(ATallowCreature* Keeper, ATallowCharacter* Player, FVector& OutArea);
+    float NextGuardAt = 0.f;
     float PhaseStartedAt = 0.f;
     float PhaseUntil = 0.f;
     float PendingRelaxAt = -1.f;

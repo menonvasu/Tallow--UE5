@@ -27,6 +27,8 @@ public:
  FName GetCurrentRoom()const;
  bool KnowsRoom(FName Id)const;
  FString GetClue()const;
+ /** The room the map circles (31 Oct): where the chapter's tape, battery or humming box is. None when nothing waits. */
+ FName GetMarkedRoom()const;
  static const TArray<FTallowMapRoom>& Rooms();
  const TArray<TWeakObjectPtr<ATallowDoor>>& GetKnownDoors()const{return KnownDoors;}
  void PlayGesture(bool bPuttingAway);
@@ -37,4 +39,5 @@ private:
  TSet<FName>Discovered;
  TArray<TWeakObjectPtr<ATallowDoor>>KnownDoors;
  bool bCollected=false;
+ FName LoggedMark;
 };
